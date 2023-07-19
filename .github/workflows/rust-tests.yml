@@ -1,0 +1,41 @@
+#
+# Rust Test Suite
+#
+# This workflow builds the project via Cargo, configures a suitable test
+# environment, and then runs the test-suite defined in Cargo.
+#
+
+name: "Rust Test Suite"
+
+on:
+  pull_request:
+  push:
+    branches-ignore: ["pr/**"]
+    tags: ["**"]
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: "bash"
+
+jobs:
+  unittest:
+    name: "Unittest - rust-${{ matrix.rust }}@${{ matrix.os }}"
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest"]
+        rust: ["nightly", "stable"]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: "Fetch Sources"
+      uses: actions/checkout@v3
+    - name: "Install Rust Components"
+      run: rustup default "${{ matrix.rust }}"
+    - name: "Build Project"
+      run: cargo build --verbose --all-targets
+    - name: "Run Tests"
+      run: cargo test --verbose

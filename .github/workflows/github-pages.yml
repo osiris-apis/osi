@@ -1,0 +1,61 @@
+name: "Github Pages"
+
+on:
+  pull_request:
+  push:
+    branches-ignore: ["pr/**"]
+    tags: ["**"]
+  workflow_dispatch:
+
+concurrency:
+  cancel-in-progress: false
+  group: "github-pages"
+
+defaults:
+  run:
+    shell: "bash"
+
+jobs:
+  build:
+    name: "Build Project Pages"
+
+    runs-on: "ubuntu-latest"
+
+    steps:
+    - name: "Fetch Sources"
+      uses: actions/checkout@v3
+    - name: "Setup Pages"
+      uses: actions/configure-pages@v3
+    - name: "Prepare build"
+      run: mkdir "./pages"
+
+    - name: "Build Rust Documentation"
+      uses: osiris-apis/plumbing/lib/actions/cargo-doc@main
+
+    - name: "Assemble Pages"
+      run: cp -r "./target/doc" "./pages/doc"
+    - name: "Upload pages"
+      uses: actions/upload-pages-artifact@v1
+      with:
+        path: './pages'
+
+  deploy:
+    name: "Deploy Pages to Github"
+
+    environment:
+      name: "github-pages"
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    if: github.event_name == 'workflow_dispatch'
+    needs: "build"
+
+    permissions:
+      id-token: "write"
+      pages: "write"
+
+    runs-on: "ubuntu-latest"
+
+    steps:
+    - name: "Deploy Pages"
+      id: deploy
+      uses: actions/deploy-pages@v2
