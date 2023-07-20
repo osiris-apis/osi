@@ -80,6 +80,8 @@
 )))]
 compile_error!("Target platform has an unsupported pointer-width.");
 
+pub mod util;
+
 #[cfg(test)]
 mod tests {
     use core::mem::{align_of, size_of};
