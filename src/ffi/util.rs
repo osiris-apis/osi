@@ -71,6 +71,15 @@ pub struct PhantomAlign32 {}
 #[repr(C, align(8))]
 pub struct PhantomAlign64 {}
 
+/// ## A 128-bit aligned ZST
+///
+/// This type can be used to align structures to at least 128-bit by
+/// embedding it in the structure. It works similar to other phantom-marker
+/// types.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(C, align(16))]
+pub struct PhantomAlign128 {}
+
 /// ## Value Selector based on Address Size
 ///
 /// Return either of the arguments, depending on the pointer-width of the
@@ -110,10 +119,12 @@ mod tests {
         assert_eq!(align_of::<PhantomAlign16>(), 2);
         assert_eq!(align_of::<PhantomAlign32>(), 4);
         assert_eq!(align_of::<PhantomAlign64>(), 8);
+        assert_eq!(align_of::<PhantomAlign128>(), 16);
         assert_eq!(size_of::<PhantomAlign8>(), 0);
         assert_eq!(size_of::<PhantomAlign16>(), 0);
         assert_eq!(size_of::<PhantomAlign32>(), 0);
         assert_eq!(size_of::<PhantomAlign64>(), 0);
+        assert_eq!(size_of::<PhantomAlign128>(), 0);
     }
 
     // Verify `v32_v64()` selects correctly
