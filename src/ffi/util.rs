@@ -99,8 +99,8 @@ pub struct PhantomAlign128 {}
 #[repr(C)]
 pub struct Ptr<ADDR, ALIGN, TARGET>
 where
-    ADDR: Clone + Copy + core::fmt::Debug + Eq + core::hash::Hash + Ord + PartialEq + PartialOrd,
-    ALIGN: Clone + Copy + core::fmt::Debug + Eq + core::hash::Hash + Ord + PartialEq + PartialOrd,
+    ADDR: Copy,
+    ALIGN: Copy,
     TARGET: ?Sized,
 {
     addr: ADDR,
@@ -163,8 +163,8 @@ where
 
 impl<ADDR, ALIGN, TARGET> Ptr<ADDR, ALIGN, TARGET>
 where
-    ADDR: Clone + Copy + core::fmt::Debug + Eq + core::hash::Hash + Ord + PartialEq + PartialOrd,
-    ALIGN: Clone + Copy + core::fmt::Debug + Eq + core::hash::Hash + Ord + PartialEq + PartialOrd,
+    ADDR: Copy,
+    ALIGN: Copy,
     TARGET: ?Sized,
 {
     /// ## Create new instance
@@ -202,8 +202,8 @@ where
 // Implement natural conversion from address to pointer.
 impl<ADDR, ALIGN, TARGET> From<ADDR> for Ptr<ADDR, ALIGN, TARGET>
 where
-    ADDR: Clone + Copy + core::fmt::Debug + Eq + core::hash::Hash + Ord + PartialEq + PartialOrd,
-    ALIGN: Clone + Copy + core::fmt::Debug + Eq + core::hash::Hash + Ord + PartialEq + PartialOrd,
+    ADDR: Copy,
+    ALIGN: Copy,
     TARGET: ?Sized,
 {
     #[inline]
