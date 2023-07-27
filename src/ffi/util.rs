@@ -107,6 +107,92 @@ where
     fn to_le(self) -> Self;
 }
 
+/// ## Types of Fixed Endianness
+///
+/// This trait annotates types that have values of fixed endianness regardless
+/// of the target platform endianness. It allows converting values of such
+/// types to the native representation, and vice-versa. If the endianness
+/// happens to match the endianness of the target platform, all accessors will
+/// pass values through unmodified.
+///
+/// The trait-generic `Raw` defines the type of the native representation. It
+/// must be suitable to represent native **and** foreign values. Furthermore,
+/// the trait is designed for `Copy` types (in particular primitive integers).
+/// Bigger or more complex types are not suitable.
+///
+/// Safety
+/// ------
+///
+/// This trait requires the implementation to guarantee its size and alignment
+/// match that of `Raw`, and it must support transmuting from `Raw`. This
+/// allows users to create values of this type by simply transmuting a value of
+/// type `Raw`. Since `Raw` represents both foreign and native values, special
+/// care is required if the memory representation of `Raw` contains padding or
+/// other unaccounted bits!
+pub unsafe trait FixedEndian<Raw>
+where
+    Self: Copy,
+    Raw: Copy,
+{
+    /// Create from raw value
+    ///
+    /// Take the raw, possibly foreign-ordered value `raw` and create a
+    /// wrapping object that protects the value from unguarded access. This
+    /// must not modify the raw value in any way.
+    ///
+    /// It is safe to transmute from `Raw` to `Self` instead.
+    fn from_raw(raw: Raw) -> Self;
+
+    /// Return raw value
+    ///
+    /// Return the underlying raw, possibly foreign-ordered value behind this
+    /// wrapping object. The value must be returned without any modifications.
+    ///
+    /// It is safe to transmute from `Self` to `Raw` instead.
+    fn to_raw(self) -> Raw;
+
+    /// Create value from native representation
+    ///
+    /// Create the foreign-ordered value from a native value, converting the
+    /// value before retaining it, if required.
+    fn from_native(native: Raw) -> Self;
+
+    /// Return native representation
+    ///
+    /// Return the native representation of the value behind this wrapping
+    /// object. The value is to be converted to the native representation
+    /// before returning it, if required.
+    fn to_native(self) -> Raw;
+}
+
+/// ## Big-endian Encoded Values
+///
+/// This type represents values encoded as big-endian. It is a simple
+/// wrapping-structure with the same alignment and size requirements as the
+/// type it wraps.
+///
+/// The `FixedEndian` trait is implemented for this type if `Raw` is a
+/// primitive integer. Thus, conversion from and to native endianness is
+/// provided, as well as default values, ordering, and other properties
+/// reliant on the native value.
+#[derive(Clone, Copy)]
+#[repr(transparent)]
+pub struct BigEndian<Raw: Copy>(Raw);
+
+/// ## Little-endian Encoded Values
+///
+/// This type represents values encoded as little-endian. It is a simple
+/// wrapping-structure with the same alignment and size requirements as the
+/// type it wraps.
+///
+/// The `FixedEndian` trait is implemented for this type if `Raw` is a
+/// primitive integer. Thus, conversion from and to native endianness is
+/// provided, as well as default values, ordering, and other properties
+/// reliant on the native value.
+#[derive(Clone, Copy)]
+#[repr(transparent)]
+pub struct LittleEndian<Raw: Copy>(Raw);
+
 /// ## Fixed-size non-NULL Pointers
 ///
 /// This type is designed as alternative to `core::ptr::NonNull` but
@@ -213,6 +299,304 @@ implement_integer!(i32);
 implement_integer!(i64);
 implement_integer!(i128);
 implement_integer!(isize);
+
+// For debugging simply print the raw values.
+impl<Raw> core::fmt::Debug for BigEndian<Raw>
+where
+    Raw: Copy + core::fmt::Debug,
+{
+    fn fmt(
+        &self,
+        fmt: &mut core::fmt::Formatter<'_>,
+    ) -> Result<(), core::fmt::Error> {
+        fmt.debug_tuple("BigEndian")
+           .field(&self.0)
+           .finish()
+    }
+}
+
+unsafe impl<Raw> FixedEndian<Raw> for BigEndian<Raw>
+where
+    Raw: Integer
+{
+    fn from_raw(raw: Raw) -> Self {
+        Self(raw)
+    }
+
+    fn to_raw(self) -> Raw {
+        self.0
+    }
+
+    fn from_native(native: Raw) -> Self {
+        Self::from_raw(native.to_be())
+    }
+
+    fn to_native(self) -> Raw {
+        Raw::from_be(self.to_raw())
+    }
+}
+
+// Get default from native value.
+impl<Raw> Default for BigEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + Default,
+{
+    fn default() -> Self {
+        Self::from_native(Default::default())
+    }
+}
+
+// Convert to native for basic formatting.
+impl<Raw> core::fmt::Display for BigEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + core::fmt::Display,
+{
+    fn fmt(
+        &self,
+        fmt: &mut core::fmt::Formatter<'_>,
+    ) -> Result<(), core::fmt::Error> {
+        <Raw as core::fmt::Display>::fmt(&self.to_native(), fmt)
+    }
+}
+
+// Compare based on native value.
+impl<Raw> Eq for BigEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + Eq,
+{
+}
+
+// Import from native value.
+impl<Raw> From<Raw> for BigEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy,
+{
+    fn from(native: Raw) -> Self {
+        Self::from_native(native)
+    }
+}
+
+// Hash based on native value.
+impl<Raw> core::hash::Hash for BigEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + core::hash::Hash,
+{
+    fn hash<Op>(&self, state: &mut Op)
+    where
+        Op: core::hash::Hasher,
+    {
+        self.to_native().hash(state)
+    }
+}
+
+// Order based on native value.
+impl<Raw> Ord for BigEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + Ord,
+{
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.to_native().cmp(&other.to_native())
+    }
+}
+
+// Compare based on native value.
+impl<Raw> PartialEq for BigEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.to_native().eq(&other.to_native())
+    }
+}
+
+// Compare based on native value.
+impl<Raw> PartialEq<Raw> for BigEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + PartialEq,
+{
+    fn eq(&self, other: &Raw) -> bool {
+        self.to_native().eq(other)
+    }
+}
+
+// Order based on native value.
+impl<Raw> PartialOrd for BigEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        self.to_native().partial_cmp(&other.to_native())
+    }
+}
+
+// Order based on native value.
+impl<Raw> PartialOrd<Raw> for BigEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + PartialOrd,
+{
+    fn partial_cmp(&self, other: &Raw) -> Option<core::cmp::Ordering> {
+        self.to_native().partial_cmp(other)
+    }
+}
+
+// For debugging simply print the raw values.
+impl<Raw> core::fmt::Debug for LittleEndian<Raw>
+where
+    Raw: Copy + core::fmt::Debug,
+{
+    fn fmt(
+        &self,
+        fmt: &mut core::fmt::Formatter<'_>,
+    ) -> Result<(), core::fmt::Error> {
+        fmt.debug_tuple("LittleEndian")
+           .field(&self.0)
+           .finish()
+    }
+}
+
+unsafe impl<Raw> FixedEndian<Raw> for LittleEndian<Raw>
+where
+    Raw: Integer
+{
+    fn from_raw(raw: Raw) -> Self {
+        Self(raw)
+    }
+
+    fn to_raw(self) -> Raw {
+        self.0
+    }
+
+    fn from_native(native: Raw) -> Self {
+        Self::from_raw(native.to_le())
+    }
+
+    fn to_native(self) -> Raw {
+        Raw::from_le(self.to_raw())
+    }
+}
+
+// Get default from native value.
+impl<Raw> Default for LittleEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + Default,
+{
+    fn default() -> Self {
+        Self::from_native(Default::default())
+    }
+}
+
+// Convert to native for basic formatting.
+impl<Raw> core::fmt::Display for LittleEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + core::fmt::Display,
+{
+    fn fmt(
+        &self,
+        fmt: &mut core::fmt::Formatter<'_>,
+    ) -> Result<(), core::fmt::Error> {
+        <Raw as core::fmt::Display>::fmt(&self.to_native(), fmt)
+    }
+}
+
+// Compare based on native value.
+impl<Raw> Eq for LittleEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + Eq,
+{
+}
+
+// Import from native value.
+impl<Raw> From<Raw> for LittleEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy,
+{
+    fn from(native: Raw) -> Self {
+        Self::from_native(native)
+    }
+}
+
+// Hash based on native value.
+impl<Raw> core::hash::Hash for LittleEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + core::hash::Hash,
+{
+    fn hash<Op>(&self, state: &mut Op)
+    where
+        Op: core::hash::Hasher,
+    {
+        self.to_native().hash(state)
+    }
+}
+
+// Order based on native value.
+impl<Raw> Ord for LittleEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + Ord,
+{
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.to_native().cmp(&other.to_native())
+    }
+}
+
+// Compare based on native value.
+impl<Raw> PartialEq for LittleEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.to_native().eq(&other.to_native())
+    }
+}
+
+// Compare based on native value.
+impl<Raw> PartialEq<Raw> for LittleEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + PartialEq,
+{
+    fn eq(&self, other: &Raw) -> bool {
+        self.to_native().eq(other)
+    }
+}
+
+// Order based on native value.
+impl<Raw> PartialOrd for LittleEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        self.to_native().partial_cmp(&other.to_native())
+    }
+}
+
+// Order based on native value.
+impl<Raw> PartialOrd<Raw> for LittleEndian<Raw>
+where
+    Self: FixedEndian<Raw>,
+    Raw: Copy + PartialOrd,
+{
+    fn partial_cmp(&self, other: &Raw) -> Option<core::cmp::Ordering> {
+        self.to_native().partial_cmp(other)
+    }
+}
 
 impl<ADDR, ALIGN, TARGET> Ptr<ADDR, ALIGN, TARGET>
 where
@@ -544,6 +928,27 @@ mod tests {
         assert_eq!(size_of::<PhantomAlign64>(), 0);
         assert_eq!(size_of::<PhantomAlign128>(), 0);
 
+        assert_eq!(size_of::<BigEndian<i8>>(), size_of::<i8>());
+        assert_eq!(align_of::<BigEndian<i8>>(), align_of::<i8>());
+        assert_eq!(size_of::<BigEndian<i16>>(), size_of::<i16>());
+        assert_eq!(align_of::<BigEndian<i16>>(), align_of::<i16>());
+        assert_eq!(size_of::<BigEndian<i32>>(), size_of::<i32>());
+        assert_eq!(align_of::<BigEndian<i32>>(), align_of::<i32>());
+        assert_eq!(size_of::<BigEndian<i64>>(), size_of::<i64>());
+        assert_eq!(align_of::<BigEndian<i64>>(), align_of::<i64>());
+        assert_eq!(size_of::<BigEndian<i128>>(), size_of::<i128>());
+        assert_eq!(align_of::<BigEndian<i128>>(), align_of::<i128>());
+        assert_eq!(size_of::<LittleEndian<i8>>(), size_of::<u8>());
+        assert_eq!(align_of::<LittleEndian<i8>>(), align_of::<u8>());
+        assert_eq!(size_of::<LittleEndian<i16>>(), size_of::<u16>());
+        assert_eq!(align_of::<LittleEndian<i16>>(), align_of::<u16>());
+        assert_eq!(size_of::<LittleEndian<i32>>(), size_of::<u32>());
+        assert_eq!(align_of::<LittleEndian<i32>>(), align_of::<u32>());
+        assert_eq!(size_of::<LittleEndian<i64>>(), size_of::<u64>());
+        assert_eq!(align_of::<LittleEndian<i64>>(), align_of::<u64>());
+        assert_eq!(size_of::<LittleEndian<i128>>(), size_of::<u128>());
+        assert_eq!(align_of::<LittleEndian<i128>>(), align_of::<u128>());
+
         assert_eq!(size_of::<Ptr32<()>>(), 4);
         assert_eq!(align_of::<Ptr32<()>>(), 4);
         assert_eq!(size_of::<Ptr64<()>>(), 8);
@@ -606,5 +1011,194 @@ mod tests {
         assert_eq!(Integer::to_le(1u32), 1u32.to_le());
         assert_eq!(Integer::from_be(1u32).to_be(), 1u32);
         assert_eq!(Integer::from_le(1u32).to_le(), 1u32);
+    }
+
+    // Verify `FixedEndian` on basic types
+    //
+    // Verify that `FixedEndian` is implemented for basic le/be types and has
+    // reasonable method implementations.
+    #[test]
+    fn fixed_endian_implementations() {
+        // Verify existance on BigEndian<...>
+        assert_eq!(
+            BigEndian::<i8>::from_native(1),
+            BigEndian::<i8>::from_raw(1.to_be()),
+        );
+        assert_eq!(
+            BigEndian::<i16>::from_native(1),
+            BigEndian::<i16>::from_raw(1.to_be()),
+        );
+        assert_eq!(
+            BigEndian::<i32>::from_native(1),
+            BigEndian::<i32>::from_raw(1.to_be()),
+        );
+        assert_eq!(
+            BigEndian::<i64>::from_native(1),
+            BigEndian::<i64>::from_raw(1.to_be()),
+        );
+        assert_eq!(
+            BigEndian::<i128>::from_native(1),
+            BigEndian::<i128>::from_raw(1.to_be()),
+        );
+        assert_eq!(
+            BigEndian::<i8>::from_native(1),
+            BigEndian::<i8>::from_raw(1.to_be()),
+        );
+        assert_eq!(
+            BigEndian::<i16>::from_native(1),
+            BigEndian::<i16>::from_raw(1.to_be()),
+        );
+        assert_eq!(
+            BigEndian::<i32>::from_native(1),
+            BigEndian::<i32>::from_raw(1.to_be()),
+        );
+        assert_eq!(
+            BigEndian::<i64>::from_native(1),
+            BigEndian::<i64>::from_raw(1.to_be()),
+        );
+        assert_eq!(
+            BigEndian::<i128>::from_native(1),
+            BigEndian::<i128>::from_raw(1.to_be()),
+        );
+
+        // Verify existance on LittleEndian<...>
+        assert_eq!(
+            LittleEndian::<i8>::from_native(1),
+            LittleEndian::<i8>::from_raw(1.to_le()),
+        );
+        assert_eq!(
+            LittleEndian::<i16>::from_native(1),
+            LittleEndian::<i16>::from_raw(1.to_le()),
+        );
+        assert_eq!(
+            LittleEndian::<i32>::from_native(1),
+            LittleEndian::<i32>::from_raw(1.to_le()),
+        );
+        assert_eq!(
+            LittleEndian::<i64>::from_native(1),
+            LittleEndian::<i64>::from_raw(1.to_le()),
+        );
+        assert_eq!(
+            LittleEndian::<i128>::from_native(1),
+            LittleEndian::<i128>::from_raw(1.to_le()),
+        );
+        assert_eq!(
+            LittleEndian::<i8>::from_native(1),
+            LittleEndian::<i8>::from_raw(1.to_le()),
+        );
+        assert_eq!(
+            LittleEndian::<i16>::from_native(1),
+            LittleEndian::<i16>::from_raw(1.to_le()),
+        );
+        assert_eq!(
+            LittleEndian::<i32>::from_native(1),
+            LittleEndian::<i32>::from_raw(1.to_le()),
+        );
+        assert_eq!(
+            LittleEndian::<i64>::from_native(1),
+            LittleEndian::<i64>::from_raw(1.to_le()),
+        );
+        assert_eq!(
+            LittleEndian::<i128>::from_native(1),
+            LittleEndian::<i128>::from_raw(1.to_le()),
+        );
+
+        // Verify conversions.
+        assert_eq!(
+            BigEndian::<u32>::from_raw(1u32),
+            BigEndian::<u32>(1u32),
+        );
+        assert_eq!(
+            BigEndian::<u32>(1u32).to_raw(),
+            1u32,
+        );
+        assert_eq!(
+            BigEndian::<u32>::from_native(1u32),
+            BigEndian::<u32>(1u32.to_be()),
+        );
+        assert_eq!(
+            BigEndian::<u32>(1u32).to_native(),
+            u32::from_be(1u32),
+        );
+        assert_eq!(
+            LittleEndian::<u32>::from_raw(1u32),
+            LittleEndian::<u32>(1u32),
+        );
+        assert_eq!(
+            LittleEndian::<u32>(1u32).to_raw(),
+            1u32,
+        );
+        assert_eq!(
+            LittleEndian::<u32>::from_native(1u32),
+            LittleEndian::<u32>(1u32.to_le()),
+        );
+        assert_eq!(
+            LittleEndian::<u32>(1u32).to_native(),
+            u32::from_le(1u32),
+        );
+    }
+
+    // Verify `FixedEndian` auto traits
+    //
+    // Verify the validity of the different auto-derived traits for types
+    // that implement `FixedEndian`.
+    #[test]
+    fn fixed_endian_auto_traits() {
+        // `Debug` must print the raw value.
+        assert_eq!(
+            std::format!("{:?}", BigEndian::<u16>(1)),
+            "BigEndian(1)",
+        );
+        assert_eq!(
+            std::format!("{:?}", LittleEndian::<u16>(1)),
+            "LittleEndian(1)",
+        );
+
+        // `Default` uses the native default.
+        assert_eq!(
+            <BigEndian<u16> as Default>::default(),
+            BigEndian::<u16>(0),
+        );
+        assert_eq!(
+            <LittleEndian<u16> as Default>::default(),
+            LittleEndian::<u16>(0),
+        );
+
+        // `Display` prints the native value.
+        assert_eq!(
+            std::format!("{}", BigEndian::<u16>(1.to_be())),
+            "1",
+        );
+        assert_eq!(
+            std::format!("{}", LittleEndian::<u16>(1.to_le())),
+            "1",
+        );
+
+        // `Eq` / `PartialEq` compare the native value.
+        assert_eq!(BigEndian::<u16>(1), BigEndian::<u16>(1));
+        assert_ne!(BigEndian::<u16>(1), BigEndian::<u16>(2));
+        assert_eq!(LittleEndian::<u16>(1), LittleEndian::<u16>(1));
+        assert_ne!(LittleEndian::<u16>(1), LittleEndian::<u16>(2));
+
+        // Import from native value is supported.
+        assert_eq!(BigEndian::<u16>::from(1), BigEndian::<u16>(1.to_be()));
+        assert_eq!(LittleEndian::<u16>::from(1), LittleEndian::<u16>(1.to_le()));
+
+        // Hashes match the native hash.
+        fn hash<T: core::hash::Hash>(v: T) -> u64 {
+            let mut s = std::collections::hash_map::DefaultHasher::new();
+            v.hash(&mut s);
+            core::hash::Hasher::finish(&s)
+        }
+        assert_eq!(hash(BigEndian::<u16>(1.to_be())), hash(1u16));
+        assert_eq!(hash(LittleEndian::<u16>(1.to_le())), hash(1u16));
+
+        // `Ord` / `PartialOrd` compare the native value.
+        assert!(
+            BigEndian::<u16>(1.to_be()) < BigEndian::<u16>(0x1000.to_be()),
+        );
+        assert!(
+            LittleEndian::<u16>(1.to_le()) < LittleEndian::<u16>(0x1000.to_le()),
+        );
     }
 }
