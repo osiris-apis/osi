@@ -80,6 +80,33 @@ pub struct PhantomAlign64 {}
 #[repr(C, align(16))]
 pub struct PhantomAlign128 {}
 
+/// ## Primitive Integer Trait
+///
+/// An internal abstraction over all primitive integers in the Rust standard
+/// library. This allows implementing other traits for all primitive integers
+/// without requiring hard-coded implementations for each primitive type.
+///
+/// There have always been efforts to put something similar into the Rust
+/// standard library, but so far these efforts have not been stabilised. Hence,
+/// we carry this internal helper.
+///
+/// Safety
+/// ------
+///
+/// This trait requires the implementor to guarantee that the underlying type
+/// can be transmuted from a properly aligned and sized memory block of any
+/// byte content. This most likely means the type must not contain padding or
+/// other special bit markers, and any bit representation must be valid.
+unsafe trait Integer
+where
+    Self: Copy,
+{
+    fn from_be(x: Self) -> Self;
+    fn from_le(x: Self) -> Self;
+    fn to_be(self) -> Self;
+    fn to_le(self) -> Self;
+}
+
 /// ## Fixed-size non-NULL Pointers
 ///
 /// This type is designed as alternative to `core::ptr::NonNull` but
@@ -160,6 +187,32 @@ where
     { v = v64; }
     v
 }
+
+// Implement `Integer` on all primitive integers by simply mapping to the
+// functions provided by the standard library.
+macro_rules! implement_integer {
+    ( $t:ident ) => {
+        unsafe impl Integer for $t {
+            fn from_be(x: Self) -> Self { $t::from_be(x) }
+            fn from_le(x: Self) -> Self { $t::from_le(x) }
+            fn to_be(self) -> Self { self.to_be() }
+            fn to_le(self) -> Self { self.to_le() }
+        }
+    }
+}
+
+implement_integer!(u8);
+implement_integer!(u16);
+implement_integer!(u32);
+implement_integer!(u64);
+implement_integer!(u128);
+implement_integer!(usize);
+implement_integer!(i8);
+implement_integer!(i16);
+implement_integer!(i32);
+implement_integer!(i64);
+implement_integer!(i128);
+implement_integer!(isize);
 
 impl<ADDR, ALIGN, TARGET> Ptr<ADDR, ALIGN, TARGET>
 where
@@ -519,5 +572,39 @@ mod tests {
     fn v32_v64_native() {
         assert_eq!(v32_v64(4, 8), size_of::<usize>());
         assert_eq!(v32_v64(0, 0), 0);
+    }
+
+    // Verify `Integer` on basic types
+    //
+    // Verify that `Integer` is implemented for all basic integer types and
+    // has reasonable method implementations.
+    #[test]
+    fn integer_implementations() {
+        assert_eq!(Integer::from_be(0i8), 0i8);
+        assert_eq!(Integer::from_be(0i16), 0i16);
+        assert_eq!(Integer::from_be(0i32), 0i32);
+        assert_eq!(Integer::from_be(0i64), 0i64);
+        assert_eq!(Integer::from_be(0i128), 0i128);
+        assert_eq!(Integer::from_be(0isize), 0isize);
+        assert_eq!(Integer::from_be(0u8), 0u8);
+        assert_eq!(Integer::from_be(0u16), 0u16);
+        assert_eq!(Integer::from_be(0u32), 0u32);
+        assert_eq!(Integer::from_be(0u64), 0u64);
+        assert_eq!(Integer::from_be(0u128), 0u128);
+        assert_eq!(Integer::from_be(0usize), 0usize);
+    }
+
+    // Verify `Integer` endian conversions
+    //
+    // Check for le/be conversions on the `Integer` trait and verify that they
+    // properly convert the endianness.
+    #[test]
+    fn integer_endian() {
+        assert_eq!(Integer::from_be(1u32), u32::from_be(1u32));
+        assert_eq!(Integer::from_le(1u32), u32::from_le(1u32));
+        assert_eq!(Integer::to_be(1u32), 1u32.to_be());
+        assert_eq!(Integer::to_le(1u32), 1u32.to_le());
+        assert_eq!(Integer::from_be(1u32).to_be(), 1u32);
+        assert_eq!(Integer::from_le(1u32).to_le(), 1u32);
     }
 }
