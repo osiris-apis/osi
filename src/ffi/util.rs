@@ -159,11 +159,11 @@ pub type Ptr64<TARGET> = Ptr<core::num::NonZeroU64, PhantomAlign64, TARGET>;
 /// This type has a fixed alignment and size of 16 on all platforms.
 pub type Ptr128<TARGET> = Ptr<core::num::NonZeroU128, PhantomAlign128, TARGET>;
 
-#[cfg(doc)]
 /// ## Native Pointer Alias
 ///
 /// This is an alias to either `Ptr32` or `Ptr64` depending on the native
 /// pointer width of the target architecture.
+#[cfg(doc)]
 pub type PtrN<TARGET> = Ptr64<TARGET>;
 #[cfg(all(not(doc), target_pointer_width = "32"))]
 pub type PtrN<TARGET> = Ptr32<TARGET>;
