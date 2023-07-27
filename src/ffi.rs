@@ -41,6 +41,9 @@
 //! The following assumptions are made for the target platform, and verified
 //! in the test-suite:
 //!
+//!  * The target platform uses either big-endian or little-endian encoding
+//!    for multi-byte integers and addresses.
+//!
 //!  * The target uses either 32-bit or 64-bit wide pointers with native
 //!    alignment. The `usize` type must match this size.
 //!
@@ -73,6 +76,12 @@
 //! This means, it is up to the user of these interfaces to ensure correct
 //! pointer provenance, and other pointer metadata applicable to the target
 //! platform.
+
+#[cfg(not(any(
+    target_endian = "big",
+    target_endian = "little",
+)))]
+compile_error!("Target platform has an unsupported endianness.");
 
 #[cfg(not(any(
     target_pointer_width = "32",
