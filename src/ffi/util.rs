@@ -210,15 +210,15 @@ pub struct LittleEndian<Raw: Copy>(Raw);
 /// the same layout.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
-pub struct Ptr<ADDR, ALIGN, TARGET>
+pub struct Ptr<Addr, Align, Target>
 where
-    ADDR: Copy,
-    ALIGN: Copy,
-    TARGET: ?Sized,
+    Addr: Copy,
+    Align: Copy,
+    Target: ?Sized,
 {
-    addr: ADDR,
-    align: [ALIGN; 0],
-    target: core::marker::PhantomData<*const TARGET>,
+    addr: Addr,
+    align: [Align; 0],
+    target: core::marker::PhantomData<*const Target>,
 }
 
 /// ## 32-bit Pointer Alias
@@ -227,7 +227,7 @@ where
 /// that all addresses of this pointer type are 32-bit in size.
 ///
 /// This type has a fixed alignment and size of 4 on all platforms.
-pub type Ptr32<TARGET> = Ptr<core::num::NonZeroU32, PhantomAlign32, TARGET>;
+pub type Ptr32<Target> = Ptr<core::num::NonZeroU32, PhantomAlign32, Target>;
 
 /// ## 64-bit Pointer Alias
 ///
@@ -235,7 +235,7 @@ pub type Ptr32<TARGET> = Ptr<core::num::NonZeroU32, PhantomAlign32, TARGET>;
 /// that all addresses of this pointer type are 64-bit in size.
 ///
 /// This type has a fixed alignment and size of 8 on all platforms.
-pub type Ptr64<TARGET> = Ptr<core::num::NonZeroU64, PhantomAlign64, TARGET>;
+pub type Ptr64<Target> = Ptr<core::num::NonZeroU64, PhantomAlign64, Target>;
 
 /// ## 128-bit Pointer Alias
 ///
@@ -243,18 +243,18 @@ pub type Ptr64<TARGET> = Ptr<core::num::NonZeroU64, PhantomAlign64, TARGET>;
 /// that all addresses of this pointer type are 128-bit in size.
 ///
 /// This type has a fixed alignment and size of 16 on all platforms.
-pub type Ptr128<TARGET> = Ptr<core::num::NonZeroU128, PhantomAlign128, TARGET>;
+pub type Ptr128<Target> = Ptr<core::num::NonZeroU128, PhantomAlign128, Target>;
 
 /// ## Native Pointer Alias
 ///
 /// This is an alias to either `Ptr32` or `Ptr64` depending on the native
 /// pointer width of the target architecture.
 #[cfg(doc)]
-pub type PtrN<TARGET> = Ptr64<TARGET>;
+pub type PtrN<Target> = Ptr64<Target>;
 #[cfg(all(not(doc), target_pointer_width = "32"))]
-pub type PtrN<TARGET> = Ptr32<TARGET>;
+pub type PtrN<Target> = Ptr32<Target>;
 #[cfg(all(not(doc), target_pointer_width = "64"))]
-pub type PtrN<TARGET> = Ptr64<TARGET>;
+pub type PtrN<Target> = Ptr64<Target>;
 
 /// ## Value Selector based on Address Size
 ///
@@ -598,18 +598,18 @@ where
     }
 }
 
-impl<ADDR, ALIGN, TARGET> Ptr<ADDR, ALIGN, TARGET>
+impl<Addr, Align, Target> Ptr<Addr, Align, Target>
 where
-    ADDR: Copy,
-    ALIGN: Copy,
-    TARGET: ?Sized,
+    Addr: Copy,
+    Align: Copy,
+    Target: ?Sized,
 {
     /// ## Create new instance
     ///
     /// Create a new instance of this pointer type from the provided address.
     /// The address is taken verbatim.
     #[inline]
-    pub const fn new(v: ADDR) -> Self {
+    pub const fn new(v: Addr) -> Self {
         Self {
             addr: v,
             align: [],
@@ -622,7 +622,7 @@ where
     /// Return the address underlying this pointer type.
     #[inline(always)]
     #[must_use]
-    pub const fn addr(self) -> ADDR {
+    pub const fn addr(self) -> Addr {
         self.addr
     }
 
@@ -631,20 +631,20 @@ where
     /// Change the target pointer type to the specified type. This does not
     /// change the underlying address value.
     #[inline]
-    pub const fn cast<OTHER>(self) -> Ptr<ADDR, ALIGN, OTHER> {
-        Ptr::<ADDR, ALIGN, OTHER>::new(self.addr())
+    pub const fn cast<OTHER>(self) -> Ptr<Addr, Align, OTHER> {
+        Ptr::<Addr, Align, OTHER>::new(self.addr())
     }
 }
 
 // Implement natural conversion from address to pointer.
-impl<ADDR, ALIGN, TARGET> From<ADDR> for Ptr<ADDR, ALIGN, TARGET>
+impl<Addr, Align, Target> From<Addr> for Ptr<Addr, Align, Target>
 where
-    ADDR: Copy,
-    ALIGN: Copy,
-    TARGET: ?Sized,
+    Addr: Copy,
+    Align: Copy,
+    Target: ?Sized,
 {
     #[inline]
-    fn from(v: ADDR) -> Self {
+    fn from(v: Addr) -> Self {
         Self::new(v)
     }
 }
@@ -654,7 +654,7 @@ where
 // going through the intermediate address-type.
 macro_rules! implement_ptr_nonzero {
     ($addr:ty, $align:ty, $raw:ty) => {
-        impl<TARGET: ?Sized> Ptr<$addr, $align, TARGET> {
+        impl<Target: ?Sized> Ptr<$addr, $align, Target> {
             /// ## Create new instance from raw address
             ///
             /// Create a new instance of this pointer type from the raw,
@@ -697,7 +697,7 @@ macro_rules! implement_ptr_nonzero {
         }
 
         // Implement natural conversion from raw address to pointer.
-        impl<TARGET: ?Sized> TryFrom<$raw> for Ptr<$addr, $align, TARGET> {
+        impl<Target: ?Sized> TryFrom<$raw> for Ptr<$addr, $align, Target> {
             type Error = ();
 
             #[inline]
@@ -712,7 +712,7 @@ macro_rules! implement_ptr_nonzero {
 // assuming the address-type is equal to the native pointer width.
 macro_rules! supplement_ptr_native {
     ($addr:ty, $align:ty, $raw:ty) => {
-        impl<TARGET: ?Sized> Ptr<$addr, $align, TARGET> {
+        impl<Target: ?Sized> Ptr<$addr, $align, Target> {
             // Helper to convert to `usize`, ensuring non-fallible cast.
             #[inline(always)]
             const fn raw_to_usize(v: $raw) -> usize {
@@ -761,7 +761,7 @@ macro_rules! supplement_ptr_native {
             }
         }
 
-        impl<TARGET: ?Sized> TryFrom<usize> for Ptr<$addr, $align, TARGET> {
+        impl<Target: ?Sized> TryFrom<usize> for Ptr<$addr, $align, Target> {
             type Error = ();
 
             #[inline]
@@ -770,7 +770,7 @@ macro_rules! supplement_ptr_native {
             }
         }
 
-        impl<TARGET: Sized> Ptr<$addr, $align, TARGET> {
+        impl<Target: Sized> Ptr<$addr, $align, Target> {
             /// ## Create new dangling pointer
             ///
             /// Create a new instance of this pointer with a dangling address.
@@ -783,7 +783,7 @@ macro_rules! supplement_ptr_native {
                 // SAFETY: Alignments cannot be 0.
                 unsafe {
                     Self::from_usize_unchecked(
-                        core::mem::align_of::<TARGET>(),
+                        core::mem::align_of::<Target>(),
                     )
                 }
             }
@@ -794,8 +794,8 @@ macro_rules! supplement_ptr_native {
             /// type. This pointer is guaranteed to not be NULL.
             #[inline(always)]
             #[must_use]
-            pub const fn as_ptr(self) -> *const TARGET {
-                self.as_usize() as *const TARGET
+            pub const fn as_ptr(self) -> *const Target {
+                self.as_usize() as *const Target
             }
 
             /// ## Yield address as raw mutable pointer
@@ -804,8 +804,8 @@ macro_rules! supplement_ptr_native {
             /// pointer type. This pointer is guaranteed to not be NULL.
             #[inline(always)]
             #[must_use]
-            pub const fn as_mut_ptr(self) -> *mut TARGET {
-                self.as_usize() as *mut TARGET
+            pub const fn as_mut_ptr(self) -> *mut Target {
+                self.as_usize() as *mut Target
             }
 
             /// ## Yield address as reference
@@ -821,7 +821,7 @@ macro_rules! supplement_ptr_native {
             /// of the Rust language.
             #[inline(always)]
             #[must_use]
-            pub const unsafe fn as_ref<'a>(self) -> &'a TARGET {
+            pub const unsafe fn as_ref<'a>(self) -> &'a Target {
                 // SAFETY: Delegated to caller.
                 unsafe { &*self.as_ptr() }
             }
@@ -839,50 +839,50 @@ macro_rules! supplement_ptr_native {
             /// requirements of the Rust language.
             #[inline(always)]
             #[must_use]
-            pub unsafe fn as_mut<'a>(self) -> &'a mut TARGET {
+            pub unsafe fn as_mut<'a>(self) -> &'a mut Target {
                 // SAFETY: Delegated to caller.
-                unsafe { &mut *(self.as_ptr() as *mut TARGET) }
+                unsafe { &mut *(self.as_ptr() as *mut Target) }
             }
         }
 
-        impl<TARGET: Sized> From<&TARGET> for Ptr<$addr, $align, TARGET> {
+        impl<Target: Sized> From<&Target> for Ptr<$addr, $align, Target> {
             #[inline]
-            fn from(v: &TARGET) -> Self {
+            fn from(v: &Target) -> Self {
                 // SAFETY: References cannot be NULL.
                 unsafe {
                     Self::from_raw_unchecked(
-                        v as *const TARGET as usize as $raw,
+                        v as *const Target as usize as $raw,
                     )
                 }
             }
         }
 
-        impl<TARGET: Sized> From<&mut TARGET> for Ptr<$addr, $align, TARGET> {
+        impl<Target: Sized> From<&mut Target> for Ptr<$addr, $align, Target> {
             #[inline]
-            fn from(v: &mut TARGET) -> Self {
+            fn from(v: &mut Target) -> Self {
                 // SAFETY: References cannot be NULL.
                 unsafe {
                     Self::from_raw_unchecked(
-                        v as *mut TARGET as usize as $raw,
+                        v as *mut Target as usize as $raw,
                     )
                 }
             }
         }
 
-        impl<TARGET: Sized> TryFrom<*const TARGET> for Ptr<$addr, $align, TARGET> {
+        impl<Target: Sized> TryFrom<*const Target> for Ptr<$addr, $align, Target> {
             type Error = ();
 
             #[inline]
-            fn try_from(v: *const TARGET) -> Result<Self, Self::Error> {
+            fn try_from(v: *const Target) -> Result<Self, Self::Error> {
                 Self::from_raw(v as usize as $raw).ok_or(())
             }
         }
 
-        impl<TARGET: Sized> TryFrom<*mut TARGET> for Ptr<$addr, $align, TARGET> {
+        impl<Target: Sized> TryFrom<*mut Target> for Ptr<$addr, $align, Target> {
             type Error = ();
 
             #[inline]
-            fn try_from(v: *mut TARGET) -> Result<Self, Self::Error> {
+            fn try_from(v: *mut Target) -> Result<Self, Self::Error> {
                 Self::from_raw(v as usize as $raw).ok_or(())
             }
         }
