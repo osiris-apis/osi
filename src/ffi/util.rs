@@ -218,6 +218,123 @@ where
     target: core::marker::PhantomData<*const Target>,
 }
 
+/// ## ABI Description
+///
+/// This trait defines properties of a system ABI. It provides associated types
+/// for all common data-types used in a given ABI.
+pub trait Abi {
+    /// ZST with native alignment of the platform, used as phantom-type to
+    /// raise alignment requirements of a type to the native alignment.
+    type Align: Copy;
+    /// ZST with alignment for 8-byte types of the platform.
+    type Align8: Copy;
+    /// ZST with alignment for 16-byte types of the platform.
+    type Align16: Copy;
+    /// ZST with alignment for 32-byte types of the platform.
+    type Align32: Copy;
+    /// ZST with alignment for 64-byte types of the platform.
+    type Align64: Copy;
+    /// ZST with alignment for 128-byte types of the platform.
+    type Align128: Copy;
+
+    /// Native address type for non-NULL values.
+    type Addr: Copy;
+    /// Native pointer type of the platform, pointing to a value of type
+    /// `Target`.
+    type Ptr<Target>: Copy;
+
+    /// Big-endian signed x-bit integer of the platform.
+    type Ixbe<Native: Copy, Alignment: Copy>: Copy;
+    /// Little-endian signed x-bit integer of the platform.
+    type Ixle<Native: Copy, Alignment: Copy>: Copy;
+    /// Native-endian signed x-bit integer of the platform.
+    type Ix<Native: Copy, Alignment: Copy>: Copy;
+    /// Big-endian unsigned x-bit integer of the platform.
+    type Uxbe<Native: Copy, Alignment: Copy>: Copy;
+    /// Little-endian unsigned x-bit integer of the platform.
+    type Uxle<Native: Copy, Alignment: Copy>: Copy;
+    /// Native-endian unsigned x-bit integer of the platform.
+    type Ux<Native: Copy, Alignment: Copy>: Copy;
+
+    /// Big-endian signed 8-bit integer of the platform.
+    type I8be;
+    /// Big-endian signed 16-bit integer of the platform.
+    type I16be;
+    /// Big-endian signed 32-bit integer of the platform.
+    type I32be;
+    /// Big-endian signed 64-bit integer of the platform.
+    type I64be;
+    /// Big-endian signed 128-bit integer of the platform.
+    type I128be;
+
+    /// Little-endian signed 8-bit integer of the platform.
+    type I8le;
+    /// Little-endian signed 16-bit integer of the platform.
+    type I16le;
+    /// Little-endian signed 32-bit integer of the platform.
+    type I32le;
+    /// Little-endian signed 64-bit integer of the platform.
+    type I64le;
+    /// Little-endian signed 128-bit integer of the platform.
+    type I128le;
+
+    /// Native-endian signed 8-bit integer of the platform.
+    type I8;
+    /// Native-endian signed 16-bit integer of the platform.
+    type I16;
+    /// Native-endian signed 32-bit integer of the platform.
+    type I32;
+    /// Native-endian signed 64-bit integer of the platform.
+    type I64;
+    /// Native-endian signed 128-bit integer of the platform.
+    type I128;
+
+    /// Big-endian unsigned 8-bit integer of the platform.
+    type U8be;
+    /// Big-endian unsigned 16-bit integer of the platform.
+    type U16be;
+    /// Big-endian unsigned 32-bit integer of the platform.
+    type U32be;
+    /// Big-endian unsigned 64-bit integer of the platform.
+    type U64be;
+    /// Big-endian unsigned 128-bit integer of the platform.
+    type U128be;
+
+    /// Little-endian unsigned 8-bit integer of the platform.
+    type U8le;
+    /// Little-endian unsigned 16-bit integer of the platform.
+    type U16le;
+    /// Little-endian unsigned 32-bit integer of the platform.
+    type U32le;
+    /// Little-endian unsigned 64-bit integer of the platform.
+    type U64le;
+    /// Little-endian unsigned 128-bit integer of the platform.
+    type U128le;
+
+    /// Native-endian unsigned 8-bit integer of the platform.
+    type U8;
+    /// Native-endian unsigned 16-bit integer of the platform.
+    type U16;
+    /// Native-endian unsigned 32-bit integer of the platform.
+    type U32;
+    /// Native-endian unsigned 64-bit integer of the platform.
+    type U64;
+    /// Native-endian unsigned 128-bit integer of the platform.
+    type U128;
+}
+
+/// ## Big-endian 32-bit ABI
+pub struct Abi32be {}
+
+/// ## Little-endian 32-bit ABI
+pub struct Abi32le {}
+
+/// ## Big-endian 64-bit ABI
+pub struct Abi64be {}
+
+/// ## Little-endian 64-bit ABI
+pub struct Abi64le {}
+
 /// ## Value Selector based on Address Size
 ///
 /// Return either of the arguments, depending on the pointer-width of the
@@ -779,6 +896,130 @@ where
         self.to_native().partial_cmp(&other.to_native())
     }
 }
+
+// Supplement `Abi` implementations with type-aliases, which are not stable
+// in trait definitions.
+macro_rules! supplement_abi_aliases {
+    () => {
+        type Ptr<Target> = Ptr<Self::Addr, Target>;
+
+        type Ixbe<Native: Copy, Alignment: Copy> = Integer<BigEndian<Native>, Alignment, Native>;
+        type Ixle<Native: Copy, Alignment: Copy> = Integer<LittleEndian<Native>, Alignment, Native>;
+        type Uxbe<Native: Copy, Alignment: Copy> = Integer<BigEndian<Native>, Alignment, Native>;
+        type Uxle<Native: Copy, Alignment: Copy> = Integer<LittleEndian<Native>, Alignment, Native>;
+
+        type I8be = Self::Ixbe<i8, Self::Align8>;
+        type I16be = Self::Ixbe<i16, Self::Align16>;
+        type I32be = Self::Ixbe<i32, Self::Align32>;
+        type I64be = Self::Ixbe<i64, Self::Align64>;
+        type I128be = Self::Ixbe<i128, Self::Align128>;
+
+        type I8le = Self::Ixle<i8, Self::Align8>;
+        type I16le = Self::Ixle<i16, Self::Align16>;
+        type I32le = Self::Ixle<i32, Self::Align32>;
+        type I64le = Self::Ixle<i64, Self::Align64>;
+        type I128le = Self::Ixle<i128, Self::Align128>;
+
+        type I8 = Self::Ix<i8, Self::Align8>;
+        type I16 = Self::Ix<i16, Self::Align16>;
+        type I32 = Self::Ix<i32, Self::Align32>;
+        type I64 = Self::Ix<i64, Self::Align64>;
+        type I128 = Self::Ix<i128, Self::Align128>;
+
+        type U8be = Self::Uxbe<u8, Self::Align8>;
+        type U16be = Self::Uxbe<u16, Self::Align16>;
+        type U32be = Self::Uxbe<u32, Self::Align32>;
+        type U64be = Self::Uxbe<u64, Self::Align64>;
+        type U128be = Self::Uxbe<u128, Self::Align128>;
+
+        type U8le = Self::Uxle<u8, Self::Align8>;
+        type U16le = Self::Uxle<u16, Self::Align16>;
+        type U32le = Self::Uxle<u32, Self::Align32>;
+        type U64le = Self::Uxle<u64, Self::Align64>;
+        type U128le = Self::Uxle<u128, Self::Align128>;
+
+        type U8 = Self::Ux<u8, Self::Align8>;
+        type U16 = Self::Ux<u16, Self::Align16>;
+        type U32 = Self::Ux<u32, Self::Align32>;
+        type U64 = Self::Ux<u64, Self::Align64>;
+        type U128 = Self::Ux<u128, Self::Align128>;
+    }
+}
+
+impl Abi for Abi32be {
+    type Align = PhantomAlign32;
+    type Align8 = PhantomAlign8;
+    type Align16 = PhantomAlign16;
+    type Align32 = Self::Align;
+    type Align64 = Self::Align;
+    type Align128 = Self::Align;
+
+    type Addr = Integer<BigEndian<core::num::NonZeroU32>, Self::Align, core::num::NonZeroU32>;
+
+    type Ix<Native: Copy, Alignment: Copy> = Self::Ixbe<Native, Alignment>;
+    type Ux<Native: Copy, Alignment: Copy> = Self::Uxbe<Native, Alignment>;
+
+    supplement_abi_aliases!();
+}
+
+impl Abi for Abi32le {
+    type Align = PhantomAlign32;
+    type Align8 = PhantomAlign8;
+    type Align16 = PhantomAlign16;
+    type Align32 = Self::Align;
+    type Align64 = Self::Align;
+    type Align128 = Self::Align;
+
+    type Addr = Integer<LittleEndian<core::num::NonZeroU32>, Self::Align, core::num::NonZeroU32>;
+
+    type Ix<Native: Copy, Alignment: Copy> = Self::Ixle<Native, Alignment>;
+    type Ux<Native: Copy, Alignment: Copy> = Self::Uxle<Native, Alignment>;
+
+    supplement_abi_aliases!();
+}
+
+impl Abi for Abi64be {
+    type Align = PhantomAlign64;
+    type Align8 = PhantomAlign8;
+    type Align16 = PhantomAlign16;
+    type Align32 = PhantomAlign32;
+    type Align64 = Self::Align;
+    type Align128 = Self::Align;
+
+    type Addr = Integer<BigEndian<core::num::NonZeroU64>, Self::Align, core::num::NonZeroU64>;
+
+    type Ix<Native: Copy, Alignment: Copy> = Self::Ixbe<Native, Alignment>;
+    type Ux<Native: Copy, Alignment: Copy> = Self::Uxbe<Native, Alignment>;
+
+    supplement_abi_aliases!();
+}
+
+impl Abi for Abi64le {
+    type Align = PhantomAlign64;
+    type Align8 = PhantomAlign8;
+    type Align16 = PhantomAlign16;
+    type Align32 = PhantomAlign32;
+    type Align64 = Self::Align;
+    type Align128 = Self::Align;
+
+    type Addr = Integer<LittleEndian<core::num::NonZeroU64>, Self::Align, core::num::NonZeroU64>;
+
+    type Ix<Native: Copy, Alignment: Copy> = Self::Ixle<Native, Alignment>;
+    type Ux<Native: Copy, Alignment: Copy> = Self::Uxle<Native, Alignment>;
+
+    supplement_abi_aliases!();
+}
+
+#[cfg(doc)]
+pub type Native = Abi64le;
+#[cfg(all(not(doc), target_endian = "big", target_pointer_width = "32"))]
+pub type Native = Abi32be;
+#[cfg(all(not(doc), target_endian = "big", target_pointer_width = "64"))]
+pub type Native = Abi64be;
+#[cfg(all(not(doc), target_endian = "little", target_pointer_width = "32"))]
+pub type Native = Abi32le;
+#[cfg(all(not(doc), target_endian = "little", target_pointer_width = "64"))]
+pub type Native = Abi64le;
 
 #[cfg(test)]
 mod tests {
