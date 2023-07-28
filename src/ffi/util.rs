@@ -214,7 +214,7 @@ where
 ///
 /// Wrapping this type in an `Option<...>` is guaranteed to yield a type of
 /// the same layout.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct Ptr<Addr, Align, Target>
 where
@@ -341,6 +341,25 @@ where
     pub const fn cast<OTHER>(self) -> Ptr<Addr, Align, OTHER> {
         Ptr::<Addr, Align, OTHER>::new(self.addr())
     }
+}
+
+// Implement clone via shallow-copy.
+impl<Addr, Target> Clone for Ptr<Addr, Target>
+where
+    Addr: Copy,
+    Target: ?Sized,
+{
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+// Implement copy via shallow-copy.
+impl<Addr, Target> Copy for Ptr<Addr, Target>
+where
+    Addr: Copy,
+    Target: ?Sized,
+{
 }
 
 // Implement natural conversion from address to pointer.
