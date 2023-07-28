@@ -205,62 +205,18 @@ where
 /// provides a fixed-size address type. It allows representing 32-bit
 /// pointers on 64-bit machines, and vice-versa.
 ///
-/// See `Ptr32`, `Ptr64`, and `PtrN` for common type aliases using non-zero
-/// integers as address type.
-///
-/// This type ensures suitable alignment of pointer values independent of the
-/// natural alignment of the target platform. That is, 64-bit pointers will
-/// always be 8-byte aligned, even on 32-bit machines.
-///
 /// Wrapping this type in an `Option<...>` is guaranteed to yield a type of
 /// the same layout.
 #[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[repr(C)]
-pub struct Ptr<Addr, Align, Target>
+#[repr(transparent)]
+pub struct Ptr<Addr, Target>
 where
     Addr: Copy,
-    Align: Copy,
     Target: ?Sized,
 {
     addr: Addr,
-    align: [Align; 0],
     target: core::marker::PhantomData<*const Target>,
 }
-
-/// ## 32-bit Pointer Alias
-///
-/// A simple alias for `Ptr` using `NonZeroU32` as backing type, thus ensuring
-/// that all addresses of this pointer type are 32-bit in size.
-///
-/// This type has a fixed alignment and size of 4 on all platforms.
-pub type Ptr32<Target> = Ptr<core::num::NonZeroU32, PhantomAlign32, Target>;
-
-/// ## 64-bit Pointer Alias
-///
-/// A simple alias for `Ptr` using `NonZeroU64` as backing type, thus ensuring
-/// that all addresses of this pointer type are 64-bit in size.
-///
-/// This type has a fixed alignment and size of 8 on all platforms.
-pub type Ptr64<Target> = Ptr<core::num::NonZeroU64, PhantomAlign64, Target>;
-
-/// ## 128-bit Pointer Alias
-///
-/// A simple alias for `Ptr` using `NonZeroU128` as backing type, thus ensuring
-/// that all addresses of this pointer type are 128-bit in size.
-///
-/// This type has a fixed alignment and size of 16 on all platforms.
-pub type Ptr128<Target> = Ptr<core::num::NonZeroU128, PhantomAlign128, Target>;
-
-/// ## Native Pointer Alias
-///
-/// This is an alias to either `Ptr32` or `Ptr64` depending on the native
-/// pointer width of the target architecture.
-#[cfg(doc)]
-pub type PtrN<Target> = Ptr64<Target>;
-#[cfg(all(not(doc), target_pointer_width = "32"))]
-pub type PtrN<Target> = Ptr32<Target>;
-#[cfg(all(not(doc), target_pointer_width = "64"))]
-pub type PtrN<Target> = Ptr64<Target>;
 
 /// ## Value Selector based on Address Size
 ///
@@ -305,10 +261,9 @@ implement_endian_identity!(u64);
 implement_endian_identity!(u128);
 implement_endian_identity!(usize);
 
-impl<Addr, Align, Target> Ptr<Addr, Align, Target>
+impl<Addr, Target> Ptr<Addr, Target>
 where
     Addr: Copy,
-    Align: Copy,
     Target: ?Sized,
 {
     /// ## Create new instance
@@ -319,7 +274,6 @@ where
     pub const fn new(v: Addr) -> Self {
         Self {
             addr: v,
-            align: [],
             target: core::marker::PhantomData {},
         }
     }
@@ -338,8 +292,8 @@ where
     /// Change the target pointer type to the specified type. This does not
     /// change the underlying address value.
     #[inline]
-    pub const fn cast<OTHER>(self) -> Ptr<Addr, Align, OTHER> {
-        Ptr::<Addr, Align, OTHER>::new(self.addr())
+    pub const fn cast<OTHER>(self) -> Ptr<Addr, OTHER> {
+        Ptr::<Addr, OTHER>::new(self.addr())
     }
 }
 
@@ -363,10 +317,9 @@ where
 }
 
 // Implement natural conversion from address to pointer.
-impl<Addr, Align, Target> From<Addr> for Ptr<Addr, Align, Target>
+impl<Addr, Target> From<Addr> for Ptr<Addr, Target>
 where
     Addr: Copy,
-    Align: Copy,
     Target: ?Sized,
 {
     #[inline]
@@ -379,8 +332,8 @@ where
 // provide suitable helpers to convert to and from primitive integers without
 // going through the intermediate address-type.
 macro_rules! implement_ptr_nonzero {
-    ($addr:ty, $align:ty, $raw:ty) => {
-        impl<Target: ?Sized> Ptr<$addr, $align, Target> {
+    ($addr:ty, $raw:ty) => {
+        impl<Target: ?Sized> Ptr<$addr, Target> {
             /// ## Create new instance from raw address
             ///
             /// Create a new instance of this pointer type from the raw,
@@ -423,7 +376,7 @@ macro_rules! implement_ptr_nonzero {
         }
 
         // Implement natural conversion from raw address to pointer.
-        impl<Target: ?Sized> TryFrom<$raw> for Ptr<$addr, $align, Target> {
+        impl<Target: ?Sized> TryFrom<$raw> for Ptr<$addr, Target> {
             type Error = ();
 
             #[inline]
@@ -437,8 +390,8 @@ macro_rules! implement_ptr_nonzero {
 // Supplement `implement_ptr_*()` with converters to and from native pointers,
 // assuming the address-type is equal to the native pointer width.
 macro_rules! supplement_ptr_native {
-    ($addr:ty, $align:ty, $raw:ty) => {
-        impl<Target: ?Sized> Ptr<$addr, $align, Target> {
+    ($addr:ty, $raw:ty) => {
+        impl<Target: ?Sized> Ptr<$addr, Target> {
             // Helper to convert to `usize`, ensuring non-fallible cast.
             #[inline(always)]
             const fn raw_to_usize(v: $raw) -> usize {
@@ -487,7 +440,7 @@ macro_rules! supplement_ptr_native {
             }
         }
 
-        impl<Target: ?Sized> TryFrom<usize> for Ptr<$addr, $align, Target> {
+        impl<Target: ?Sized> TryFrom<usize> for Ptr<$addr, Target> {
             type Error = ();
 
             #[inline]
@@ -496,7 +449,7 @@ macro_rules! supplement_ptr_native {
             }
         }
 
-        impl<Target: Sized> Ptr<$addr, $align, Target> {
+        impl<Target: Sized> Ptr<$addr, Target> {
             /// ## Create new dangling pointer
             ///
             /// Create a new instance of this pointer with a dangling address.
@@ -571,7 +524,7 @@ macro_rules! supplement_ptr_native {
             }
         }
 
-        impl<Target: Sized> From<&Target> for Ptr<$addr, $align, Target> {
+        impl<Target: Sized> From<&Target> for Ptr<$addr, Target> {
             #[inline]
             fn from(v: &Target) -> Self {
                 // SAFETY: References cannot be NULL.
@@ -583,7 +536,7 @@ macro_rules! supplement_ptr_native {
             }
         }
 
-        impl<Target: Sized> From<&mut Target> for Ptr<$addr, $align, Target> {
+        impl<Target: Sized> From<&mut Target> for Ptr<$addr, Target> {
             #[inline]
             fn from(v: &mut Target) -> Self {
                 // SAFETY: References cannot be NULL.
@@ -595,7 +548,7 @@ macro_rules! supplement_ptr_native {
             }
         }
 
-        impl<Target: Sized> TryFrom<*const Target> for Ptr<$addr, $align, Target> {
+        impl<Target: Sized> TryFrom<*const Target> for Ptr<$addr, Target> {
             type Error = ();
 
             #[inline]
@@ -604,7 +557,7 @@ macro_rules! supplement_ptr_native {
             }
         }
 
-        impl<Target: Sized> TryFrom<*mut Target> for Ptr<$addr, $align, Target> {
+        impl<Target: Sized> TryFrom<*mut Target> for Ptr<$addr, Target> {
             type Error = ();
 
             #[inline]
@@ -616,15 +569,15 @@ macro_rules! supplement_ptr_native {
 }
 
 // Implement `Ptr<NonZeroU*>` for common pointer sizes.
-implement_ptr_nonzero!(core::num::NonZeroU32, PhantomAlign32, u32);
-implement_ptr_nonzero!(core::num::NonZeroU64, PhantomAlign64, u64);
-implement_ptr_nonzero!(core::num::NonZeroU128, PhantomAlign128, u128);
+implement_ptr_nonzero!(core::num::NonZeroU32, u32);
+implement_ptr_nonzero!(core::num::NonZeroU64, u64);
+implement_ptr_nonzero!(core::num::NonZeroU128, u128);
 
 // Supplement the native pointer type with converters to raw pointers et al.
 #[cfg(target_pointer_width = "32")]
-supplement_ptr_native!(core::num::NonZeroU32, PhantomAlign32, u32);
+supplement_ptr_native!(core::num::NonZeroU32, u32);
 #[cfg(target_pointer_width = "64")]
-supplement_ptr_native!(core::num::NonZeroU64, PhantomAlign64, u64);
+supplement_ptr_native!(core::num::NonZeroU64, u64);
 
 impl<Raw, Alignment, Native> Integer<Raw, Alignment, Native>
 where
@@ -875,24 +828,6 @@ mod tests {
         assert_eq!(align_of::<LittleEndian<i64>>(), align_of::<u64>());
         assert_eq!(size_of::<LittleEndian<i128>>(), size_of::<u128>());
         assert_eq!(align_of::<LittleEndian<i128>>(), align_of::<u128>());
-
-        assert_eq!(size_of::<Ptr32<()>>(), 4);
-        assert_eq!(align_of::<Ptr32<()>>(), 4);
-        assert_eq!(size_of::<Ptr64<()>>(), 8);
-        assert_eq!(align_of::<Ptr64<()>>(), 8);
-        assert_eq!(size_of::<Ptr128<()>>(), 16);
-        assert_eq!(align_of::<Ptr128<()>>(), 16);
-        assert_eq!(size_of::<PtrN<()>>(), v32_v64(4, 8));
-        assert_eq!(align_of::<PtrN<()>>(), v32_v64(4, 8));
-
-        assert_eq!(size_of::<Option<Ptr32<()>>>(), 4);
-        assert_eq!(align_of::<Option<Ptr32<()>>>(), 4);
-        assert_eq!(size_of::<Option<Ptr64<()>>>(), 8);
-        assert_eq!(align_of::<Option<Ptr64<()>>>(), 8);
-        assert_eq!(size_of::<Option<Ptr128<()>>>(), 16);
-        assert_eq!(align_of::<Option<Ptr128<()>>>(), 16);
-        assert_eq!(size_of::<Option<PtrN<()>>>(), v32_v64(4, 8));
-        assert_eq!(align_of::<Option<PtrN<()>>>(), v32_v64(4, 8));
     }
 
     // Verify `v32_v64()` selects correctly
