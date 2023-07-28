@@ -193,6 +193,39 @@ pub struct BigEndian<Raw: Copy>(Raw);
 #[repr(transparent)]
 pub struct LittleEndian<Raw: Copy>(Raw);
 
+/// ## Primitive Integers
+///
+/// This type abstracts over primitive integers of different sizes,
+/// alignments, and endianness. It is meant to be used as a replacement for
+/// builtin primitive integer types like `u32` or `i64`. Unlike the builtin
+/// types, this type allows working on a wide range of integers with a single
+/// implementation.
+///
+/// Most importantly, this type allows to explicitly define its properties:
+///
+/// - **Size**: The size and encoding of the type matches that of `Raw`.
+///
+/// - **Alignment**: The alignment matches the maximum of the alignment of the
+///   raw type and the alignment specified via `Alignment`.
+///
+/// - **Endianness*: The endianness is controlled by `Raw` and always converted
+///   to native endianness when accessed via the `from/to_native()` accessors.
+///
+/// The non-zero property of `Raw` is propagated through this type, allowing
+/// for `Option<..>` optimizations and ffi-stability.
+#[derive(Clone, Copy)]
+#[repr(C)]
+pub struct Integer<Raw, Alignment, Native>
+where
+    Raw: Copy,
+    Alignment: Copy,
+    Native: Copy,
+{
+    raw: Raw,
+    alignment: [Alignment; 0],
+    native: core::marker::PhantomData<Native>,
+}
+
 /// ## Fixed-size non-NULL Pointers
 ///
 /// This type is designed as alternative to `core::ptr::NonNull` but
@@ -299,6 +332,31 @@ implement_integer!(i32);
 implement_integer!(i64);
 implement_integer!(i128);
 implement_integer!(isize);
+
+// Implement `FixedEndian` on all primitive integers via identity mappings.
+macro_rules! implement_endian_identity {
+    ( $self:ty ) => {
+        unsafe impl FixedEndian<$self> for $self {
+            fn from_raw(raw: Self) -> Self { raw }
+            fn to_raw(self) -> Self { self }
+            fn from_native(native: Self) -> Self { native }
+            fn to_native(self) -> Self { self }
+        }
+    }
+}
+
+implement_endian_identity!(i8);
+implement_endian_identity!(i16);
+implement_endian_identity!(i32);
+implement_endian_identity!(i64);
+implement_endian_identity!(i128);
+implement_endian_identity!(isize);
+implement_endian_identity!(u8);
+implement_endian_identity!(u16);
+implement_endian_identity!(u32);
+implement_endian_identity!(u64);
+implement_endian_identity!(u128);
+implement_endian_identity!(usize);
 
 // For debugging simply print the raw values.
 impl<Raw> core::fmt::Debug for BigEndian<Raw>
@@ -900,6 +958,207 @@ supplement_ptr_native!(core::num::NonZeroU32, PhantomAlign32, u32);
 #[cfg(target_pointer_width = "64")]
 supplement_ptr_native!(core::num::NonZeroU64, PhantomAlign64, u64);
 
+impl<Raw, Alignment, Native> Integer<Raw, Alignment, Native>
+where
+    Raw: Copy,
+    Alignment: Copy,
+    Native: Copy,
+{
+    /// ## Create from underlying raw value
+    ///
+    /// Create a new integer object from its raw value. The data is taken
+    /// unmodified and embedded into the new object. `to_raw()` will yield
+    /// the same value again.
+    ///
+    /// The memory represenation of the new object is the same as of the
+    /// raw value. Thus, the value can be safely transmuted instead. However,
+    /// note that the alignment requirements of the data might change, so you
+    /// cannot transmute pointers to the data, unless suitably aligned.
+    pub fn from_raw(raw: Raw) -> Self {
+        Self {
+            raw: raw,
+            alignment: [],
+            native: core::marker::PhantomData::<Native>,
+        }
+    }
+
+    /// ## Yield underlying raw value
+    ///
+    /// Yield the raw value that is embedded in this object. The value is
+    /// returned unmodified. You can safely transmute the object to the raw
+    /// type instead. See `from_raw()` for the inverse operation.
+    ///
+    /// Unlike `from_raw()`, you can safely transmute pointers to this object
+    /// to pointers of the raw value, since the alignment requirements of `Raw`
+    /// are equal to, or lower than, the alignment requirements of `Self`.
+    pub fn to_raw(self) -> Raw {
+        self.raw
+    }
+
+    /// ## Cast to the raw value
+    ///
+    /// Return a reference to the underlying raw value. It is safe to do the
+    /// same via a transmute.
+    pub fn as_raw(&self) -> &Raw {
+        &self.raw
+    }
+
+    /// ## Cast to the mutable raw value
+    ///
+    /// Return a mutable reference to the underlying raw value. It is safe to
+    /// do the same via a transmute.
+    pub fn as_raw_mut(&mut self) -> &mut Raw {
+        &mut self.raw
+    }
+}
+
+// For debugging simply print the raw values.
+impl<Raw, Alignment, Native> core::fmt::Debug for Integer<Raw, Alignment, Native>
+where
+    Raw: Copy + core::fmt::Debug,
+    Alignment: Copy,
+    Native: Copy,
+{
+    fn fmt(
+        &self,
+        fmt: &mut core::fmt::Formatter<'_>,
+    ) -> Result<(), core::fmt::Error> {
+        fmt.debug_tuple("Integer")
+           .field(&self.raw)
+           .finish()
+    }
+}
+
+impl<Raw, Alignment, Native> Integer<Raw, Alignment, Native>
+where
+    Raw: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy,
+{
+    /// ## Create from native value
+    ///
+    /// Create a new integer object from its native representation. This will
+    /// convert the value to the representation used by the integer object. Use
+    /// `to_native()` to get back the native value.
+    ///
+    /// If the native representation matches the raw representation, this
+    /// operation is equivalent to `from_raw()`.
+    pub fn from_native(v: Native) -> Self {
+        Self::from_raw(Raw::from_native(v))
+    }
+
+    /// ## Convert to native value
+    ///
+    /// Return the native representation of the value stored in this integer.
+    /// This will convert the value from the representation used by this
+    /// integer object.
+    ///
+    /// If the native representation matches the raw representation, this
+    /// operation is equivalent to `to_raw()`.
+    pub fn to_native(self) -> Native {
+        self.to_raw().to_native()
+    }
+}
+
+// Get default from native value.
+impl<Raw, Alignment, Native> Default for Integer<Raw, Alignment, Native>
+where
+    Raw: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy + Default,
+{
+    fn default() -> Self {
+        Self::from_native(Default::default())
+    }
+}
+
+// Convert to native for basic formatting.
+impl<Raw, Alignment, Native> core::fmt::Display for Integer<Raw, Alignment, Native>
+where
+    Raw: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy + core::fmt::Display,
+{
+    fn fmt(
+        &self,
+        fmt: &mut core::fmt::Formatter<'_>,
+    ) -> Result<(), core::fmt::Error> {
+        <Native as core::fmt::Display>::fmt(&self.to_native(), fmt)
+    }
+}
+
+// Compare based on native value.
+impl<Raw, Alignment, Native> Eq for Integer<Raw, Alignment, Native>
+where
+    Raw: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy + Eq,
+{
+}
+
+// Import from native value.
+impl<Raw, Alignment, Native> From<Native> for Integer<Raw, Alignment, Native>
+where
+    Raw: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy,
+{
+    fn from(native: Native) -> Self {
+        Self::from_native(native)
+    }
+}
+
+// Hash based on native value.
+impl<Raw, Alignment, Native> core::hash::Hash for Integer<Raw, Alignment, Native>
+where
+    Raw: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy + core::hash::Hash,
+{
+    fn hash<Op>(&self, state: &mut Op)
+    where
+        Op: core::hash::Hasher,
+    {
+        self.to_native().hash(state)
+    }
+}
+
+// Order based on native value.
+impl<Raw, Alignment, Native> Ord for Integer<Raw, Alignment, Native>
+where
+    Raw: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy + Ord,
+{
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.to_native().cmp(&other.to_native())
+    }
+}
+
+// Compare based on native value.
+impl<Raw, Alignment, Native> PartialEq for Integer<Raw, Alignment, Native>
+where
+    Raw: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy + PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.to_native().eq(&other.to_native())
+    }
+}
+
+// Order based on native value.
+impl<Raw, Alignment, Native> PartialOrd for Integer<Raw, Alignment, Native>
+where
+    Raw: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy + PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        self.to_native().partial_cmp(&other.to_native())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1200,5 +1459,42 @@ mod tests {
         assert!(
             LittleEndian::<u16>(1.to_le()) < LittleEndian::<u16>(0x1000.to_le()),
         );
+    }
+
+    // Verify `Integer` auto traits
+    //
+    // Verify the validity of the different auto-derived traits for the
+    // `Integer` type.
+    #[test]
+    fn integer_auto_traits() {
+        fn hash<T: core::hash::Hash>(v: T) -> u64 {
+            let mut s = std::collections::hash_map::DefaultHasher::new();
+            v.hash(&mut s);
+            core::hash::Hasher::finish(&s)
+        }
+
+        type Test16 = Integer<u16, PhantomAlign16, u16>;
+
+        // `Debug` must print the raw value.
+        assert_eq!(std::format!("{:?}", Test16::from_raw(1)), "Integer(1)");
+
+        // `Default` uses the native default.
+        assert_eq!(<Test16 as Default>::default(), Test16::from_native(0));
+
+        // `Display` prints the native value.
+        assert_eq!(std::format!("{}", Test16::from_native(1)), "1");
+
+        // `Eq` / `PartialEq` compare the native value.
+        assert_eq!(Test16::from_native(1), Test16::from_native(1));
+        assert_ne!(Test16::from_native(0), Test16::from_native(1));
+
+        // Import from native value is supported.
+        assert_eq!(Test16::from(1u16), Test16::from_native(1));
+
+        // Hashes match the native hash.
+        assert_eq!(hash(Test16::from_native(1)), hash(1u16));
+
+        // `Ord` / `PartialOrd` compare the native value.
+        assert!(Test16::from_native(0x0010) < Test16::from_native(0x0100));
     }
 }
