@@ -148,7 +148,7 @@ where
 /// primitive integer. Thus, conversion from and to native endianness is
 /// provided, as well as default values, ordering, and other properties
 /// reliant on the native value.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct BigEndian<Raw: Copy>(Raw);
 
@@ -162,7 +162,7 @@ pub struct BigEndian<Raw: Copy>(Raw);
 /// primitive integer. Thus, conversion from and to native endianness is
 /// provided, as well as default values, ordering, and other properties
 /// reliant on the native value.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct LittleEndian<Raw: Copy>(Raw);
 
@@ -304,36 +304,6 @@ implement_endian_identity!(u32);
 implement_endian_identity!(u64);
 implement_endian_identity!(u128);
 implement_endian_identity!(usize);
-
-// For debugging simply print the raw values.
-impl<Raw> core::fmt::Debug for BigEndian<Raw>
-where
-    Raw: Copy + core::fmt::Debug,
-{
-    fn fmt(
-        &self,
-        fmt: &mut core::fmt::Formatter<'_>,
-    ) -> Result<(), core::fmt::Error> {
-        fmt.debug_tuple("BigEndian")
-           .field(&self.0)
-           .finish()
-    }
-}
-
-// For debugging simply print the raw values.
-impl<Raw> core::fmt::Debug for LittleEndian<Raw>
-where
-    Raw: Copy + core::fmt::Debug,
-{
-    fn fmt(
-        &self,
-        fmt: &mut core::fmt::Formatter<'_>,
-    ) -> Result<(), core::fmt::Error> {
-        fmt.debug_tuple("LittleEndian")
-           .field(&self.0)
-           .finish()
-    }
-}
 
 impl<Addr, Align, Target> Ptr<Addr, Align, Target>
 where
@@ -915,6 +885,21 @@ mod tests {
     fn v32_v64_native() {
         assert_eq!(v32_v64(4, 8), size_of::<usize>());
         assert_eq!(v32_v64(0, 0), 0);
+    }
+
+    // Verify auto traits for big/little-endian wrappers
+    //
+    // Verify the validity of the different auto-derived traits for the
+    // `BigEndian` and `LittleEndian` type.
+    #[test]
+    fn endian_auto_traits() {
+        // `Debug` must print the raw value.
+        assert_eq!(
+            std::format!("{:?}", BigEndian::<u16>(1)), "BigEndian(1)",
+        );
+        assert_eq!(
+            std::format!("{:?}", LittleEndian::<u16>(1)), "LittleEndian(1)",
+        );
     }
 
     // Verify `Integer` auto traits
