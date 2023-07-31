@@ -1069,6 +1069,31 @@ mod tests {
         assert_eq!(align_of::<LittleEndian<i64>>(), align_of::<u64>());
         assert_eq!(size_of::<LittleEndian<i128>>(), size_of::<u128>());
         assert_eq!(align_of::<LittleEndian<i128>>(), align_of::<u128>());
+
+        assert_eq!(align_of::<<Abi32be as Abi>::Align>(), 4);
+        assert_eq!(align_of::<<Abi32be as Abi>::Align8>(), 1);
+        assert_eq!(align_of::<<Abi32be as Abi>::Align16>(), 2);
+        assert_eq!(align_of::<<Abi32be as Abi>::Align32>(), 4);
+        assert_eq!(align_of::<<Abi32be as Abi>::Align64>(), 4);
+        assert_eq!(align_of::<<Abi32be as Abi>::Align128>(), 4);
+        assert_eq!(align_of::<<Abi32le as Abi>::Align>(), 4);
+        assert_eq!(align_of::<<Abi32le as Abi>::Align8>(), 1);
+        assert_eq!(align_of::<<Abi32le as Abi>::Align16>(), 2);
+        assert_eq!(align_of::<<Abi32le as Abi>::Align32>(), 4);
+        assert_eq!(align_of::<<Abi32le as Abi>::Align64>(), 4);
+        assert_eq!(align_of::<<Abi32le as Abi>::Align128>(), 4);
+        assert_eq!(align_of::<<Abi64be as Abi>::Align>(), 8);
+        assert_eq!(align_of::<<Abi64be as Abi>::Align8>(), 1);
+        assert_eq!(align_of::<<Abi64be as Abi>::Align16>(), 2);
+        assert_eq!(align_of::<<Abi64be as Abi>::Align32>(), 4);
+        assert_eq!(align_of::<<Abi64be as Abi>::Align64>(), 8);
+        assert_eq!(align_of::<<Abi64be as Abi>::Align128>(), 8);
+        assert_eq!(align_of::<<Abi64le as Abi>::Align>(), 8);
+        assert_eq!(align_of::<<Abi64le as Abi>::Align8>(), 1);
+        assert_eq!(align_of::<<Abi64le as Abi>::Align16>(), 2);
+        assert_eq!(align_of::<<Abi64le as Abi>::Align32>(), 4);
+        assert_eq!(align_of::<<Abi64le as Abi>::Align64>(), 8);
+        assert_eq!(align_of::<<Abi64le as Abi>::Align128>(), 8);
     }
 
     // Verify `v32_v64()` selects correctly
