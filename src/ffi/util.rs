@@ -730,7 +730,7 @@ where
     /// Return the address underlying this pointer type.
     #[inline(always)]
     #[must_use]
-    pub const fn address(self) -> Address {
+    pub const fn address(&self) -> Address {
         self.address
     }
 
@@ -739,7 +739,7 @@ where
     /// Change the target pointer type to the specified type. This does not
     /// change the underlying address value.
     #[inline]
-    pub const fn cast<Other>(self) -> Pointer<Address, Other> {
+    pub const fn cast<Other>(&self) -> Pointer<Address, Other> {
         Pointer::<Address, Other>::new(self.address())
     }
 }
