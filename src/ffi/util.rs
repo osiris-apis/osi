@@ -984,6 +984,87 @@ where
     }
 }
 
+// Implement import from usize based on NativeAddress.
+impl<Address, Target> TryFrom<usize> for Pointer<Address, Target>
+where
+    Self: NativeAddress<Target>,
+    Address: Copy,
+    Target: ?Sized,
+{
+    type Error = ();
+
+    #[inline]
+    fn try_from(v: usize) -> Result<Self, Self::Error> {
+        Self::from_usize(v).ok_or(())
+    }
+}
+
+// Implement import from reference based on NativeAddress.
+impl<Address, Target> From<&Target> for Pointer<Address, Target>
+where
+    Self: NativeAddress<Target>,
+    Address: Copy,
+    Target: Sized,
+{
+    #[inline]
+    fn from(v: &Target) -> Self {
+        // SAFETY: References cannot be NULL.
+        unsafe {
+            Self::from_usize_unchecked(
+                v as *const Target as usize,
+            )
+        }
+    }
+}
+
+// Implement import from mutable reference based on NativeAddress.
+impl<Address, Target> From<&mut Target> for Pointer<Address, Target>
+where
+    Self: NativeAddress<Target>,
+    Address: Copy,
+    Target: Sized,
+{
+    #[inline]
+    fn from(v: &mut Target) -> Self {
+        // SAFETY: References cannot be NULL.
+        unsafe {
+            Self::from_usize_unchecked(
+                v as *mut Target as usize,
+            )
+        }
+    }
+}
+
+// Implement import from pointer based on NativeAddress.
+impl<Address, Target> TryFrom<*const Target> for Pointer<Address, Target>
+where
+    Self: NativeAddress<Target>,
+    Address: Copy,
+    Target: Sized,
+{
+    type Error = ();
+
+    #[inline]
+    fn try_from(v: *const Target) -> Result<Self, Self::Error> {
+        Self::from_usize(v as usize).ok_or(())
+    }
+}
+
+// Implement import from pointer based on NativeAddress.
+impl<Address, Target> TryFrom<*mut Target> for Pointer<Address, Target>
+where
+    Self: NativeAddress<Target>,
+    Address: Copy,
+    Target: Sized,
+{
+    type Error = ();
+
+    #[inline]
+    fn try_from(v: *mut Target) -> Result<Self, Self::Error> {
+        Self::from_usize(v as usize).ok_or(())
+    }
+}
+
 unsafe impl<Address, Target, Native> FixedEndian<Native> for Pointer<Address, Target>
 where
     Address: Copy + FixedEndian<Native>,
