@@ -786,7 +786,7 @@ where
     }
 
     fn to_raw(self) -> Native {
-        self.address.to_raw()
+        self.address().to_raw()
     }
 
     fn from_native(native: Native) -> Self {
@@ -794,7 +794,7 @@ where
     }
 
     fn to_native(self) -> Native {
-        self.address.to_native()
+        self.address().to_native()
     }
 }
 
