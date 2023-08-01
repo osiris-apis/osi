@@ -404,70 +404,70 @@ pub trait Abi {
     type Ux<Native: Copy, Alignment: Copy>: Copy;
 
     /// Big-endian signed 8-bit integer of the platform.
-    type I8be;
+    type I8be: Copy;
     /// Big-endian signed 16-bit integer of the platform.
-    type I16be;
+    type I16be: Copy;
     /// Big-endian signed 32-bit integer of the platform.
-    type I32be;
+    type I32be: Copy;
     /// Big-endian signed 64-bit integer of the platform.
-    type I64be;
+    type I64be: Copy;
     /// Big-endian signed 128-bit integer of the platform.
-    type I128be;
+    type I128be: Copy;
 
     /// Little-endian signed 8-bit integer of the platform.
-    type I8le;
+    type I8le: Copy;
     /// Little-endian signed 16-bit integer of the platform.
-    type I16le;
+    type I16le: Copy;
     /// Little-endian signed 32-bit integer of the platform.
-    type I32le;
+    type I32le: Copy;
     /// Little-endian signed 64-bit integer of the platform.
-    type I64le;
+    type I64le: Copy;
     /// Little-endian signed 128-bit integer of the platform.
-    type I128le;
+    type I128le: Copy;
 
     /// Native-endian signed 8-bit integer of the platform.
-    type I8;
+    type I8: Copy;
     /// Native-endian signed 16-bit integer of the platform.
-    type I16;
+    type I16: Copy;
     /// Native-endian signed 32-bit integer of the platform.
-    type I32;
+    type I32: Copy;
     /// Native-endian signed 64-bit integer of the platform.
-    type I64;
+    type I64: Copy;
     /// Native-endian signed 128-bit integer of the platform.
-    type I128;
+    type I128: Copy;
 
     /// Big-endian unsigned 8-bit integer of the platform.
-    type U8be;
+    type U8be: Copy;
     /// Big-endian unsigned 16-bit integer of the platform.
-    type U16be;
+    type U16be: Copy;
     /// Big-endian unsigned 32-bit integer of the platform.
-    type U32be;
+    type U32be: Copy;
     /// Big-endian unsigned 64-bit integer of the platform.
-    type U64be;
+    type U64be: Copy;
     /// Big-endian unsigned 128-bit integer of the platform.
-    type U128be;
+    type U128be: Copy;
 
     /// Little-endian unsigned 8-bit integer of the platform.
-    type U8le;
+    type U8le: Copy;
     /// Little-endian unsigned 16-bit integer of the platform.
-    type U16le;
+    type U16le: Copy;
     /// Little-endian unsigned 32-bit integer of the platform.
-    type U32le;
+    type U32le: Copy;
     /// Little-endian unsigned 64-bit integer of the platform.
-    type U64le;
+    type U64le: Copy;
     /// Little-endian unsigned 128-bit integer of the platform.
-    type U128le;
+    type U128le: Copy;
 
     /// Native-endian unsigned 8-bit integer of the platform.
-    type U8;
+    type U8: Copy;
     /// Native-endian unsigned 16-bit integer of the platform.
-    type U16;
+    type U16: Copy;
     /// Native-endian unsigned 32-bit integer of the platform.
-    type U32;
+    type U32: Copy;
     /// Native-endian unsigned 64-bit integer of the platform.
-    type U64;
+    type U64: Copy;
     /// Native-endian unsigned 128-bit integer of the platform.
-    type U128;
+    type U128: Copy;
 }
 
 /// ## Big-endian 32-bit ABI
