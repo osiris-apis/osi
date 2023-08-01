@@ -1350,4 +1350,27 @@ mod tests {
             8,
         );
     }
+
+    // Verify `Pointer` advanced type layout
+    //
+    // Check some non-standard combinations for `Pointer` and verify that the
+    // layout is properly defined.
+    #[test]
+    fn pointer_typeinfo() {
+        // zero-optimization must propagate through `Pointer<Integer<BigEndian<...>>>`
+        assert_eq!(
+            size_of::<Option<Pointer<
+                Integer<BigEndian<core::num::NonZeroI64>, PhantomAlign64, core::num::NonZeroI64>,
+                u8,
+            >>>(),
+            8,
+        );
+        assert_eq!(
+            align_of::<Option<Pointer<
+                Integer<BigEndian<core::num::NonZeroI64>, PhantomAlign64, core::num::NonZeroI64>,
+                u8,
+            >>>(),
+            8,
+        );
+    }
 }
