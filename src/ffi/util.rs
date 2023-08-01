@@ -970,18 +970,6 @@ where
 {
 }
 
-// Implement natural conversion from address to pointer.
-impl<Address, Target> From<Address> for Pointer<Address, Target>
-where
-    Address: Copy,
-    Target: ?Sized,
-{
-    #[inline]
-    fn from(v: Address) -> Self {
-        Self::new(v)
-    }
-}
-
 impl<Address, Target> NativeAddress<Target> for Pointer<Address, Target>
 where
     Address: Copy + NativeAddress<Target>,
