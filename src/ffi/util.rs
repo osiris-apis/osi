@@ -582,31 +582,6 @@ macro_rules! implement_endian_identity {
     }
 }
 
-implement_endian_identity!(i8);
-implement_endian_identity!(i16);
-implement_endian_identity!(i32);
-implement_endian_identity!(i64);
-implement_endian_identity!(i128);
-implement_endian_identity!(isize);
-implement_endian_identity!(u8);
-implement_endian_identity!(u16);
-implement_endian_identity!(u32);
-implement_endian_identity!(u64);
-implement_endian_identity!(u128);
-implement_endian_identity!(usize);
-implement_endian_identity!(core::num::NonZeroI8);
-implement_endian_identity!(core::num::NonZeroI16);
-implement_endian_identity!(core::num::NonZeroI32);
-implement_endian_identity!(core::num::NonZeroI64);
-implement_endian_identity!(core::num::NonZeroI128);
-implement_endian_identity!(core::num::NonZeroIsize);
-implement_endian_identity!(core::num::NonZeroU8);
-implement_endian_identity!(core::num::NonZeroU16);
-implement_endian_identity!(core::num::NonZeroU32);
-implement_endian_identity!(core::num::NonZeroU64);
-implement_endian_identity!(core::num::NonZeroU128);
-implement_endian_identity!(core::num::NonZeroUsize);
-
 // Implement `NativeEndian` on big-endian integers via `from/to_be()`.
 macro_rules! implement_endian_be {
     ( $self:ty, $raw:ty ) => {
@@ -661,31 +636,6 @@ macro_rules! implement_endian_be_nonzero {
     }
 }
 
-implement_endian_be!(BigEndian<i8>, i8);
-implement_endian_be!(BigEndian<i16>, i16);
-implement_endian_be!(BigEndian<i32>, i32);
-implement_endian_be!(BigEndian<i64>, i64);
-implement_endian_be!(BigEndian<i128>, i128);
-implement_endian_be!(BigEndian<isize>, isize);
-implement_endian_be!(BigEndian<u8>, u8);
-implement_endian_be!(BigEndian<u16>, u16);
-implement_endian_be!(BigEndian<u32>, u32);
-implement_endian_be!(BigEndian<u64>, u64);
-implement_endian_be!(BigEndian<u128>, u128);
-implement_endian_be!(BigEndian<usize>, usize);
-implement_endian_be_nonzero!(BigEndian<core::num::NonZeroI8>, core::num::NonZeroI8, i8);
-implement_endian_be_nonzero!(BigEndian<core::num::NonZeroI16>, core::num::NonZeroI16, i16);
-implement_endian_be_nonzero!(BigEndian<core::num::NonZeroI32>, core::num::NonZeroI32, i32);
-implement_endian_be_nonzero!(BigEndian<core::num::NonZeroI64>, core::num::NonZeroI64, i64);
-implement_endian_be_nonzero!(BigEndian<core::num::NonZeroI128>, core::num::NonZeroI128, i128);
-implement_endian_be_nonzero!(BigEndian<core::num::NonZeroIsize>, core::num::NonZeroIsize, isize);
-implement_endian_be_nonzero!(BigEndian<core::num::NonZeroU8>, core::num::NonZeroU8, u8);
-implement_endian_be_nonzero!(BigEndian<core::num::NonZeroU16>, core::num::NonZeroU16, u16);
-implement_endian_be_nonzero!(BigEndian<core::num::NonZeroU32>, core::num::NonZeroU32, u32);
-implement_endian_be_nonzero!(BigEndian<core::num::NonZeroU64>, core::num::NonZeroU64, u64);
-implement_endian_be_nonzero!(BigEndian<core::num::NonZeroU128>, core::num::NonZeroU128, u128);
-implement_endian_be_nonzero!(BigEndian<core::num::NonZeroUsize>, core::num::NonZeroUsize, usize);
-
 // Implement `NativeEndian` on little-endian integers via `from/to_le()`.
 macro_rules! implement_endian_le {
     ( $self:ty, $raw:ty ) => {
@@ -739,6 +689,56 @@ macro_rules! implement_endian_le_nonzero {
         }
     }
 }
+
+implement_endian_identity!(i8);
+implement_endian_identity!(i16);
+implement_endian_identity!(i32);
+implement_endian_identity!(i64);
+implement_endian_identity!(i128);
+implement_endian_identity!(isize);
+implement_endian_identity!(u8);
+implement_endian_identity!(u16);
+implement_endian_identity!(u32);
+implement_endian_identity!(u64);
+implement_endian_identity!(u128);
+implement_endian_identity!(usize);
+implement_endian_identity!(core::num::NonZeroI8);
+implement_endian_identity!(core::num::NonZeroI16);
+implement_endian_identity!(core::num::NonZeroI32);
+implement_endian_identity!(core::num::NonZeroI64);
+implement_endian_identity!(core::num::NonZeroI128);
+implement_endian_identity!(core::num::NonZeroIsize);
+implement_endian_identity!(core::num::NonZeroU8);
+implement_endian_identity!(core::num::NonZeroU16);
+implement_endian_identity!(core::num::NonZeroU32);
+implement_endian_identity!(core::num::NonZeroU64);
+implement_endian_identity!(core::num::NonZeroU128);
+implement_endian_identity!(core::num::NonZeroUsize);
+
+implement_endian_be!(BigEndian<i8>, i8);
+implement_endian_be!(BigEndian<i16>, i16);
+implement_endian_be!(BigEndian<i32>, i32);
+implement_endian_be!(BigEndian<i64>, i64);
+implement_endian_be!(BigEndian<i128>, i128);
+implement_endian_be!(BigEndian<isize>, isize);
+implement_endian_be!(BigEndian<u8>, u8);
+implement_endian_be!(BigEndian<u16>, u16);
+implement_endian_be!(BigEndian<u32>, u32);
+implement_endian_be!(BigEndian<u64>, u64);
+implement_endian_be!(BigEndian<u128>, u128);
+implement_endian_be!(BigEndian<usize>, usize);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroI8>, core::num::NonZeroI8, i8);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroI16>, core::num::NonZeroI16, i16);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroI32>, core::num::NonZeroI32, i32);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroI64>, core::num::NonZeroI64, i64);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroI128>, core::num::NonZeroI128, i128);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroIsize>, core::num::NonZeroIsize, isize);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroU8>, core::num::NonZeroU8, u8);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroU16>, core::num::NonZeroU16, u16);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroU32>, core::num::NonZeroU32, u32);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroU64>, core::num::NonZeroU64, u64);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroU128>, core::num::NonZeroU128, u128);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroUsize>, core::num::NonZeroUsize, usize);
 
 implement_endian_le!(LittleEndian<i8>, i8);
 implement_endian_le!(LittleEndian<i16>, i16);
