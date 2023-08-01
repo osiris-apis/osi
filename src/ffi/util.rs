@@ -518,7 +518,7 @@ where
     /// ## Create from underlying value
     ///
     /// Create a new integer object from its value. The data is taken
-    /// unmodified and embedded into the new object. `to_value()` will yield
+    /// unmodified and embedded into the new object. `value()` will yield
     /// the same value again.
     ///
     /// Alternatively, if the size of `Self` matches the size of `Value`, then
@@ -548,7 +548,7 @@ where
     /// are equal to, or lower than, the alignment requirements of `Self`. Note
     /// that the wrapped object might have trailing padding bytes to serve an
     /// alignment request greater than its own size.
-    pub fn to_value(self) -> Value {
+    pub fn value(&self) -> Value {
         self.value
     }
 
@@ -581,7 +581,7 @@ where
         fmt: &mut core::fmt::Formatter<'_>,
     ) -> Result<(), core::fmt::Error> {
         fmt.debug_tuple("Integer")
-           .field(&self.to_value())
+           .field(&self.value())
            .finish()
     }
 }
@@ -696,7 +696,7 @@ where
     }
 
     fn to_raw(self) -> Native {
-        self.to_value().to_raw()
+        self.value().to_raw()
     }
 
     fn from_native(native: Native) -> Self {
@@ -704,7 +704,7 @@ where
     }
 
     fn to_native(self) -> Native {
-        self.to_value().to_native()
+        self.value().to_native()
     }
 }
 
