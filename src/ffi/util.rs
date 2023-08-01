@@ -201,22 +201,19 @@ where
     native: core::marker::PhantomData<Native>,
 }
 
-/// ## Fixed-size non-NULL Pointers
+/// ## Fixed-size Pointers
 ///
 /// This type is designed as alternative to `core::ptr::NonNull` but
 /// provides a fixed-size address type. It allows representing 32-bit
 /// pointers on 64-bit machines, and vice-versa.
-///
-/// Wrapping this type in an `Option<...>` is guaranteed to yield a type of
-/// the same layout.
 #[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(transparent)]
-pub struct Ptr<Addr, Target>
+pub struct Pointer<Address, Target>
 where
-    Addr: Copy,
+    Address: Copy,
     Target: ?Sized,
 {
-    addr: Addr,
+    address: Address,
     target: core::marker::PhantomData<*const Target>,
 }
 
@@ -510,9 +507,9 @@ implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroU64>, core::num::Non
 implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroU128>, core::num::NonZeroU128, u128);
 implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroUsize>, core::num::NonZeroUsize, usize);
 
-impl<Addr, Target> Ptr<Addr, Target>
+impl<Address, Target> Pointer<Address, Target>
 where
-    Addr: Copy,
+    Address: Copy,
     Target: ?Sized,
 {
     /// ## Create new instance
@@ -520,9 +517,9 @@ where
     /// Create a new instance of this pointer type from the provided address.
     /// The address is taken verbatim.
     #[inline]
-    pub const fn new(v: Addr) -> Self {
+    pub const fn new(v: Address) -> Self {
         Self {
-            addr: v,
+            address: v,
             target: core::marker::PhantomData {},
         }
     }
@@ -532,8 +529,8 @@ where
     /// Return the address underlying this pointer type.
     #[inline(always)]
     #[must_use]
-    pub const fn addr(self) -> Addr {
-        self.addr
+    pub const fn addr(self) -> Address {
+        self.address
     }
 
     /// ## Cast pointer
@@ -541,15 +538,15 @@ where
     /// Change the target pointer type to the specified type. This does not
     /// change the underlying address value.
     #[inline]
-    pub const fn cast<OTHER>(self) -> Ptr<Addr, OTHER> {
-        Ptr::<Addr, OTHER>::new(self.addr())
+    pub const fn cast<Other>(self) -> Pointer<Address, Other> {
+        Pointer::<Address, Other>::new(self.addr())
     }
 }
 
 // Implement clone via shallow-copy.
-impl<Addr, Target> Clone for Ptr<Addr, Target>
+impl<Address, Target> Clone for Pointer<Address, Target>
 where
-    Addr: Copy,
+    Address: Copy,
     Target: ?Sized,
 {
     fn clone(&self) -> Self {
@@ -558,31 +555,31 @@ where
 }
 
 // Implement copy via shallow-copy.
-impl<Addr, Target> Copy for Ptr<Addr, Target>
+impl<Address, Target> Copy for Pointer<Address, Target>
 where
-    Addr: Copy,
+    Address: Copy,
     Target: ?Sized,
 {
 }
 
 // Implement natural conversion from address to pointer.
-impl<Addr, Target> From<Addr> for Ptr<Addr, Target>
+impl<Address, Target> From<Address> for Pointer<Address, Target>
 where
-    Addr: Copy,
+    Address: Copy,
     Target: ?Sized,
 {
     #[inline]
-    fn from(v: Addr) -> Self {
+    fn from(v: Address) -> Self {
         Self::new(v)
     }
 }
 
-// Implement `Ptr` for address-types like `core::num::NonZeroU*`. This will
-// provide suitable helpers to convert to and from primitive integers without
-// going through the intermediate address-type.
+// Implement `Pointer` for non-zero types like `core::num::NonZeroU*`. This
+// will provide suitable helpers to convert to and from primitive integers
+// without going through the intermediate address-type.
 macro_rules! implement_ptr_nonzero {
-    ($addr:ty, $raw:ty) => {
-        impl<Target: ?Sized> Ptr<$addr, Target> {
+    ($address:ty, $raw:ty) => {
+        impl<Target: ?Sized> Pointer<$address, Target> {
             /// ## Create new instance from raw address
             ///
             /// Create a new instance of this pointer type from the raw,
@@ -596,7 +593,7 @@ macro_rules! implement_ptr_nonzero {
             pub const unsafe fn from_raw_unchecked(v: $raw) -> Self {
                 // SAFETY: Delegated to the caller.
                 unsafe {
-                    Self::new(<$addr>::new_unchecked(v))
+                    Self::new(<$address>::new_unchecked(v))
                 }
             }
 
@@ -606,8 +603,8 @@ macro_rules! implement_ptr_nonzero {
             /// address, yielding `None` if it is 0.
             #[inline]
             pub const fn from_raw(v: $raw) -> Option<Self> {
-                if let Some(addr) = <$addr>::new(v) {
-                    Some(Self::new(addr))
+                if let Some(address) = <$address>::new(v) {
+                    Some(Self::new(address))
                 } else {
                     None
                 }
@@ -620,12 +617,12 @@ macro_rules! implement_ptr_nonzero {
             #[inline(always)]
             #[must_use]
             pub const fn raw(self) -> $raw {
-                self.addr.get()
+                self.address.get()
             }
         }
 
         // Implement natural conversion from raw address to pointer.
-        impl<Target: ?Sized> TryFrom<$raw> for Ptr<$addr, Target> {
+        impl<Target: ?Sized> TryFrom<$raw> for Pointer<$address, Target> {
             type Error = ();
 
             #[inline]
@@ -639,8 +636,8 @@ macro_rules! implement_ptr_nonzero {
 // Supplement `implement_ptr_*()` with converters to and from native pointers,
 // assuming the address-type is equal to the native pointer width.
 macro_rules! supplement_ptr_native {
-    ($addr:ty, $raw:ty) => {
-        impl<Target: ?Sized> Ptr<$addr, Target> {
+    ($address:ty, $raw:ty) => {
+        impl<Target: ?Sized> Pointer<$address, Target> {
             // Helper to convert to `usize`, ensuring non-fallible cast.
             #[inline(always)]
             const fn raw_to_usize(v: $raw) -> usize {
@@ -689,7 +686,7 @@ macro_rules! supplement_ptr_native {
             }
         }
 
-        impl<Target: ?Sized> TryFrom<usize> for Ptr<$addr, Target> {
+        impl<Target: ?Sized> TryFrom<usize> for Pointer<$address, Target> {
             type Error = ();
 
             #[inline]
@@ -698,7 +695,7 @@ macro_rules! supplement_ptr_native {
             }
         }
 
-        impl<Target: Sized> Ptr<$addr, Target> {
+        impl<Target: Sized> Pointer<$address, Target> {
             /// ## Create new dangling pointer
             ///
             /// Create a new instance of this pointer with a dangling address.
@@ -773,7 +770,7 @@ macro_rules! supplement_ptr_native {
             }
         }
 
-        impl<Target: Sized> From<&Target> for Ptr<$addr, Target> {
+        impl<Target: Sized> From<&Target> for Pointer<$address, Target> {
             #[inline]
             fn from(v: &Target) -> Self {
                 // SAFETY: References cannot be NULL.
@@ -785,7 +782,7 @@ macro_rules! supplement_ptr_native {
             }
         }
 
-        impl<Target: Sized> From<&mut Target> for Ptr<$addr, Target> {
+        impl<Target: Sized> From<&mut Target> for Pointer<$address, Target> {
             #[inline]
             fn from(v: &mut Target) -> Self {
                 // SAFETY: References cannot be NULL.
@@ -797,7 +794,7 @@ macro_rules! supplement_ptr_native {
             }
         }
 
-        impl<Target: Sized> TryFrom<*const Target> for Ptr<$addr, Target> {
+        impl<Target: Sized> TryFrom<*const Target> for Pointer<$address, Target> {
             type Error = ();
 
             #[inline]
@@ -806,7 +803,7 @@ macro_rules! supplement_ptr_native {
             }
         }
 
-        impl<Target: Sized> TryFrom<*mut Target> for Ptr<$addr, Target> {
+        impl<Target: Sized> TryFrom<*mut Target> for Pointer<$address, Target> {
             type Error = ();
 
             #[inline]
@@ -1038,7 +1035,7 @@ where
 // in trait definitions.
 macro_rules! supplement_abi_aliases {
     () => {
-        type Ptr<Target> = Ptr<Self::Addr, Target>;
+        type Ptr<Target> = Pointer<Self::Addr, Target>;
 
         type Ixbe<Native: Copy, Alignment: Copy> = Integer<BigEndian<Native>, Alignment, Native>;
         type Ixle<Native: Copy, Alignment: Copy> = Integer<LittleEndian<Native>, Alignment, Native>;
