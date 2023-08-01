@@ -377,6 +377,18 @@ implement_endian_identity!(u32);
 implement_endian_identity!(u64);
 implement_endian_identity!(u128);
 implement_endian_identity!(usize);
+implement_endian_identity!(core::num::NonZeroI8);
+implement_endian_identity!(core::num::NonZeroI16);
+implement_endian_identity!(core::num::NonZeroI32);
+implement_endian_identity!(core::num::NonZeroI64);
+implement_endian_identity!(core::num::NonZeroI128);
+implement_endian_identity!(core::num::NonZeroIsize);
+implement_endian_identity!(core::num::NonZeroU8);
+implement_endian_identity!(core::num::NonZeroU16);
+implement_endian_identity!(core::num::NonZeroU32);
+implement_endian_identity!(core::num::NonZeroU64);
+implement_endian_identity!(core::num::NonZeroU128);
+implement_endian_identity!(core::num::NonZeroUsize);
 
 impl<Addr, Target> Ptr<Addr, Target>
 where
