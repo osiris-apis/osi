@@ -123,6 +123,7 @@ where
     /// Create a new instance of this type with the address specified as a
     /// `usize` value. If the address is 0, this will yield `None`.
     #[inline]
+    #[must_use]
     fn from_usize(v: usize) -> Option<Self> {
         if v == 0 {
             None
@@ -255,6 +256,7 @@ where
     /// must not modify the raw value in any way.
     ///
     /// It is safe to transmute from `Raw` to `Self` instead.
+    #[must_use]
     fn from_raw(raw: Raw) -> Self;
 
     /// Return raw value
@@ -263,12 +265,14 @@ where
     /// wrapping object. The value must be returned without any modifications.
     ///
     /// It is safe to transmute from `Self` to `Raw` instead.
+    #[must_use]
     fn to_raw(self) -> Raw;
 
     /// Create value from native representation
     ///
     /// Create the foreign-ordered value from a native value, converting the
     /// value before retaining it, if required.
+    #[must_use]
     fn from_native(native: Raw) -> Self;
 
     /// Return native representation
@@ -276,6 +280,7 @@ where
     /// Return the native representation of the value behind this wrapping
     /// object. The value is to be converted to the native representation
     /// before returning it, if required.
+    #[must_use]
     fn to_native(self) -> Raw;
 }
 
@@ -483,6 +488,7 @@ pub struct Abi64le {}
 /// compilation target. For 32-bit machines `v32` is returned, for 64-bit
 /// machines `v64` is returned.
 #[allow(unused)]
+#[must_use]
 pub const fn v32_v64<T>(v32: T, v64: T) -> T
 where
     T: Copy,
@@ -499,12 +505,16 @@ where
 macro_rules! implement_address {
     ( $self:ty ) => {
         impl<Target: ?Sized> NativeAddress<Target> for $self {
+            #[inline]
+            #[must_use]
             unsafe fn from_usize_unchecked(v: usize) -> Self {
                 assert!(core::mem::size_of::<usize>() <= core::mem::size_of::<$self>());
                 // SAFETY: as-cast never folds to 0
                 v as _
             }
 
+            #[inline(always)]
+            #[must_use]
             fn to_usize(self) -> usize {
                 assert!(core::mem::size_of::<$self>() <= core::mem::size_of::<usize>());
                 self as _
@@ -517,12 +527,16 @@ macro_rules! implement_address {
 macro_rules! implement_address_nonzero {
     ( $self:ty ) => {
         impl<Target: ?Sized> NativeAddress<Target> for $self {
+            #[inline]
+            #[must_use]
             unsafe fn from_usize_unchecked(v: usize) -> Self {
                 assert!(core::mem::size_of::<usize>() <= core::mem::size_of::<$self>());
                 // SAFETY: delegated to caller
                 Self::new_unchecked(v as _)
             }
 
+            #[inline(always)]
+            #[must_use]
             fn to_usize(self) -> usize {
                 assert!(core::mem::size_of::<$self>() <= core::mem::size_of::<usize>());
                 self.get() as _
@@ -549,9 +563,20 @@ implement_address_nonzero!(core::num::NonZeroU64);
 macro_rules! implement_endian_identity {
     ( $self:ty ) => {
         unsafe impl NativeEndian<$self> for $self {
+            #[inline]
+            #[must_use]
             fn from_raw(raw: Self) -> Self { raw }
+
+            #[inline(always)]
+            #[must_use]
             fn to_raw(self) -> Self { self }
+
+            #[inline]
+            #[must_use]
             fn from_native(native: Self) -> Self { native }
+
+            #[inline(always)]
+            #[must_use]
             fn to_native(self) -> Self { self }
         }
     }
@@ -586,9 +611,20 @@ implement_endian_identity!(core::num::NonZeroUsize);
 macro_rules! implement_endian_be {
     ( $self:ty, $raw:ty ) => {
         unsafe impl NativeEndian<$raw> for $self {
+            #[inline]
+            #[must_use]
             fn from_raw(raw: $raw) -> Self { Self(raw) }
+
+            #[inline(always)]
+            #[must_use]
             fn to_raw(self) -> $raw { self.0 }
+
+            #[inline]
+            #[must_use]
             fn from_native(native: $raw) -> Self { Self::from_raw(native.to_be()) }
+
+            #[inline(always)]
+            #[must_use]
             fn to_native(self) -> $raw { <$raw>::from_be(self.to_raw()) }
         }
     }
@@ -598,9 +634,16 @@ macro_rules! implement_endian_be {
 macro_rules! implement_endian_be_nonzero {
     ( $self:ty, $raw:ty, $prim:ty ) => {
         unsafe impl NativeEndian<$raw> for $self {
+            #[inline]
+            #[must_use]
             fn from_raw(raw: $raw) -> Self { Self(raw) }
+
+            #[inline(always)]
+            #[must_use]
             fn to_raw(self) -> $raw { self.0 }
 
+            #[inline]
+            #[must_use]
             fn from_native(native: $raw) -> Self {
                 Self::from_raw(
                     // SAFETY: endian conversion never folds to 0
@@ -608,6 +651,8 @@ macro_rules! implement_endian_be_nonzero {
                 )
             }
 
+            #[inline(always)]
+            #[must_use]
             fn to_native(self) -> $raw {
                 // SAFETY: endian conversion never folds to 0
                 unsafe { <$raw>::new_unchecked(<$prim>::from_be(self.to_raw().get())) }
@@ -645,9 +690,20 @@ implement_endian_be_nonzero!(BigEndian<core::num::NonZeroUsize>, core::num::NonZ
 macro_rules! implement_endian_le {
     ( $self:ty, $raw:ty ) => {
         unsafe impl NativeEndian<$raw> for $self {
+            #[inline]
+            #[must_use]
             fn from_raw(raw: $raw) -> Self { Self(raw) }
+
+            #[inline(always)]
+            #[must_use]
             fn to_raw(self) -> $raw { self.0 }
+
+            #[inline]
+            #[must_use]
             fn from_native(native: $raw) -> Self { Self::from_raw(native.to_le()) }
+
+            #[inline(always)]
+            #[must_use]
             fn to_native(self) -> $raw { <$raw>::from_le(self.to_raw()) }
         }
     }
@@ -657,9 +713,16 @@ macro_rules! implement_endian_le {
 macro_rules! implement_endian_le_nonzero {
     ( $self:ty, $raw:ty, $prim:ty ) => {
         unsafe impl NativeEndian<$raw> for $self {
+            #[inline]
+            #[must_use]
             fn from_raw(raw: $raw) -> Self { Self(raw) }
+
+            #[inline(always)]
+            #[must_use]
             fn to_raw(self) -> $raw { self.0 }
 
+            #[inline]
+            #[must_use]
             fn from_native(native: $raw) -> Self {
                 Self::from_raw(
                     // SAFETY: endian conversion never folds to 0
@@ -667,6 +730,8 @@ macro_rules! implement_endian_le_nonzero {
                 )
             }
 
+            #[inline(always)]
+            #[must_use]
             fn to_native(self) -> $raw {
                 // SAFETY: endian conversion never folds to 0
                 unsafe { <$raw>::new_unchecked(<$prim>::from_le(self.to_raw().get())) }
@@ -718,6 +783,8 @@ where
     /// Note that you cannot transmute pointers to `Value` to a pointer of
     /// `Self` since `Value` might have a lower alignment than is required for
     /// `Self`.
+    #[inline]
+    #[must_use]
     pub const fn new(v: Value) -> Self {
         Self {
             value: v,
@@ -739,6 +806,8 @@ where
     /// are equal to, or lower than, the alignment requirements of `Self`. Note
     /// that the wrapped object might have trailing padding bytes to serve an
     /// alignment request greater than its own size.
+    #[inline(always)]
+    #[must_use]
     pub const fn value(&self) -> Value {
         self.value
     }
@@ -747,6 +816,8 @@ where
     ///
     /// Return a reference to the underlying value. It is safe to do the
     /// same via a transmute.
+    #[inline(always)]
+    #[must_use]
     pub const fn as_value(&self) -> &Value {
         &self.value
     }
@@ -755,6 +826,8 @@ where
     ///
     /// Return a mutable reference to the underlying value. It is safe to
     /// do the same via a transmute.
+    #[inline(always)]
+    #[must_use]
     pub fn as_value_mut(&mut self) -> &mut Value {
         &mut self.value
     }
@@ -785,10 +858,14 @@ where
     Native: Copy,
     Target: ?Sized,
 {
+    #[inline]
+    #[must_use]
     unsafe fn from_usize_unchecked(v: usize) -> Self {
         Self::new(Value::from_usize_unchecked(v))
     }
 
+    #[inline(always)]
+    #[must_use]
     fn to_usize(self) -> usize {
         self.value().to_usize()
     }
@@ -801,18 +878,26 @@ where
     Alignment: Copy,
     Native: Copy,
 {
+    #[inline]
+    #[must_use]
     fn from_raw(raw: Native) -> Self {
         Self::new(Value::from_raw(raw))
     }
 
+    #[inline(always)]
+    #[must_use]
     fn to_raw(self) -> Native {
         self.value().to_raw()
     }
 
+    #[inline]
+    #[must_use]
     fn from_native(native: Native) -> Self {
         Self::new(Value::from_native(native))
     }
 
+    #[inline(always)]
+    #[must_use]
     fn to_native(self) -> Native {
         self.value().to_native()
     }
@@ -861,6 +946,8 @@ where
     Alignment: Copy,
     Native: Copy,
 {
+    #[inline]
+    #[must_use]
     fn from(native: Native) -> Self {
         Self::from_native(native)
     }
@@ -888,6 +975,7 @@ where
     Alignment: Copy,
     Native: Copy + Ord,
 {
+    #[must_use]
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.to_native().cmp(&other.to_native())
     }
@@ -900,6 +988,7 @@ where
     Alignment: Copy,
     Native: Copy + PartialEq,
 {
+    #[must_use]
     fn eq(&self, other: &Self) -> bool {
         self.to_native().eq(&other.to_native())
     }
@@ -912,6 +1001,7 @@ where
     Alignment: Copy,
     Native: Copy + PartialOrd,
 {
+    #[must_use]
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         self.to_native().partial_cmp(&other.to_native())
     }
@@ -927,6 +1017,7 @@ where
     /// Create a new instance of this pointer type from the provided address.
     /// The address is taken verbatim.
     #[inline]
+    #[must_use]
     pub const fn new(v: Address) -> Self {
         Self {
             address: v,
@@ -948,6 +1039,7 @@ where
     /// Change the target pointer type to the specified type. This does not
     /// change the underlying address value.
     #[inline]
+    #[must_use]
     pub const fn cast<Other>(&self) -> Pointer<Address, Other> {
         Pointer::<Address, Other>::new(self.address())
     }
@@ -959,6 +1051,8 @@ where
     Address: Copy,
     Target: ?Sized,
 {
+    #[inline]
+    #[must_use]
     fn clone(&self) -> Self {
         *self
     }
@@ -978,10 +1072,14 @@ where
     Address: Copy + NativeAddress<Target>,
     Target: ?Sized,
 {
+    #[inline]
+    #[must_use]
     unsafe fn from_usize_unchecked(v: usize) -> Self {
         Self::new(Address::from_usize_unchecked(v))
     }
 
+    #[inline(always)]
+    #[must_use]
     fn to_usize(self) -> usize {
         self.address().to_usize()
     }
@@ -996,7 +1094,6 @@ where
 {
     type Error = ();
 
-    #[inline]
     fn try_from(v: usize) -> Result<Self, Self::Error> {
         Self::from_usize(v).ok_or(())
     }
@@ -1010,6 +1107,7 @@ where
     Target: Sized,
 {
     #[inline]
+    #[must_use]
     fn from(v: &Target) -> Self {
         // SAFETY: References cannot be NULL.
         unsafe {
@@ -1028,6 +1126,7 @@ where
     Target: Sized,
 {
     #[inline]
+    #[must_use]
     fn from(v: &mut Target) -> Self {
         // SAFETY: References cannot be NULL.
         unsafe {
@@ -1047,7 +1146,6 @@ where
 {
     type Error = ();
 
-    #[inline]
     fn try_from(v: *const Target) -> Result<Self, Self::Error> {
         Self::from_usize(v as usize).ok_or(())
     }
@@ -1062,7 +1160,6 @@ where
 {
     type Error = ();
 
-    #[inline]
     fn try_from(v: *mut Target) -> Result<Self, Self::Error> {
         Self::from_usize(v as usize).ok_or(())
     }
@@ -1075,18 +1172,26 @@ where
     Target: ?Sized,
     Native: Copy,
 {
+    #[inline]
+    #[must_use]
     fn from_raw(raw: Native) -> Self {
         Self::new(Address::from_raw(raw))
     }
 
+    #[inline(always)]
+    #[must_use]
     fn to_raw(self) -> Native {
         self.address().to_raw()
     }
 
+    #[inline]
+    #[must_use]
     fn from_native(native: Native) -> Self {
         Self::new(Address::from_native(native))
     }
 
+    #[inline(always)]
+    #[must_use]
     fn to_native(self) -> Native {
         self.address().to_native()
     }
