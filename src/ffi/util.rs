@@ -80,6 +80,147 @@ pub struct PhantomAlign64 {}
 #[repr(C, align(16))]
 pub struct PhantomAlign128 {}
 
+/// ## Types as Native Addresses
+///
+/// This trait annotates types that effectively wrap a native memory address.
+/// It allows converting the type to and from a native memory address. On top
+/// of these conversions it implements a wide range of utility methods to
+/// treat the type as a pointer or reference.
+///
+/// This type should only be implemented for types that can be represented as
+/// a `usize` on the target platform. That is, this type assumes that the
+/// addresses it deals with is a native memory addresses.
+///
+/// This is a helper trait to allow direct interaction with addresses
+/// compatible with the target platform. For runtime interaction with cross
+/// platform data, fallible converters must be used instead.
+pub trait NativeAddress<Target>
+where
+    Self: Copy,
+    Target: ?Sized,
+{
+    /// ## Create from non-zero usize
+    ///
+    /// Create a new instance of this type from its address given as a `usize`
+    /// value. The given value must not be 0.
+    ///
+    /// Safety
+    /// ------
+    ///
+    /// The caller must guarantee that the address is not zero.
+    #[must_use]
+    unsafe fn from_usize_unchecked(v: usize) -> Self;
+
+    /// ## Yield address as usize
+    ///
+    /// Yield the address of this instance as a `usize` value. The returned
+    /// address is guaranteed to be non-zero.
+    #[must_use]
+    fn to_usize(self) -> usize;
+
+    /// ## Create from usize
+    ///
+    /// Create a new instance of this type with the address specified as a
+    /// `usize` value. If the address is 0, this will yield `None`.
+    #[inline]
+    fn from_usize(v: usize) -> Option<Self> {
+        if v == 0 {
+            None
+        } else {
+            // SAFETY: verified to be non-zero
+            unsafe { Some(Self::from_usize_unchecked(v)) }
+        }
+    }
+
+    /// ## Create new dangling address
+    ///
+    /// Create a new instance of this type with a dangling address.
+    /// This address is guaranteed to not be 0. However, the address is
+    /// not necessarily unique and might match a valid address of
+    /// another allocated object.
+    #[inline]
+    #[must_use]
+    fn dangling() -> Self
+    where
+        Target: Sized,
+    {
+        // SAFETY: Alignments cannot be 0.
+        unsafe {
+            Self::from_usize_unchecked(
+                core::mem::align_of::<Target>(),
+            )
+        }
+    }
+
+    /// ## Yield address as raw pointer
+    ///
+    /// Return the address underlying this type as a raw pointer type. This
+    /// pointer is guaranteed to not be NULL.
+    #[inline(always)]
+    #[must_use]
+    fn as_ptr(&self) -> *const Target
+    where
+        Target: Sized,
+    {
+        self.to_usize() as *const Target
+    }
+
+    /// ## Yield address as raw mutable pointer
+    ///
+    /// Return the address underlying this type as a raw pointer pointer type.
+    /// This pointer is guaranteed to not be NULL.
+    #[inline(always)]
+    #[must_use]
+    fn as_mut_ptr(&self) -> *mut Target
+    where
+        Target: Sized,
+    {
+        self.to_usize() as *mut Target
+    }
+
+    /// ## Yield address as reference
+    ///
+    /// Return the address underlying this type as a reference to the target
+    /// type.
+    ///
+    /// Safety
+    /// ------
+    ///
+    /// The caller must ensure that the underlying address can be safely cast
+    /// into a reference, following the usual requirements of the Rust
+    /// language.
+    #[inline(always)]
+    #[must_use]
+    unsafe fn as_ref<'a>(&self) -> &'a Target
+    where
+        Target: Sized,
+    {
+        // SAFETY: Delegated to caller.
+        unsafe { &*self.as_ptr() }
+    }
+
+    /// ## Yield address as mutable reference
+    ///
+    /// Return the address underlying this pointer as a mutable
+    /// reference to the target type.
+    ///
+    /// Safety
+    /// ------
+    ///
+    /// The caller must ensure that the underlying address can be safely cast
+    /// into a mutable reference, following the usual requirements of the Rust
+    /// language.
+    #[inline(always)]
+    #[must_use]
+    unsafe fn as_mut<'a>(&self) -> &'a mut Target
+    where
+        Target: Sized,
+    {
+        // SAFETY: Delegated to caller.
+        unsafe { &mut *self.as_mut_ptr() }
+    }
+}
+
 /// ## Types of Fixed Endianness
 ///
 /// This trait annotates types that have values of fixed endianness regardless
