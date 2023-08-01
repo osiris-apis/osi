@@ -509,6 +509,205 @@ implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroU64>, core::num::Non
 implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroU128>, core::num::NonZeroU128, u128);
 implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroUsize>, core::num::NonZeroUsize, usize);
 
+impl<Value, Alignment, Native> Integer<Value, Alignment, Native>
+where
+    Value: Copy,
+    Alignment: Copy,
+    Native: Copy,
+{
+    /// ## Create from underlying value
+    ///
+    /// Create a new integer object from its value. The data is taken
+    /// unmodified and embedded into the new object. `to_value()` will yield
+    /// the same value again.
+    ///
+    /// Alternatively, if the size of `Self` matches the size of `Value`, then
+    /// you can also safely transmute the object to the value type.
+    ///
+    /// Note that you cannot transmute pointers to `Value` to a pointer of
+    /// `Self` since `Value` might have a lower alignment than is required for
+    /// `Self`.
+    pub fn from_value(v: Value) -> Self {
+        Self {
+            value: v,
+            alignment: [],
+            native: core::marker::PhantomData::<Native>,
+        }
+    }
+
+    /// ## Yield underlying value
+    ///
+    /// Yield the value that is embedded in this object. The value is
+    /// returned unmodified. See `from_value()` for the inverse operation.
+    ///
+    /// Alternatively, if the size of `Self` matches the size of `Value`, then
+    /// you can also safely transmute the object to the value type.
+    ///
+    /// Unlike `from_value()`, you can safely transmute pointers to this object
+    /// to pointers of the value, since the alignment requirements of `Value`
+    /// are equal to, or lower than, the alignment requirements of `Self`. Note
+    /// that the wrapped object might have trailing padding bytes to serve an
+    /// alignment request greater than its own size.
+    pub fn to_value(self) -> Value {
+        self.value
+    }
+
+    /// ## Cast to the value
+    ///
+    /// Return a reference to the underlying value. It is safe to do the
+    /// same via a transmute.
+    pub fn as_value(&self) -> &Value {
+        &self.value
+    }
+
+    /// ## Cast to the mutable value
+    ///
+    /// Return a mutable reference to the underlying value. It is safe to
+    /// do the same via a transmute.
+    pub fn as_value_mut(&mut self) -> &mut Value {
+        &mut self.value
+    }
+}
+
+// For debugging simply print the values.
+impl<Value, Alignment, Native> core::fmt::Debug for Integer<Value, Alignment, Native>
+where
+    Value: Copy + core::fmt::Debug,
+    Alignment: Copy,
+    Native: Copy,
+{
+    fn fmt(
+        &self,
+        fmt: &mut core::fmt::Formatter<'_>,
+    ) -> Result<(), core::fmt::Error> {
+        fmt.debug_tuple("Integer")
+           .field(&self.to_value())
+           .finish()
+    }
+}
+
+// Get default from native value.
+impl<Value, Alignment, Native> Default for Integer<Value, Alignment, Native>
+where
+    Value: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy + Default,
+{
+    fn default() -> Self {
+        Self::from_native(Default::default())
+    }
+}
+
+// Convert to native for basic formatting.
+impl<Value, Alignment, Native> core::fmt::Display for Integer<Value, Alignment, Native>
+where
+    Value: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy + core::fmt::Display,
+{
+    fn fmt(
+        &self,
+        fmt: &mut core::fmt::Formatter<'_>,
+    ) -> Result<(), core::fmt::Error> {
+        <Native as core::fmt::Display>::fmt(&self.to_native(), fmt)
+    }
+}
+
+// Compare based on native value.
+impl<Value, Alignment, Native> Eq for Integer<Value, Alignment, Native>
+where
+    Value: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy + Eq,
+{
+}
+
+// Import from native value.
+impl<Value, Alignment, Native> From<Native> for Integer<Value, Alignment, Native>
+where
+    Value: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy,
+{
+    fn from(native: Native) -> Self {
+        Self::from_native(native)
+    }
+}
+
+// Hash based on native value.
+impl<Value, Alignment, Native> core::hash::Hash for Integer<Value, Alignment, Native>
+where
+    Value: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy + core::hash::Hash,
+{
+    fn hash<Op>(&self, state: &mut Op)
+    where
+        Op: core::hash::Hasher,
+    {
+        self.to_native().hash(state)
+    }
+}
+
+// Order based on native value.
+impl<Value, Alignment, Native> Ord for Integer<Value, Alignment, Native>
+where
+    Value: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy + Ord,
+{
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.to_native().cmp(&other.to_native())
+    }
+}
+
+// Compare based on native value.
+impl<Value, Alignment, Native> PartialEq for Integer<Value, Alignment, Native>
+where
+    Value: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy + PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.to_native().eq(&other.to_native())
+    }
+}
+
+// Order based on native value.
+impl<Value, Alignment, Native> PartialOrd for Integer<Value, Alignment, Native>
+where
+    Value: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy + PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        self.to_native().partial_cmp(&other.to_native())
+    }
+}
+
+unsafe impl<Value, Alignment, Native> FixedEndian<Native> for Integer<Value, Alignment, Native>
+where
+    Value: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy,
+{
+    fn from_raw(raw: Native) -> Self {
+        Self::from_value(Value::from_raw(raw))
+    }
+
+    fn to_raw(self) -> Native {
+        self.to_value().to_raw()
+    }
+
+    fn from_native(native: Native) -> Self {
+        Self::from_value(Value::from_native(native))
+    }
+
+    fn to_native(self) -> Native {
+        self.to_value().to_native()
+    }
+}
+
 impl<Address, Target> Pointer<Address, Target>
 where
     Address: Copy,
@@ -849,205 +1048,6 @@ implement_ptr_nonzero!(core::num::NonZeroU128, u128);
 supplement_ptr_native!(core::num::NonZeroU32, u32);
 #[cfg(target_pointer_width = "64")]
 supplement_ptr_native!(core::num::NonZeroU64, u64);
-
-impl<Value, Alignment, Native> Integer<Value, Alignment, Native>
-where
-    Value: Copy,
-    Alignment: Copy,
-    Native: Copy,
-{
-    /// ## Create from underlying value
-    ///
-    /// Create a new integer object from its value. The data is taken
-    /// unmodified and embedded into the new object. `to_value()` will yield
-    /// the same value again.
-    ///
-    /// Alternatively, if the size of `Self` matches the size of `Value`, then
-    /// you can also safely transmute the object to the value type.
-    ///
-    /// Note that you cannot transmute pointers to `Value` to a pointer of
-    /// `Self` since `Value` might have a lower alignment than is required for
-    /// `Self`.
-    pub fn from_value(v: Value) -> Self {
-        Self {
-            value: v,
-            alignment: [],
-            native: core::marker::PhantomData::<Native>,
-        }
-    }
-
-    /// ## Yield underlying value
-    ///
-    /// Yield the value that is embedded in this object. The value is
-    /// returned unmodified. See `from_value()` for the inverse operation.
-    ///
-    /// Alternatively, if the size of `Self` matches the size of `Value`, then
-    /// you can also safely transmute the object to the value type.
-    ///
-    /// Unlike `from_value()`, you can safely transmute pointers to this object
-    /// to pointers of the value, since the alignment requirements of `Value`
-    /// are equal to, or lower than, the alignment requirements of `Self`. Note
-    /// that the wrapped object might have trailing padding bytes to serve an
-    /// alignment request greater than its own size.
-    pub fn to_value(self) -> Value {
-        self.value
-    }
-
-    /// ## Cast to the value
-    ///
-    /// Return a reference to the underlying value. It is safe to do the
-    /// same via a transmute.
-    pub fn as_value(&self) -> &Value {
-        &self.value
-    }
-
-    /// ## Cast to the mutable value
-    ///
-    /// Return a mutable reference to the underlying value. It is safe to
-    /// do the same via a transmute.
-    pub fn as_value_mut(&mut self) -> &mut Value {
-        &mut self.value
-    }
-}
-
-// For debugging simply print the values.
-impl<Value, Alignment, Native> core::fmt::Debug for Integer<Value, Alignment, Native>
-where
-    Value: Copy + core::fmt::Debug,
-    Alignment: Copy,
-    Native: Copy,
-{
-    fn fmt(
-        &self,
-        fmt: &mut core::fmt::Formatter<'_>,
-    ) -> Result<(), core::fmt::Error> {
-        fmt.debug_tuple("Integer")
-           .field(&self.to_value())
-           .finish()
-    }
-}
-
-// Get default from native value.
-impl<Value, Alignment, Native> Default for Integer<Value, Alignment, Native>
-where
-    Value: Copy + FixedEndian<Native>,
-    Alignment: Copy,
-    Native: Copy + Default,
-{
-    fn default() -> Self {
-        Self::from_native(Default::default())
-    }
-}
-
-// Convert to native for basic formatting.
-impl<Value, Alignment, Native> core::fmt::Display for Integer<Value, Alignment, Native>
-where
-    Value: Copy + FixedEndian<Native>,
-    Alignment: Copy,
-    Native: Copy + core::fmt::Display,
-{
-    fn fmt(
-        &self,
-        fmt: &mut core::fmt::Formatter<'_>,
-    ) -> Result<(), core::fmt::Error> {
-        <Native as core::fmt::Display>::fmt(&self.to_native(), fmt)
-    }
-}
-
-// Compare based on native value.
-impl<Value, Alignment, Native> Eq for Integer<Value, Alignment, Native>
-where
-    Value: Copy + FixedEndian<Native>,
-    Alignment: Copy,
-    Native: Copy + Eq,
-{
-}
-
-// Import from native value.
-impl<Value, Alignment, Native> From<Native> for Integer<Value, Alignment, Native>
-where
-    Value: Copy + FixedEndian<Native>,
-    Alignment: Copy,
-    Native: Copy,
-{
-    fn from(native: Native) -> Self {
-        Self::from_native(native)
-    }
-}
-
-// Hash based on native value.
-impl<Value, Alignment, Native> core::hash::Hash for Integer<Value, Alignment, Native>
-where
-    Value: Copy + FixedEndian<Native>,
-    Alignment: Copy,
-    Native: Copy + core::hash::Hash,
-{
-    fn hash<Op>(&self, state: &mut Op)
-    where
-        Op: core::hash::Hasher,
-    {
-        self.to_native().hash(state)
-    }
-}
-
-// Order based on native value.
-impl<Value, Alignment, Native> Ord for Integer<Value, Alignment, Native>
-where
-    Value: Copy + FixedEndian<Native>,
-    Alignment: Copy,
-    Native: Copy + Ord,
-{
-    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        self.to_native().cmp(&other.to_native())
-    }
-}
-
-// Compare based on native value.
-impl<Value, Alignment, Native> PartialEq for Integer<Value, Alignment, Native>
-where
-    Value: Copy + FixedEndian<Native>,
-    Alignment: Copy,
-    Native: Copy + PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.to_native().eq(&other.to_native())
-    }
-}
-
-// Order based on native value.
-impl<Value, Alignment, Native> PartialOrd for Integer<Value, Alignment, Native>
-where
-    Value: Copy + FixedEndian<Native>,
-    Alignment: Copy,
-    Native: Copy + PartialOrd,
-{
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        self.to_native().partial_cmp(&other.to_native())
-    }
-}
-
-unsafe impl<Value, Alignment, Native> FixedEndian<Native> for Integer<Value, Alignment, Native>
-where
-    Value: Copy + FixedEndian<Native>,
-    Alignment: Copy,
-    Native: Copy,
-{
-    fn from_raw(raw: Native) -> Self {
-        Self::from_value(Value::from_raw(raw))
-    }
-
-    fn to_raw(self) -> Native {
-        self.to_value().to_raw()
-    }
-
-    fn from_native(native: Native) -> Self {
-        Self::from_value(Value::from_native(native))
-    }
-
-    fn to_native(self) -> Native {
-        self.to_value().to_native()
-    }
-}
 
 // Supplement `Abi` implementations with type-aliases, which are not stable
 // in trait definitions.
