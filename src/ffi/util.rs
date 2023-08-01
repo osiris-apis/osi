@@ -495,6 +495,56 @@ where
     v
 }
 
+// Implement `NativeAddress` on native-sized primitive integers.
+macro_rules! implement_address {
+    ( $self:ty ) => {
+        impl<Target: ?Sized> NativeAddress<Target> for $self {
+            unsafe fn from_usize_unchecked(v: usize) -> Self {
+                assert!(core::mem::size_of::<usize>() <= core::mem::size_of::<$self>());
+                // SAFETY: as-cast never folds to 0
+                v as _
+            }
+
+            fn to_usize(self) -> usize {
+                assert!(core::mem::size_of::<$self>() <= core::mem::size_of::<usize>());
+                self as _
+            }
+        }
+    }
+}
+
+// Implement `NativeAddress` on native-sized non-zero integers.
+macro_rules! implement_address_nonzero {
+    ( $self:ty ) => {
+        impl<Target: ?Sized> NativeAddress<Target> for $self {
+            unsafe fn from_usize_unchecked(v: usize) -> Self {
+                assert!(core::mem::size_of::<usize>() <= core::mem::size_of::<$self>());
+                // SAFETY: delegated to caller
+                Self::new_unchecked(v as _)
+            }
+
+            fn to_usize(self) -> usize {
+                assert!(core::mem::size_of::<$self>() <= core::mem::size_of::<usize>());
+                self.get() as _
+            }
+        }
+    }
+}
+
+implement_address!(usize);
+
+#[cfg(target_pointer_width = "32")]
+implement_address!(u32);
+#[cfg(target_pointer_width = "64")]
+implement_address!(u64);
+
+implement_address_nonzero!(core::num::NonZeroUsize);
+
+#[cfg(target_pointer_width = "32")]
+implement_address_nonzero!(core::num::NonZeroU32);
+#[cfg(target_pointer_width = "64")]
+implement_address_nonzero!(core::num::NonZeroU64);
+
 // Implement `FixedEndian` on all primitive integers via identity mappings.
 macro_rules! implement_endian_identity {
     ( $self:ty ) => {
@@ -826,6 +876,22 @@ where
     }
 }
 
+impl<Value, Alignment, Native, Target> NativeAddress<Target> for Integer<Value, Alignment, Native>
+where
+    Value: Copy + NativeAddress<Target>,
+    Alignment: Copy,
+    Native: Copy,
+    Target: ?Sized,
+{
+    unsafe fn from_usize_unchecked(v: usize) -> Self {
+        Self::new(Value::from_usize_unchecked(v))
+    }
+
+    fn to_usize(self) -> usize {
+        self.value().to_usize()
+    }
+}
+
 unsafe impl<Value, Alignment, Native> FixedEndian<Native> for Integer<Value, Alignment, Native>
 where
     Value: Copy + FixedEndian<Native>,
@@ -913,6 +979,20 @@ where
     #[inline]
     fn from(v: Address) -> Self {
         Self::new(v)
+    }
+}
+
+impl<Address, Target> NativeAddress<Target> for Pointer<Address, Target>
+where
+    Address: Copy + NativeAddress<Target>,
+    Target: ?Sized,
+{
+    unsafe fn from_usize_unchecked(v: usize) -> Self {
+        Self::new(Address::from_usize_unchecked(v))
+    }
+
+    fn to_usize(self) -> usize {
+        self.address().to_usize()
     }
 }
 
