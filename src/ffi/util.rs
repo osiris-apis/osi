@@ -1330,4 +1330,28 @@ mod tests {
         // `Ord` / `PartialOrd` compare the native value.
         assert!(Test16::from_native(0x0010) < Test16::from_native(0x0100));
     }
+
+    // Verify `Integer` advanced type layout
+    //
+    // Check some non-standard type-parameters for `Integer` and verify the
+    // memory layout.
+    #[test]
+    fn integer_typeinfo() {
+        // verify that the alignment honors the request
+        assert_eq!(align_of::<Integer<u8, PhantomAlign128, u8>>(), 16);
+        assert_eq!(align_of::<Integer<u128, PhantomAlign8, u128>>(), align_of::<u128>());
+
+        // verify that high alignments cause padding
+        assert_eq!(size_of::<Integer<u8, PhantomAlign128, u8>>(), 16);
+
+        // zero-optimization must propagate through `Integer<BigEndian<...>>`
+        assert_eq!(
+            size_of::<Option<Integer<BigEndian<core::num::NonZeroI64>, PhantomAlign64, core::num::NonZeroI64>>>(),
+            8,
+        );
+        assert_eq!(
+            align_of::<Option<Integer<BigEndian<core::num::NonZeroI64>, PhantomAlign64, core::num::NonZeroI64>>>(),
+            8,
+        );
+    }
 }
