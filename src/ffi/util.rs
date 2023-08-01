@@ -1014,10 +1014,10 @@ impl Abi for Abi64le {
 pub type Native = Abi64le;
 #[cfg(all(not(doc), target_endian = "big", target_pointer_width = "32"))]
 pub type Native = Abi32be;
-#[cfg(all(not(doc), target_endian = "big", target_pointer_width = "64"))]
-pub type Native = Abi64be;
 #[cfg(all(not(doc), target_endian = "little", target_pointer_width = "32"))]
 pub type Native = Abi32le;
+#[cfg(all(not(doc), target_endian = "big", target_pointer_width = "64"))]
+pub type Native = Abi64be;
 #[cfg(all(not(doc), target_endian = "little", target_pointer_width = "64"))]
 pub type Native = Abi64le;
 
