@@ -777,6 +777,47 @@ where
     }
 }
 
+// Propagate NativeAddress from the underlying value.
+impl<Value, Alignment, Native, Target> NativeAddress<Target> for Integer<Value, Alignment, Native>
+where
+    Value: Copy + NativeAddress<Target>,
+    Alignment: Copy,
+    Native: Copy,
+    Target: ?Sized,
+{
+    unsafe fn from_usize_unchecked(v: usize) -> Self {
+        Self::new(Value::from_usize_unchecked(v))
+    }
+
+    fn to_usize(self) -> usize {
+        self.value().to_usize()
+    }
+}
+
+// Propagate FixedEndian from the underlying address.
+unsafe impl<Value, Alignment, Native> FixedEndian<Native> for Integer<Value, Alignment, Native>
+where
+    Value: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy,
+{
+    fn from_raw(raw: Native) -> Self {
+        Self::new(Value::from_raw(raw))
+    }
+
+    fn to_raw(self) -> Native {
+        self.value().to_raw()
+    }
+
+    fn from_native(native: Native) -> Self {
+        Self::new(Value::from_native(native))
+    }
+
+    fn to_native(self) -> Native {
+        self.value().to_native()
+    }
+}
+
 // Get default from native value.
 impl<Value, Alignment, Native> Default for Integer<Value, Alignment, Native>
 where
@@ -876,45 +917,6 @@ where
     }
 }
 
-impl<Value, Alignment, Native, Target> NativeAddress<Target> for Integer<Value, Alignment, Native>
-where
-    Value: Copy + NativeAddress<Target>,
-    Alignment: Copy,
-    Native: Copy,
-    Target: ?Sized,
-{
-    unsafe fn from_usize_unchecked(v: usize) -> Self {
-        Self::new(Value::from_usize_unchecked(v))
-    }
-
-    fn to_usize(self) -> usize {
-        self.value().to_usize()
-    }
-}
-
-unsafe impl<Value, Alignment, Native> FixedEndian<Native> for Integer<Value, Alignment, Native>
-where
-    Value: Copy + FixedEndian<Native>,
-    Alignment: Copy,
-    Native: Copy,
-{
-    fn from_raw(raw: Native) -> Self {
-        Self::new(Value::from_raw(raw))
-    }
-
-    fn to_raw(self) -> Native {
-        self.value().to_raw()
-    }
-
-    fn from_native(native: Native) -> Self {
-        Self::new(Value::from_native(native))
-    }
-
-    fn to_native(self) -> Native {
-        self.value().to_native()
-    }
-}
-
 impl<Address, Target> Pointer<Address, Target>
 where
     Address: Copy,
@@ -970,6 +972,7 @@ where
 {
 }
 
+// Propagate NativeAddress from the underlying address.
 impl<Address, Target> NativeAddress<Target> for Pointer<Address, Target>
 where
     Address: Copy + NativeAddress<Target>,
@@ -1065,6 +1068,7 @@ where
     }
 }
 
+// Propagate FixedEndian from the underlying address.
 unsafe impl<Address, Target, Native> FixedEndian<Native> for Pointer<Address, Target>
 where
     Address: Copy + FixedEndian<Native>,
