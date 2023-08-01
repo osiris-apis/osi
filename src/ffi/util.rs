@@ -901,37 +901,6 @@ where
     }
 }
 
-impl<Raw, Alignment, Native> Integer<Raw, Alignment, Native>
-where
-    Raw: Copy + FixedEndian<Native>,
-    Alignment: Copy,
-    Native: Copy,
-{
-    /// ## Create from native value
-    ///
-    /// Create a new integer object from its native representation. This will
-    /// convert the value to the representation used by the integer object. Use
-    /// `to_native()` to get back the native value.
-    ///
-    /// If the native representation matches the raw representation, this
-    /// operation is equivalent to `from_raw()`.
-    pub fn from_native(v: Native) -> Self {
-        Self::from_raw(Raw::from_native(v))
-    }
-
-    /// ## Convert to native value
-    ///
-    /// Return the native representation of the value stored in this integer.
-    /// This will convert the value from the representation used by this
-    /// integer object.
-    ///
-    /// If the native representation matches the raw representation, this
-    /// operation is equivalent to `to_raw()`.
-    pub fn to_native(self) -> Native {
-        self.to_raw().to_native()
-    }
-}
-
 // Get default from native value.
 impl<Raw, Alignment, Native> Default for Integer<Raw, Alignment, Native>
 where
@@ -1028,6 +997,29 @@ where
 {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         self.to_native().partial_cmp(&other.to_native())
+    }
+}
+
+unsafe impl<Raw, Alignment, Native> FixedEndian<Native> for Integer<Raw, Alignment, Native>
+where
+    Raw: Copy + FixedEndian<Native>,
+    Alignment: Copy,
+    Native: Copy,
+{
+    fn from_raw(raw: Native) -> Self {
+        Self::from_raw(Raw::from_raw(raw))
+    }
+
+    fn to_raw(self) -> Native {
+        self.to_raw().to_raw()
+    }
+
+    fn from_native(native: Native) -> Self {
+        Self::from_raw(Raw::from_native(native))
+    }
+
+    fn to_native(self) -> Native {
+        self.to_raw().to_native()
     }
 }
 
