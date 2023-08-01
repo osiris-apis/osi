@@ -529,7 +529,7 @@ where
     /// Return the address underlying this pointer type.
     #[inline(always)]
     #[must_use]
-    pub const fn addr(self) -> Address {
+    pub const fn address(self) -> Address {
         self.address
     }
 
@@ -539,7 +539,7 @@ where
     /// change the underlying address value.
     #[inline]
     pub const fn cast<Other>(self) -> Pointer<Address, Other> {
-        Pointer::<Address, Other>::new(self.addr())
+        Pointer::<Address, Other>::new(self.address())
     }
 }
 
