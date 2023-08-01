@@ -176,10 +176,12 @@ pub struct LittleEndian<Raw: Copy>(Raw);
 ///
 /// Most importantly, this type allows to explicitly define its properties:
 ///
-/// - **Size**: The size and encoding of the type matches that of `Raw`.
-///
 /// - **Alignment**: The alignment matches the maximum of the alignment of the
 ///   raw type and the alignment specified via `Alignment`.
+///
+/// - **Size**: The size and encoding of the type matches that of `Raw`, unless
+///   the requested alignment exceeds its size. In that case, trailing padding
+///   bytes are added to ensure the size is a multiple of the alignment.
 ///
 /// - **Endianness*: The endianness is controlled by `Raw` and always converted
 ///   to native endianness when accessed via the `from/to_native()` accessors.
@@ -838,10 +840,11 @@ where
     /// unmodified and embedded into the new object. `to_raw()` will yield
     /// the same value again.
     ///
-    /// The memory represenation of the new object is the same as of the
-    /// raw value. Thus, the value can be safely transmuted instead. However,
-    /// note that the alignment requirements of the data might change, so you
-    /// cannot transmute pointers to the data, unless suitably aligned.
+    /// Alternatively, if the size of `Self` matches the size of `Raw`, then
+    /// you can also safely transmute the object to the raw type.
+    ///
+    /// Note that you cannot transmute pointers to `Raw` to a pointer of `Self`
+    /// since `Raw` might have a lower alignment than is required for `Self`.
     pub fn from_raw(raw: Raw) -> Self {
         Self {
             raw: raw,
@@ -853,12 +856,16 @@ where
     /// ## Yield underlying raw value
     ///
     /// Yield the raw value that is embedded in this object. The value is
-    /// returned unmodified. You can safely transmute the object to the raw
-    /// type instead. See `from_raw()` for the inverse operation.
+    /// returned unmodified. See `from_raw()` for the inverse operation.
+    ///
+    /// Alternatively, if the size of `Self` matches the size of `Raw`, then
+    /// you can also safely transmute the object to the raw type.
     ///
     /// Unlike `from_raw()`, you can safely transmute pointers to this object
     /// to pointers of the raw value, since the alignment requirements of `Raw`
-    /// are equal to, or lower than, the alignment requirements of `Self`.
+    /// are equal to, or lower than, the alignment requirements of `Self`. Note
+    /// that the wrapped object might have trailing padding bytes to serve an
+    /// alignment request greater than its own size.
     pub fn to_raw(self) -> Raw {
         self.raw
     }
