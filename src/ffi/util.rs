@@ -221,13 +221,13 @@ where
     }
 }
 
-/// ## Types of Fixed Endianness
+/// ## Types with Mapping to Native Endianness
 ///
-/// This trait annotates types that have values of fixed endianness regardless
-/// of the target platform endianness. It allows converting values of such
-/// types to the native representation, and vice-versa. If the endianness
-/// happens to match the endianness of the target platform, all accessors will
-/// pass values through unmodified.
+/// This trait allows creating instances of the implementing type from their
+/// representation in native endianness, as well as converting it into native
+/// endianness. If a type is already encoded in the native endianness, this
+/// trait becomes an identity function for this type. For other types, it
+/// converts from and to native endianness.
 ///
 /// The trait-generic `Raw` defines the type of the native representation. It
 /// must be suitable to represent native **and** foreign values. Furthermore,
@@ -243,7 +243,7 @@ where
 /// type `Raw`. Since `Raw` represents both foreign and native values, special
 /// care is required if the memory representation of `Raw` contains padding or
 /// other unaccounted bits!
-pub unsafe trait FixedEndian<Raw>
+pub unsafe trait NativeEndian<Raw>
 where
     Self: Copy,
     Raw: Copy,
@@ -285,7 +285,7 @@ where
 /// wrapping-structure with the same alignment and size requirements as the
 /// type it wraps.
 ///
-/// The `FixedEndian` trait is implemented for this type if `Raw` is a
+/// The `NativeEndian` trait is implemented for this type if `Raw` is a
 /// primitive integer. Thus, conversion from and to native endianness is
 /// provided, as well as default values, ordering, and other properties
 /// reliant on the native value.
@@ -299,7 +299,7 @@ pub struct BigEndian<Raw: Copy>(Raw);
 /// wrapping-structure with the same alignment and size requirements as the
 /// type it wraps.
 ///
-/// The `FixedEndian` trait is implemented for this type if `Raw` is a
+/// The `NativeEndian` trait is implemented for this type if `Raw` is a
 /// primitive integer. Thus, conversion from and to native endianness is
 /// provided, as well as default values, ordering, and other properties
 /// reliant on the native value.
@@ -545,10 +545,10 @@ implement_address_nonzero!(core::num::NonZeroU32);
 #[cfg(target_pointer_width = "64")]
 implement_address_nonzero!(core::num::NonZeroU64);
 
-// Implement `FixedEndian` on all primitive integers via identity mappings.
+// Implement `NativeEndian` on all primitive integers via identity mappings.
 macro_rules! implement_endian_identity {
     ( $self:ty ) => {
-        unsafe impl FixedEndian<$self> for $self {
+        unsafe impl NativeEndian<$self> for $self {
             fn from_raw(raw: Self) -> Self { raw }
             fn to_raw(self) -> Self { self }
             fn from_native(native: Self) -> Self { native }
@@ -582,10 +582,10 @@ implement_endian_identity!(core::num::NonZeroU64);
 implement_endian_identity!(core::num::NonZeroU128);
 implement_endian_identity!(core::num::NonZeroUsize);
 
-// Implement `FixedEndian` on big-endian integers via `from/to_be()`.
+// Implement `NativeEndian` on big-endian integers via `from/to_be()`.
 macro_rules! implement_endian_be {
     ( $self:ty, $raw:ty ) => {
-        unsafe impl FixedEndian<$raw> for $self {
+        unsafe impl NativeEndian<$raw> for $self {
             fn from_raw(raw: $raw) -> Self { Self(raw) }
             fn to_raw(self) -> $raw { self.0 }
             fn from_native(native: $raw) -> Self { Self::from_raw(native.to_be()) }
@@ -594,10 +594,10 @@ macro_rules! implement_endian_be {
     }
 }
 
-// Implement `FixedEndian` on big-endian non-zeros via `from/to_be()`.
+// Implement `NativeEndian` on big-endian non-zeros via `from/to_be()`.
 macro_rules! implement_endian_be_nonzero {
     ( $self:ty, $raw:ty, $prim:ty ) => {
-        unsafe impl FixedEndian<$raw> for $self {
+        unsafe impl NativeEndian<$raw> for $self {
             fn from_raw(raw: $raw) -> Self { Self(raw) }
             fn to_raw(self) -> $raw { self.0 }
 
@@ -641,10 +641,10 @@ implement_endian_be_nonzero!(BigEndian<core::num::NonZeroU64>, core::num::NonZer
 implement_endian_be_nonzero!(BigEndian<core::num::NonZeroU128>, core::num::NonZeroU128, u128);
 implement_endian_be_nonzero!(BigEndian<core::num::NonZeroUsize>, core::num::NonZeroUsize, usize);
 
-// Implement `FixedEndian` on little-endian integers via `from/to_le()`.
+// Implement `NativeEndian` on little-endian integers via `from/to_le()`.
 macro_rules! implement_endian_le {
     ( $self:ty, $raw:ty ) => {
-        unsafe impl FixedEndian<$raw> for $self {
+        unsafe impl NativeEndian<$raw> for $self {
             fn from_raw(raw: $raw) -> Self { Self(raw) }
             fn to_raw(self) -> $raw { self.0 }
             fn from_native(native: $raw) -> Self { Self::from_raw(native.to_le()) }
@@ -653,10 +653,10 @@ macro_rules! implement_endian_le {
     }
 }
 
-// Implement `FixedEndian` on little-endian non-zeros via `from/to_be()`.
+// Implement `NativeEndian` on little-endian non-zeros via `from/to_be()`.
 macro_rules! implement_endian_le_nonzero {
     ( $self:ty, $raw:ty, $prim:ty ) => {
-        unsafe impl FixedEndian<$raw> for $self {
+        unsafe impl NativeEndian<$raw> for $self {
             fn from_raw(raw: $raw) -> Self { Self(raw) }
             fn to_raw(self) -> $raw { self.0 }
 
@@ -794,10 +794,10 @@ where
     }
 }
 
-// Propagate FixedEndian from the underlying address.
-unsafe impl<Value, Alignment, Native> FixedEndian<Native> for Integer<Value, Alignment, Native>
+// Propagate NativeEndian from the underlying address.
+unsafe impl<Value, Alignment, Native> NativeEndian<Native> for Integer<Value, Alignment, Native>
 where
-    Value: Copy + FixedEndian<Native>,
+    Value: Copy + NativeEndian<Native>,
     Alignment: Copy,
     Native: Copy,
 {
@@ -821,7 +821,7 @@ where
 // Get default from native value.
 impl<Value, Alignment, Native> Default for Integer<Value, Alignment, Native>
 where
-    Value: Copy + FixedEndian<Native>,
+    Value: Copy + NativeEndian<Native>,
     Alignment: Copy,
     Native: Copy + Default,
 {
@@ -833,7 +833,7 @@ where
 // Convert to native for basic formatting.
 impl<Value, Alignment, Native> core::fmt::Display for Integer<Value, Alignment, Native>
 where
-    Value: Copy + FixedEndian<Native>,
+    Value: Copy + NativeEndian<Native>,
     Alignment: Copy,
     Native: Copy + core::fmt::Display,
 {
@@ -848,7 +848,7 @@ where
 // Compare based on native value.
 impl<Value, Alignment, Native> Eq for Integer<Value, Alignment, Native>
 where
-    Value: Copy + FixedEndian<Native>,
+    Value: Copy + NativeEndian<Native>,
     Alignment: Copy,
     Native: Copy + Eq,
 {
@@ -857,7 +857,7 @@ where
 // Import from native value.
 impl<Value, Alignment, Native> From<Native> for Integer<Value, Alignment, Native>
 where
-    Value: Copy + FixedEndian<Native>,
+    Value: Copy + NativeEndian<Native>,
     Alignment: Copy,
     Native: Copy,
 {
@@ -869,7 +869,7 @@ where
 // Hash based on native value.
 impl<Value, Alignment, Native> core::hash::Hash for Integer<Value, Alignment, Native>
 where
-    Value: Copy + FixedEndian<Native>,
+    Value: Copy + NativeEndian<Native>,
     Alignment: Copy,
     Native: Copy + core::hash::Hash,
 {
@@ -884,7 +884,7 @@ where
 // Order based on native value.
 impl<Value, Alignment, Native> Ord for Integer<Value, Alignment, Native>
 where
-    Value: Copy + FixedEndian<Native>,
+    Value: Copy + NativeEndian<Native>,
     Alignment: Copy,
     Native: Copy + Ord,
 {
@@ -896,7 +896,7 @@ where
 // Compare based on native value.
 impl<Value, Alignment, Native> PartialEq for Integer<Value, Alignment, Native>
 where
-    Value: Copy + FixedEndian<Native>,
+    Value: Copy + NativeEndian<Native>,
     Alignment: Copy,
     Native: Copy + PartialEq,
 {
@@ -908,7 +908,7 @@ where
 // Order based on native value.
 impl<Value, Alignment, Native> PartialOrd for Integer<Value, Alignment, Native>
 where
-    Value: Copy + FixedEndian<Native>,
+    Value: Copy + NativeEndian<Native>,
     Alignment: Copy,
     Native: Copy + PartialOrd,
 {
@@ -1068,10 +1068,10 @@ where
     }
 }
 
-// Propagate FixedEndian from the underlying address.
-unsafe impl<Address, Target, Native> FixedEndian<Native> for Pointer<Address, Target>
+// Propagate NativeEndian from the underlying address.
+unsafe impl<Address, Target, Native> NativeEndian<Native> for Pointer<Address, Target>
 where
-    Address: Copy + FixedEndian<Native>,
+    Address: Copy + NativeEndian<Native>,
     Target: ?Sized,
     Native: Copy,
 {
