@@ -520,7 +520,7 @@ where
     pub const fn new(v: Address) -> Self {
         Self {
             address: v,
-            target: core::marker::PhantomData {},
+            target: core::marker::PhantomData,
         }
     }
 
