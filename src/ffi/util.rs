@@ -527,7 +527,7 @@ where
     /// Note that you cannot transmute pointers to `Value` to a pointer of
     /// `Self` since `Value` might have a lower alignment than is required for
     /// `Self`.
-    pub fn from_value(v: Value) -> Self {
+    pub fn new(v: Value) -> Self {
         Self {
             value: v,
             alignment: [],
@@ -538,12 +538,12 @@ where
     /// ## Yield underlying value
     ///
     /// Yield the value that is embedded in this object. The value is
-    /// returned unmodified. See `from_value()` for the inverse operation.
+    /// returned unmodified. See `new()` for the inverse operation.
     ///
     /// Alternatively, if the size of `Self` matches the size of `Value`, then
     /// you can also safely transmute the object to the value type.
     ///
-    /// Unlike `from_value()`, you can safely transmute pointers to this object
+    /// Unlike `new()`, you can safely transmute pointers to this object
     /// to pointers of the value, since the alignment requirements of `Value`
     /// are equal to, or lower than, the alignment requirements of `Self`. Note
     /// that the wrapped object might have trailing padding bytes to serve an
@@ -692,7 +692,7 @@ where
     Native: Copy,
 {
     fn from_raw(raw: Native) -> Self {
-        Self::from_value(Value::from_raw(raw))
+        Self::new(Value::from_raw(raw))
     }
 
     fn to_raw(self) -> Native {
@@ -700,7 +700,7 @@ where
     }
 
     fn from_native(native: Native) -> Self {
-        Self::from_value(Value::from_native(native))
+        Self::new(Value::from_native(native))
     }
 
     fn to_native(self) -> Native {
