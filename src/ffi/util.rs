@@ -177,26 +177,28 @@ pub struct LittleEndian<Raw: Copy>(Raw);
 /// Most importantly, this type allows to explicitly define its properties:
 ///
 /// - **Alignment**: The alignment matches the maximum of the alignment of the
-///   raw type and the alignment specified via `Alignment`.
+///   value type and the alignment specified via `Alignment`.
 ///
-/// - **Size**: The size and encoding of the type matches that of `Raw`, unless
-///   the requested alignment exceeds its size. In that case, trailing padding
-///   bytes are added to ensure the size is a multiple of the alignment.
+/// - **Size**: The size and encoding of the type matches that of `Value`,
+///   unless the requested alignment exceeds its size. In that case, trailing
+///   padding bytes are added to ensure the size is a multiple of the
+///   alignment.
 ///
-/// - **Endianness*: The endianness is controlled by `Raw` and always converted
-///   to native endianness when accessed via the `from/to_native()` accessors.
+/// - **Endianness*: The endianness is controlled by `Value` and always
+///   converted to native endianness when accessed via the `from/to_native()`
+///   accessors.
 ///
-/// The non-zero property of `Raw` is propagated through this type, allowing
+/// The non-zero property of `Value` is propagated through this type, allowing
 /// for `Option<..>` optimizations and ffi-stability.
 #[derive(Clone, Copy)]
 #[repr(C)]
-pub struct Integer<Raw, Alignment, Native>
+pub struct Integer<Value, Alignment, Native>
 where
-    Raw: Copy,
+    Value: Copy,
     Alignment: Copy,
     Native: Copy,
 {
-    raw: Raw,
+    value: Value,
     alignment: [Alignment; 0],
     native: core::marker::PhantomData<Native>,
 }
@@ -848,69 +850,70 @@ supplement_ptr_native!(core::num::NonZeroU32, u32);
 #[cfg(target_pointer_width = "64")]
 supplement_ptr_native!(core::num::NonZeroU64, u64);
 
-impl<Raw, Alignment, Native> Integer<Raw, Alignment, Native>
+impl<Value, Alignment, Native> Integer<Value, Alignment, Native>
 where
-    Raw: Copy,
+    Value: Copy,
     Alignment: Copy,
     Native: Copy,
 {
-    /// ## Create from underlying raw value
+    /// ## Create from underlying value
     ///
-    /// Create a new integer object from its raw value. The data is taken
-    /// unmodified and embedded into the new object. `to_raw()` will yield
+    /// Create a new integer object from its value. The data is taken
+    /// unmodified and embedded into the new object. `to_value()` will yield
     /// the same value again.
     ///
-    /// Alternatively, if the size of `Self` matches the size of `Raw`, then
-    /// you can also safely transmute the object to the raw type.
+    /// Alternatively, if the size of `Self` matches the size of `Value`, then
+    /// you can also safely transmute the object to the value type.
     ///
-    /// Note that you cannot transmute pointers to `Raw` to a pointer of `Self`
-    /// since `Raw` might have a lower alignment than is required for `Self`.
-    pub fn from_raw(raw: Raw) -> Self {
+    /// Note that you cannot transmute pointers to `Value` to a pointer of
+    /// `Self` since `Value` might have a lower alignment than is required for
+    /// `Self`.
+    pub fn from_value(v: Value) -> Self {
         Self {
-            raw: raw,
+            value: v,
             alignment: [],
             native: core::marker::PhantomData::<Native>,
         }
     }
 
-    /// ## Yield underlying raw value
+    /// ## Yield underlying value
     ///
-    /// Yield the raw value that is embedded in this object. The value is
-    /// returned unmodified. See `from_raw()` for the inverse operation.
+    /// Yield the value that is embedded in this object. The value is
+    /// returned unmodified. See `from_value()` for the inverse operation.
     ///
-    /// Alternatively, if the size of `Self` matches the size of `Raw`, then
-    /// you can also safely transmute the object to the raw type.
+    /// Alternatively, if the size of `Self` matches the size of `Value`, then
+    /// you can also safely transmute the object to the value type.
     ///
-    /// Unlike `from_raw()`, you can safely transmute pointers to this object
-    /// to pointers of the raw value, since the alignment requirements of `Raw`
+    /// Unlike `from_value()`, you can safely transmute pointers to this object
+    /// to pointers of the value, since the alignment requirements of `Value`
     /// are equal to, or lower than, the alignment requirements of `Self`. Note
     /// that the wrapped object might have trailing padding bytes to serve an
     /// alignment request greater than its own size.
-    pub fn to_raw(self) -> Raw {
-        self.raw
+    pub fn to_value(self) -> Value {
+        self.value
     }
 
-    /// ## Cast to the raw value
+    /// ## Cast to the value
     ///
-    /// Return a reference to the underlying raw value. It is safe to do the
+    /// Return a reference to the underlying value. It is safe to do the
     /// same via a transmute.
-    pub fn as_raw(&self) -> &Raw {
-        &self.raw
+    pub fn as_value(&self) -> &Value {
+        &self.value
     }
 
-    /// ## Cast to the mutable raw value
+    /// ## Cast to the mutable value
     ///
-    /// Return a mutable reference to the underlying raw value. It is safe to
+    /// Return a mutable reference to the underlying value. It is safe to
     /// do the same via a transmute.
-    pub fn as_raw_mut(&mut self) -> &mut Raw {
-        &mut self.raw
+    pub fn as_value_mut(&mut self) -> &mut Value {
+        &mut self.value
     }
 }
 
-// For debugging simply print the raw values.
-impl<Raw, Alignment, Native> core::fmt::Debug for Integer<Raw, Alignment, Native>
+// For debugging simply print the values.
+impl<Value, Alignment, Native> core::fmt::Debug for Integer<Value, Alignment, Native>
 where
-    Raw: Copy + core::fmt::Debug,
+    Value: Copy + core::fmt::Debug,
     Alignment: Copy,
     Native: Copy,
 {
@@ -919,15 +922,15 @@ where
         fmt: &mut core::fmt::Formatter<'_>,
     ) -> Result<(), core::fmt::Error> {
         fmt.debug_tuple("Integer")
-           .field(&self.raw)
+           .field(&self.to_value())
            .finish()
     }
 }
 
 // Get default from native value.
-impl<Raw, Alignment, Native> Default for Integer<Raw, Alignment, Native>
+impl<Value, Alignment, Native> Default for Integer<Value, Alignment, Native>
 where
-    Raw: Copy + FixedEndian<Native>,
+    Value: Copy + FixedEndian<Native>,
     Alignment: Copy,
     Native: Copy + Default,
 {
@@ -937,9 +940,9 @@ where
 }
 
 // Convert to native for basic formatting.
-impl<Raw, Alignment, Native> core::fmt::Display for Integer<Raw, Alignment, Native>
+impl<Value, Alignment, Native> core::fmt::Display for Integer<Value, Alignment, Native>
 where
-    Raw: Copy + FixedEndian<Native>,
+    Value: Copy + FixedEndian<Native>,
     Alignment: Copy,
     Native: Copy + core::fmt::Display,
 {
@@ -952,18 +955,18 @@ where
 }
 
 // Compare based on native value.
-impl<Raw, Alignment, Native> Eq for Integer<Raw, Alignment, Native>
+impl<Value, Alignment, Native> Eq for Integer<Value, Alignment, Native>
 where
-    Raw: Copy + FixedEndian<Native>,
+    Value: Copy + FixedEndian<Native>,
     Alignment: Copy,
     Native: Copy + Eq,
 {
 }
 
 // Import from native value.
-impl<Raw, Alignment, Native> From<Native> for Integer<Raw, Alignment, Native>
+impl<Value, Alignment, Native> From<Native> for Integer<Value, Alignment, Native>
 where
-    Raw: Copy + FixedEndian<Native>,
+    Value: Copy + FixedEndian<Native>,
     Alignment: Copy,
     Native: Copy,
 {
@@ -973,9 +976,9 @@ where
 }
 
 // Hash based on native value.
-impl<Raw, Alignment, Native> core::hash::Hash for Integer<Raw, Alignment, Native>
+impl<Value, Alignment, Native> core::hash::Hash for Integer<Value, Alignment, Native>
 where
-    Raw: Copy + FixedEndian<Native>,
+    Value: Copy + FixedEndian<Native>,
     Alignment: Copy,
     Native: Copy + core::hash::Hash,
 {
@@ -988,9 +991,9 @@ where
 }
 
 // Order based on native value.
-impl<Raw, Alignment, Native> Ord for Integer<Raw, Alignment, Native>
+impl<Value, Alignment, Native> Ord for Integer<Value, Alignment, Native>
 where
-    Raw: Copy + FixedEndian<Native>,
+    Value: Copy + FixedEndian<Native>,
     Alignment: Copy,
     Native: Copy + Ord,
 {
@@ -1000,9 +1003,9 @@ where
 }
 
 // Compare based on native value.
-impl<Raw, Alignment, Native> PartialEq for Integer<Raw, Alignment, Native>
+impl<Value, Alignment, Native> PartialEq for Integer<Value, Alignment, Native>
 where
-    Raw: Copy + FixedEndian<Native>,
+    Value: Copy + FixedEndian<Native>,
     Alignment: Copy,
     Native: Copy + PartialEq,
 {
@@ -1012,9 +1015,9 @@ where
 }
 
 // Order based on native value.
-impl<Raw, Alignment, Native> PartialOrd for Integer<Raw, Alignment, Native>
+impl<Value, Alignment, Native> PartialOrd for Integer<Value, Alignment, Native>
 where
-    Raw: Copy + FixedEndian<Native>,
+    Value: Copy + FixedEndian<Native>,
     Alignment: Copy,
     Native: Copy + PartialOrd,
 {
@@ -1023,26 +1026,26 @@ where
     }
 }
 
-unsafe impl<Raw, Alignment, Native> FixedEndian<Native> for Integer<Raw, Alignment, Native>
+unsafe impl<Value, Alignment, Native> FixedEndian<Native> for Integer<Value, Alignment, Native>
 where
-    Raw: Copy + FixedEndian<Native>,
+    Value: Copy + FixedEndian<Native>,
     Alignment: Copy,
     Native: Copy,
 {
     fn from_raw(raw: Native) -> Self {
-        Self::from_raw(Raw::from_raw(raw))
+        Self::from_value(Value::from_raw(raw))
     }
 
     fn to_raw(self) -> Native {
-        self.to_raw().to_raw()
+        self.to_value().to_raw()
     }
 
     fn from_native(native: Native) -> Self {
-        Self::from_raw(Raw::from_native(native))
+        Self::from_value(Value::from_native(native))
     }
 
     fn to_native(self) -> Native {
-        self.to_raw().to_native()
+        self.to_value().to_native()
     }
 }
 
