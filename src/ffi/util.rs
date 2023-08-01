@@ -1200,6 +1200,48 @@ mod tests {
         assert_eq!(size_of::<LittleEndian<i128>>(), size_of::<u128>());
         assert_eq!(align_of::<LittleEndian<i128>>(), align_of::<u128>());
 
+        assert_eq!(size_of::<Integer<i8, PhantomAlign8, i8>>(), 1);
+        assert_eq!(align_of::<Integer<i8, PhantomAlign8, i8>>(), 1);
+        assert_eq!(size_of::<Integer<i16, PhantomAlign16, i16>>(), 2);
+        assert_eq!(align_of::<Integer<i16, PhantomAlign16, i16>>(), 2);
+        assert_eq!(size_of::<Integer<i32, PhantomAlign32, i32>>(), 4);
+        assert_eq!(align_of::<Integer<i32, PhantomAlign32, i32>>(), 4);
+        assert_eq!(size_of::<Integer<i64, PhantomAlign64, i64>>(), 8);
+        assert_eq!(align_of::<Integer<i64, PhantomAlign64, i64>>(), 8);
+        assert_eq!(size_of::<Integer<i128, PhantomAlign128, i128>>(), 16);
+        assert_eq!(align_of::<Integer<i128, PhantomAlign128, i128>>(), 16);
+        assert_eq!(size_of::<Integer<u8, PhantomAlign8, u8>>(), 1);
+        assert_eq!(align_of::<Integer<u8, PhantomAlign8, u8>>(), 1);
+        assert_eq!(size_of::<Integer<u16, PhantomAlign16, u16>>(), 2);
+        assert_eq!(align_of::<Integer<u16, PhantomAlign16, u16>>(), 2);
+        assert_eq!(size_of::<Integer<u32, PhantomAlign32, u32>>(), 4);
+        assert_eq!(align_of::<Integer<u32, PhantomAlign32, u32>>(), 4);
+        assert_eq!(size_of::<Integer<u64, PhantomAlign64, u64>>(), 8);
+        assert_eq!(align_of::<Integer<u64, PhantomAlign64, u64>>(), 8);
+        assert_eq!(size_of::<Integer<u128, PhantomAlign128, u128>>(), 16);
+        assert_eq!(align_of::<Integer<u128, PhantomAlign128, u128>>(), 16);
+
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroI8, PhantomAlign8, core::num::NonZeroI8>>>(), 1);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroI8, PhantomAlign8, core::num::NonZeroI8>>>(), 1);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroI16, PhantomAlign16, core::num::NonZeroI16>>>(), 2);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroI16, PhantomAlign16, core::num::NonZeroI16>>>(), 2);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroI32, PhantomAlign32, core::num::NonZeroI32>>>(), 4);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroI32, PhantomAlign32, core::num::NonZeroI32>>>(), 4);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroI64, PhantomAlign64, core::num::NonZeroI64>>>(), 8);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroI64, PhantomAlign64, core::num::NonZeroI64>>>(), 8);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroI128, PhantomAlign128, core::num::NonZeroI128>>>(), 16);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroI128, PhantomAlign128, core::num::NonZeroI128>>>(), 16);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroU8, PhantomAlign8, core::num::NonZeroU8>>>(), 1);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroU8, PhantomAlign8, core::num::NonZeroU8>>>(), 1);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroU16, PhantomAlign16, core::num::NonZeroU16>>>(), 2);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroU16, PhantomAlign16, core::num::NonZeroU16>>>(), 2);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroU32, PhantomAlign32, core::num::NonZeroU32>>>(), 4);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroU32, PhantomAlign32, core::num::NonZeroU32>>>(), 4);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroU64, PhantomAlign64, core::num::NonZeroU64>>>(), 8);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroU64, PhantomAlign64, core::num::NonZeroU64>>>(), 8);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroU128, PhantomAlign128, core::num::NonZeroU128>>>(), 16);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroU128, PhantomAlign128, core::num::NonZeroU128>>>(), 16);
+
         assert_eq!(align_of::<<Abi32be as Abi>::Align>(), 4);
         assert_eq!(align_of::<<Abi32be as Abi>::Align8>(), 1);
         assert_eq!(align_of::<<Abi32be as Abi>::Align16>(), 2);
