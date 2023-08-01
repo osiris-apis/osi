@@ -527,7 +527,7 @@ where
     /// Note that you cannot transmute pointers to `Value` to a pointer of
     /// `Self` since `Value` might have a lower alignment than is required for
     /// `Self`.
-    pub fn new(v: Value) -> Self {
+    pub const fn new(v: Value) -> Self {
         Self {
             value: v,
             alignment: [],
@@ -548,7 +548,7 @@ where
     /// are equal to, or lower than, the alignment requirements of `Self`. Note
     /// that the wrapped object might have trailing padding bytes to serve an
     /// alignment request greater than its own size.
-    pub fn value(&self) -> Value {
+    pub const fn value(&self) -> Value {
         self.value
     }
 
@@ -556,7 +556,7 @@ where
     ///
     /// Return a reference to the underlying value. It is safe to do the
     /// same via a transmute.
-    pub fn as_value(&self) -> &Value {
+    pub const fn as_value(&self) -> &Value {
         &self.value
     }
 
