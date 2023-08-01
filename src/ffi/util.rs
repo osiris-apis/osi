@@ -574,6 +574,29 @@ where
     }
 }
 
+unsafe impl<Address, Target, Native> FixedEndian<Native> for Pointer<Address, Target>
+where
+    Address: Copy + FixedEndian<Native>,
+    Target: ?Sized,
+    Native: Copy,
+{
+    fn from_raw(raw: Native) -> Self {
+        Self::new(Address::from_raw(raw))
+    }
+
+    fn to_raw(self) -> Native {
+        self.address.to_raw()
+    }
+
+    fn from_native(native: Native) -> Self {
+        Self::new(Address::from_native(native))
+    }
+
+    fn to_native(self) -> Native {
+        self.address.to_native()
+    }
+}
+
 // Implement `Pointer` for non-zero types like `core::num::NonZeroU*`. This
 // will provide suitable helpers to convert to and from primitive integers
 // without going through the intermediate address-type.
