@@ -390,6 +390,124 @@ implement_endian_identity!(core::num::NonZeroU64);
 implement_endian_identity!(core::num::NonZeroU128);
 implement_endian_identity!(core::num::NonZeroUsize);
 
+// Implement `FixedEndian` on big-endian integers via `from/to_be()`.
+macro_rules! implement_endian_be {
+    ( $self:ty, $raw:ty ) => {
+        unsafe impl FixedEndian<$raw> for $self {
+            fn from_raw(raw: $raw) -> Self { Self(raw) }
+            fn to_raw(self) -> $raw { self.0 }
+            fn from_native(native: $raw) -> Self { Self::from_raw(native.to_be()) }
+            fn to_native(self) -> $raw { <$raw>::from_be(self.to_raw()) }
+        }
+    }
+}
+
+// Implement `FixedEndian` on big-endian non-zeros via `from/to_be()`.
+macro_rules! implement_endian_be_nonzero {
+    ( $self:ty, $raw:ty, $prim:ty ) => {
+        unsafe impl FixedEndian<$raw> for $self {
+            fn from_raw(raw: $raw) -> Self { Self(raw) }
+            fn to_raw(self) -> $raw { self.0 }
+
+            fn from_native(native: $raw) -> Self {
+                Self::from_raw(
+                    // SAFETY: endian conversion never folds to 0
+                    unsafe { <$raw>::new_unchecked(native.get().to_be()) }
+                )
+            }
+
+            fn to_native(self) -> $raw {
+                // SAFETY: endian conversion never folds to 0
+                unsafe { <$raw>::new_unchecked(<$prim>::from_be(self.to_raw().get())) }
+            }
+        }
+    }
+}
+
+implement_endian_be!(BigEndian<i8>, i8);
+implement_endian_be!(BigEndian<i16>, i16);
+implement_endian_be!(BigEndian<i32>, i32);
+implement_endian_be!(BigEndian<i64>, i64);
+implement_endian_be!(BigEndian<i128>, i128);
+implement_endian_be!(BigEndian<isize>, isize);
+implement_endian_be!(BigEndian<u8>, u8);
+implement_endian_be!(BigEndian<u16>, u16);
+implement_endian_be!(BigEndian<u32>, u32);
+implement_endian_be!(BigEndian<u64>, u64);
+implement_endian_be!(BigEndian<u128>, u128);
+implement_endian_be!(BigEndian<usize>, usize);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroI8>, core::num::NonZeroI8, i8);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroI16>, core::num::NonZeroI16, i16);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroI32>, core::num::NonZeroI32, i32);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroI64>, core::num::NonZeroI64, i64);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroI128>, core::num::NonZeroI128, i128);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroIsize>, core::num::NonZeroIsize, isize);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroU8>, core::num::NonZeroU8, u8);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroU16>, core::num::NonZeroU16, u16);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroU32>, core::num::NonZeroU32, u32);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroU64>, core::num::NonZeroU64, u64);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroU128>, core::num::NonZeroU128, u128);
+implement_endian_be_nonzero!(BigEndian<core::num::NonZeroUsize>, core::num::NonZeroUsize, usize);
+
+// Implement `FixedEndian` on little-endian integers via `from/to_le()`.
+macro_rules! implement_endian_le {
+    ( $self:ty, $raw:ty ) => {
+        unsafe impl FixedEndian<$raw> for $self {
+            fn from_raw(raw: $raw) -> Self { Self(raw) }
+            fn to_raw(self) -> $raw { self.0 }
+            fn from_native(native: $raw) -> Self { Self::from_raw(native.to_le()) }
+            fn to_native(self) -> $raw { <$raw>::from_le(self.to_raw()) }
+        }
+    }
+}
+
+// Implement `FixedEndian` on little-endian non-zeros via `from/to_be()`.
+macro_rules! implement_endian_le_nonzero {
+    ( $self:ty, $raw:ty, $prim:ty ) => {
+        unsafe impl FixedEndian<$raw> for $self {
+            fn from_raw(raw: $raw) -> Self { Self(raw) }
+            fn to_raw(self) -> $raw { self.0 }
+
+            fn from_native(native: $raw) -> Self {
+                Self::from_raw(
+                    // SAFETY: endian conversion never folds to 0
+                    unsafe { <$raw>::new_unchecked(native.get().to_le()) }
+                )
+            }
+
+            fn to_native(self) -> $raw {
+                // SAFETY: endian conversion never folds to 0
+                unsafe { <$raw>::new_unchecked(<$prim>::from_le(self.to_raw().get())) }
+            }
+        }
+    }
+}
+
+implement_endian_le!(LittleEndian<i8>, i8);
+implement_endian_le!(LittleEndian<i16>, i16);
+implement_endian_le!(LittleEndian<i32>, i32);
+implement_endian_le!(LittleEndian<i64>, i64);
+implement_endian_le!(LittleEndian<i128>, i128);
+implement_endian_le!(LittleEndian<isize>, isize);
+implement_endian_le!(LittleEndian<u8>, u8);
+implement_endian_le!(LittleEndian<u16>, u16);
+implement_endian_le!(LittleEndian<u32>, u32);
+implement_endian_le!(LittleEndian<u64>, u64);
+implement_endian_le!(LittleEndian<u128>, u128);
+implement_endian_le!(LittleEndian<usize>, usize);
+implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroI8>, core::num::NonZeroI8, i8);
+implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroI16>, core::num::NonZeroI16, i16);
+implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroI32>, core::num::NonZeroI32, i32);
+implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroI64>, core::num::NonZeroI64, i64);
+implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroI128>, core::num::NonZeroI128, i128);
+implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroIsize>, core::num::NonZeroIsize, isize);
+implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroU8>, core::num::NonZeroU8, u8);
+implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroU16>, core::num::NonZeroU16, u16);
+implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroU32>, core::num::NonZeroU32, u32);
+implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroU64>, core::num::NonZeroU64, u64);
+implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroU128>, core::num::NonZeroU128, u128);
+implement_endian_le_nonzero!(LittleEndian<core::num::NonZeroUsize>, core::num::NonZeroUsize, usize);
+
 impl<Addr, Target> Ptr<Addr, Target>
 where
     Addr: Copy,
