@@ -3,24 +3,6 @@
 //! This is a utility module for the other `ffi` modules. It provides common
 //! abstractions and type definitions used across many different interfaces.
 
-/// ## Enumeration Content
-///
-/// When interfaces use C-enum types, we use this as backing type for all
-/// its integer constants by default. Note that C-enums are highly compiler
-/// specific and do not necessarily match the type of the integer constants
-/// that make up the enum (yet, they must be able to represent all values).
-///
-/// In C, the enumeration type does not necessarily equal the type of the
-/// enumeration members, but must be suitable to represent their values.
-/// Before C23, there was no way to control the type the compiler would
-/// pick for the enum, yet all relevant compilers picked `int`. Hence, we
-/// use the same as default for all enums.
-///
-/// Note that this is not necessarily the right type for every C-enum in
-/// every interface. Hence, care must be taken to pick a suitable type if
-/// necessary.
-pub type Enumeration = i32;
-
 /// ## Anonymous Pointer Content
 ///
 /// When interfaces (e.g., JNI) use anonymous pointer targets, we declare
@@ -389,6 +371,21 @@ pub trait Abi {
     /// Native pointer type of the platform, pointing to a value of type
     /// `Target`.
     type Ptr<Target>: Copy;
+    /// Native integer type used to encode C-enum values. Note that C-enums
+    /// are highly compiler specific and do not necessarily match the type of
+    /// the integer constants that make up the enum (yet, they must be able to
+    /// represent all values).
+    ///
+    /// In C, the enumeration type does not necessarily equal the type of the
+    /// enumeration members, but must be suitable to represent their values.
+    /// Before C23, there was no way to control the type the compiler would
+    /// pick for the enum, yet all relevant compilers picked `int`. Hence, you
+    /// should likely use the same as default for all enums.
+    ///
+    /// Note that this is not necessarily the right type for every C-enum in
+    /// every interface. Hence, care must be taken to pick a suitable type if
+    /// necessary.
+    type Enum: Copy;
 
     /// Big-endian signed x-bit integer of the platform.
     type Ixbe<Native: Copy, Alignment: Copy>: Copy;
@@ -1202,6 +1199,7 @@ where
 macro_rules! supplement_abi_aliases {
     () => {
         type Ptr<Target> = Pointer<Self::Addr, Target>;
+        type Enum = Self::I32;
 
         type Ixbe<Native: Copy, Alignment: Copy> = Integer<BigEndian<Native>, Alignment, Native>;
         type Ixle<Native: Copy, Alignment: Copy> = Integer<LittleEndian<Native>, Alignment, Native>;
@@ -1332,9 +1330,6 @@ mod tests {
     // guaranteed layout.
     #[test]
     fn typeinfo() {
-        assert_eq!(size_of::<Enumeration>(), 4);
-        assert_eq!(align_of::<Enumeration>(), 4);
-
         assert_eq!(size_of::<Anonymous>(), 1);
         assert_eq!(align_of::<Anonymous>(), 1);
 
