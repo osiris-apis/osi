@@ -487,15 +487,19 @@ pub trait Abi {
 }
 
 /// ## Big-endian 32-bit ABI
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Abi32be {}
 
 /// ## Little-endian 32-bit ABI
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Abi32le {}
 
 /// ## Big-endian 64-bit ABI
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Abi64be {}
 
 /// ## Little-endian 64-bit ABI
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Abi64le {}
 
 /// ## Value Selector based on Address Size
