@@ -399,6 +399,12 @@ pub trait Abi {
     type Uxle<Native: Copy, Alignment: Copy>: Copy;
     /// Native-endian unsigned x-bit integer of the platform.
     type Ux<Native: Copy, Alignment: Copy>: Copy;
+    /// Big-endian x-bit float of the platform.
+    type Fxbe<Native: Copy, ALignment: Copy>: Copy;
+    /// Little-endian x-bit float of the platform.
+    type Fxle<Native: Copy, ALignment: Copy>: Copy;
+    /// Native-endian x-bit float of the platform.
+    type Fx<Native: Copy, ALignment: Copy>: Copy;
 
     /// Big-endian signed 8-bit integer of the platform.
     type I8be: Copy;
@@ -465,6 +471,19 @@ pub trait Abi {
     type U64: Copy;
     /// Native-endian unsigned 128-bit integer of the platform.
     type U128: Copy;
+
+    /// Big-endian 32-bit float of the platform.
+    type F32be: Copy;
+    /// Big-endian 64-bit float of the platform.
+    type F64be: Copy;
+    /// Little-endian 32-bit float of the platform.
+    type F32le: Copy;
+    /// Little-endian 64-bit float of the platform.
+    type F64le: Copy;
+    /// Native-endian 32-bit float of the platform.
+    type F32: Copy;
+    /// Native-endian 64-bit float of the platform.
+    type F64: Copy;
 }
 
 /// ## Big-endian 32-bit ABI
@@ -1205,6 +1224,8 @@ macro_rules! supplement_abi_aliases {
         type Ixle<Native: Copy, Alignment: Copy> = Integer<LittleEndian<Native>, Alignment, Native>;
         type Uxbe<Native: Copy, Alignment: Copy> = Integer<BigEndian<Native>, Alignment, Native>;
         type Uxle<Native: Copy, Alignment: Copy> = Integer<LittleEndian<Native>, Alignment, Native>;
+        type Fxbe<Native: Copy, Alignment: Copy> = Integer<BigEndian<Native>, Alignment, Native>;
+        type Fxle<Native: Copy, Alignment: Copy> = Integer<LittleEndian<Native>, Alignment, Native>;
 
         type I8be = Self::Ixbe<i8, Self::Align8>;
         type I16be = Self::Ixbe<i16, Self::Align16>;
@@ -1241,6 +1262,13 @@ macro_rules! supplement_abi_aliases {
         type U32 = Self::Ux<u32, Self::Align32>;
         type U64 = Self::Ux<u64, Self::Align64>;
         type U128 = Self::Ux<u128, Self::Align128>;
+
+        type F32be = Self::Fxbe<f32, Self::Align32>;
+        type F64be = Self::Fxbe<f64, Self::Align64>;
+        type F32le = Self::Fxle<f32, Self::Align32>;
+        type F64le = Self::Fxle<f64, Self::Align64>;
+        type F32 = Self::Fx<f32, Self::Align32>;
+        type F64 = Self::Fx<f64, Self::Align64>;
     }
 }
 
@@ -1256,6 +1284,7 @@ impl Abi for Abi32be {
 
     type Ix<Native: Copy, Alignment: Copy> = Self::Ixbe<Native, Alignment>;
     type Ux<Native: Copy, Alignment: Copy> = Self::Uxbe<Native, Alignment>;
+    type Fx<Native: Copy, Alignment: Copy> = Self::Fxbe<Native, Alignment>;
 
     supplement_abi_aliases!();
 }
@@ -1272,6 +1301,7 @@ impl Abi for Abi32le {
 
     type Ix<Native: Copy, Alignment: Copy> = Self::Ixle<Native, Alignment>;
     type Ux<Native: Copy, Alignment: Copy> = Self::Uxle<Native, Alignment>;
+    type Fx<Native: Copy, Alignment: Copy> = Self::Fxle<Native, Alignment>;
 
     supplement_abi_aliases!();
 }
@@ -1288,6 +1318,7 @@ impl Abi for Abi64be {
 
     type Ix<Native: Copy, Alignment: Copy> = Self::Ixbe<Native, Alignment>;
     type Ux<Native: Copy, Alignment: Copy> = Self::Uxbe<Native, Alignment>;
+    type Fx<Native: Copy, Alignment: Copy> = Self::Fxbe<Native, Alignment>;
 
     supplement_abi_aliases!();
 }
@@ -1304,6 +1335,7 @@ impl Abi for Abi64le {
 
     type Ix<Native: Copy, Alignment: Copy> = Self::Ixle<Native, Alignment>;
     type Ux<Native: Copy, Alignment: Copy> = Self::Uxle<Native, Alignment>;
+    type Fx<Native: Copy, Alignment: Copy> = Self::Fxle<Native, Alignment>;
 
     supplement_abi_aliases!();
 }
