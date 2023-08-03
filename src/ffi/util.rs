@@ -336,7 +336,7 @@ where
 /// This type is designed as alternative to `core::ptr::NonNull` but
 /// provides a fixed-size address type. It allows representing 32-bit
 /// pointers on 64-bit machines, and vice-versa.
-#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct Pointer<Address, Target>
 where
@@ -1084,6 +1084,78 @@ where
     Address: Copy,
     Target: ?Sized,
 {
+}
+
+// Ignore PhantomData for Display.
+impl<Address, Target> core::fmt::Display for Pointer<Address, Target>
+where
+    Address: Copy + core::fmt::Display,
+    Target: ?Sized,
+{
+    fn fmt(
+        &self,
+        fmt: &mut core::fmt::Formatter<'_>,
+    ) -> Result<(), core::fmt::Error> {
+        <Address as core::fmt::Display>::fmt(&self.address(), fmt)
+    }
+}
+
+// Ignore PhantomData for Eq.
+impl<Address, Target> Eq for Pointer<Address, Target>
+where
+    Address: Copy + Eq,
+    Target: ?Sized,
+{
+}
+
+// Ignore PhantomData for Hash.
+impl<Address, Target> core::hash::Hash for Pointer<Address, Target>
+where
+    Address: Copy + core::hash::Hash,
+    Target: ?Sized,
+{
+    fn hash<Op>(&self, state: &mut Op)
+    where
+        Op: core::hash::Hasher,
+    {
+        self.address().hash(state)
+    }
+}
+
+// Ignore PhantomData for Ord.
+impl<Address, Target> Ord for Pointer<Address, Target>
+where
+    Address: Copy + Ord,
+    Target: ?Sized,
+{
+    #[must_use]
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.address().cmp(&other.address())
+    }
+}
+
+// Ignore PhantomData for PartialEq.
+impl<Address, Target> PartialEq for Pointer<Address, Target>
+where
+    Address: Copy + PartialEq,
+    Target: ?Sized,
+{
+    #[must_use]
+    fn eq(&self, other: &Self) -> bool {
+        self.address().eq(&other.address())
+    }
+}
+
+// Ignore PhantomData for PartialOrd.
+impl<Address, Target> PartialOrd for Pointer<Address, Target>
+where
+    Address: Copy + PartialOrd,
+    Target: ?Sized,
+{
+    #[must_use]
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        self.address().partial_cmp(&other.address())
+    }
 }
 
 // Propagate NativeAddress from the underlying address.
