@@ -17,6 +17,16 @@
 /// given interface specifies a required target type alignment.
 pub type Anonymous = u8;
 
+/// ## A native aligned ZST
+///
+/// This type can be used to align structures to at least the native alignment
+/// by embedding it in the structure. It works similar to other phantom-marker
+/// types.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(target_pointer_width = "32", repr(C, align(4)))]
+#[cfg_attr(target_pointer_width = "64", repr(C, align(8)))]
+pub struct PhantomAlign {}
+
 /// ## An 8-bit aligned ZST
 ///
 /// This type can be used to align structures to at least 8-bit by
@@ -1456,11 +1466,13 @@ mod tests {
         assert_eq!(size_of::<Anonymous>(), 1);
         assert_eq!(align_of::<Anonymous>(), 1);
 
+        assert_eq!(align_of::<PhantomAlign>(), v32_v64(4, 8));
         assert_eq!(align_of::<PhantomAlign8>(), 1);
         assert_eq!(align_of::<PhantomAlign16>(), 2);
         assert_eq!(align_of::<PhantomAlign32>(), 4);
         assert_eq!(align_of::<PhantomAlign64>(), 8);
         assert_eq!(align_of::<PhantomAlign128>(), 16);
+        assert_eq!(size_of::<PhantomAlign>(), 0);
         assert_eq!(size_of::<PhantomAlign8>(), 0);
         assert_eq!(size_of::<PhantomAlign16>(), 0);
         assert_eq!(size_of::<PhantomAlign32>(), 0);
