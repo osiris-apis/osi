@@ -1336,6 +1336,78 @@ where
     }
 }
 
+// Implement `constant()` for a type
+//
+// Unfortunately, Rust does not allow `const fn` in traits, thus making it
+// impossible to define constants of a type defined by a trait. Until Rust
+// gains the required capabilities, we use a workaround: We provide the
+// `constant()` function for every type used by the exported ABIs. It takes
+// a suitable literal and turns it into a constant of the respective type.
+//
+// Note that this cannot make use of traits and trait-bounds, since those
+// cannot be called from const-context. Instead, we have to channel the
+// `constant()` calls upwards on each generic.
+//
+// Unfortunately, this requires implementing this function for every single
+// combination of primitive integers with our wrapper types. This is still
+// manageable, but might get unwieldy if we define more wrappers in the
+// future.
+macro_rules! implement_constant_as {
+    ( $self:ty, $native:ty, $v:ident, $fn:expr $(,)? ) => {
+        impl $self {
+            /// ## Create constant instance
+            ///
+            /// Create a new instance suitable for constant-expressions. This
+            /// is required since traits like `From` currently cannot be used
+            /// in constant-expressions.
+            ///
+            /// This evaluates to:
+            ///
+            #[doc = concat!("`", stringify!($fn), "`")]
+            #[doc(hidden)] // Suppress for now, to avoid many duplicates.
+            pub const fn constant($v: $native) -> Self {
+                $fn
+            }
+        }
+    }
+}
+
+macro_rules! implement_constant_for_integers {
+    ( $wrapper:ident, $wrapperfn:ident, $(( $native:ty, $($align:ty),+ $(,)? )),+ $(,)? ) => {
+        $(
+            implement_constant_as!(
+                $wrapper<$native>,
+                $native,
+                v,
+                Self(v.$wrapperfn()),
+            );
+
+            $(
+                implement_constant_as!(
+                    Integer<$wrapper<$native>, $align, $native>,
+                    $native,
+                    v,
+                    Self::new($wrapper::<$native>::constant(v)),
+                );
+            )+
+        )+
+    }
+}
+
+macro_rules! implement_constant_for {
+    ( $(( $native:ty, $($align:ty),+ $(,)? )),+ $(,)? ) => {
+        implement_constant_for_integers!(BigEndian, to_be, $(($native, $($align),+)),+);
+        implement_constant_for_integers!(LittleEndian, to_le, $(($native, $($align),+)),+);
+    }
+}
+
+implement_constant_for!(
+    (isize, PhantomAlign), (i8, PhantomAlign8), (i16, PhantomAlign16), (i32, PhantomAlign32),
+    (i64, PhantomAlign32, PhantomAlign64), (i128, PhantomAlign32, PhantomAlign64),
+    (usize, PhantomAlign), (u8, PhantomAlign8), (u16, PhantomAlign16), (u32, PhantomAlign32),
+    (u64, PhantomAlign32, PhantomAlign64), (u128, PhantomAlign32, PhantomAlign64),
+);
+
 // Supplement `Abi` implementations with type-aliases, which are not stable
 // in trait definitions.
 macro_rules! supplement_abi_aliases {
