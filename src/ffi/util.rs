@@ -1412,6 +1412,25 @@ implement_constant_for!(
     (u64, PhantomAlign32, PhantomAlign64), (u128, PhantomAlign32, PhantomAlign64),
 );
 
+#[doc(hidden)]
+#[macro_export]
+macro_rules! ffi_util_constant {
+    (identity, $type: ty) => { core::convert::identity::<$type> };
+    ($fn:ident, $type: ty) => { <$type>::$fn };
+}
+
+/// ## Constant Initializer
+///
+/// This macro takes a selector and type as argument and evaluates to the
+/// function that is used to construct such values. Possible selectors are:
+///
+/// - `identity`: Use `core::convert::identity::<$type>` as constructor.
+/// - `$fn:ident`: Use `<$type>::$fn` as constructor.
+///
+/// This function does not invoke the constructor, but mere evaluates to its
+/// path.
+pub use ffi_util_constant as constant;
+
 macro_rules! supplement_abi_common {
     () => {
         type Align8 = PhantomAlign8;
