@@ -336,7 +336,6 @@ where
 /// This type is designed as alternative to `core::ptr::NonNull` but
 /// provides a fixed-size address type. It allows representing 32-bit
 /// pointers on 64-bit machines, and vice-versa.
-#[derive(Debug)]
 #[repr(transparent)]
 pub struct Pointer<Address, Target>
 where
@@ -1084,6 +1083,22 @@ where
     Address: Copy,
     Target: ?Sized,
 {
+}
+
+// For debugging simply print the values.
+impl<Address, Target> core::fmt::Debug for Pointer<Address, Target>
+where
+    Address: Copy + core::fmt::Debug,
+    Target: ?Sized,
+{
+    fn fmt(
+        &self,
+        fmt: &mut core::fmt::Formatter<'_>,
+    ) -> Result<(), core::fmt::Error> {
+        fmt.debug_tuple("Pointer")
+           .field(&self.address())
+           .finish()
+    }
 }
 
 // Ignore PhantomData for Display.
