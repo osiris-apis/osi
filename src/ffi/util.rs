@@ -328,7 +328,6 @@ pub struct LittleEndian<Raw: Copy>(Raw);
 ///
 /// The non-zero property of `Value` is propagated through this type, allowing
 /// for `Option<..>` optimizations and ffi-stability.
-#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct Integer<Value, Alignment, Native>
 where
@@ -860,6 +859,29 @@ where
     pub fn as_value_mut(&mut self) -> &mut Value {
         &mut self.value
     }
+}
+
+// Implement clone via propagation.
+impl<Value, Alignment, Native> Clone for Integer<Value, Alignment, Native>
+where
+    Value: Copy,
+    Alignment: Copy,
+    Native: Copy,
+{
+    #[inline]
+    #[must_use]
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+// Implement copy via propagation.
+impl<Value, Alignment, Native> Copy for Integer<Value, Alignment, Native>
+where
+    Value: Copy,
+    Alignment: Copy,
+    Native: Copy,
+{
 }
 
 // For debugging simply print the values.
