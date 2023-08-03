@@ -286,7 +286,7 @@ where
 /// primitive integer. Thus, conversion from and to native endianness is
 /// provided, as well as default values, ordering, and other properties
 /// reliant on the native value.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(transparent)]
 pub struct BigEndian<Raw: Copy>(Raw);
 
@@ -300,7 +300,7 @@ pub struct BigEndian<Raw: Copy>(Raw);
 /// primitive integer. Thus, conversion from and to native endianness is
 /// provided, as well as default values, ordering, and other properties
 /// reliant on the native value.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(transparent)]
 pub struct LittleEndian<Raw: Copy>(Raw);
 
