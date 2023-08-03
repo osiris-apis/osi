@@ -494,6 +494,10 @@ pub trait Abi {
     type F64: Copy;
 }
 
+/// ## Native ABI
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Native {}
+
 /// ## Big-endian 32-bit ABI
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Abi32be {}
@@ -1408,13 +1412,23 @@ implement_constant_for!(
     (u64, PhantomAlign32, PhantomAlign64), (u128, PhantomAlign32, PhantomAlign64),
 );
 
-// Supplement `Abi` implementations with type-aliases, which are not stable
-// in trait definitions.
-macro_rules! supplement_abi_aliases {
+macro_rules! supplement_abi_common {
     () => {
-        type Ptr<Target> = Pointer<Self::Addr, Target>;
-        type Enum = Self::I32;
+        type Align8 = PhantomAlign8;
+        type Align16 = PhantomAlign16;
+        type Align32 = PhantomAlign32;
 
+        // Rely on `target_pointer_width` being 4 or 8.
+        type Align64 = Self::Align;
+        type Align128 = Self::Align;
+
+        type Enum = Self::I32;
+    }
+}
+
+// Supplement `Abi` implementations with `Integer` based endian converters.
+macro_rules! supplement_abi_integer {
+    () => {
         type Ixbe<Native: Copy, Alignment: Copy> = Integer<BigEndian<Native>, Alignment, Native>;
         type Ixle<Native: Copy, Alignment: Copy> = Integer<LittleEndian<Native>, Alignment, Native>;
         type Uxbe<Native: Copy, Alignment: Copy> = Integer<BigEndian<Native>, Alignment, Native>;
@@ -1434,12 +1448,6 @@ macro_rules! supplement_abi_aliases {
         type I64le = Self::Ixle<i64, Self::Align64>;
         type I128le = Self::Ixle<i128, Self::Align128>;
 
-        type I8 = Self::Ix<i8, Self::Align8>;
-        type I16 = Self::Ix<i16, Self::Align16>;
-        type I32 = Self::Ix<i32, Self::Align32>;
-        type I64 = Self::Ix<i64, Self::Align64>;
-        type I128 = Self::Ix<i128, Self::Align128>;
-
         type U8be = Self::Uxbe<u8, Self::Align8>;
         type U16be = Self::Uxbe<u16, Self::Align16>;
         type U32be = Self::Uxbe<u32, Self::Align32>;
@@ -1452,99 +1460,141 @@ macro_rules! supplement_abi_aliases {
         type U64le = Self::Uxle<u64, Self::Align64>;
         type U128le = Self::Uxle<u128, Self::Align128>;
 
+        type F32be = Self::Fxbe<f32, Self::Align32>;
+        type F64be = Self::Fxbe<f64, Self::Align64>;
+        type F32le = Self::Fxle<f32, Self::Align32>;
+        type F64le = Self::Fxle<f64, Self::Align64>;
+    }
+}
+
+// Supplement `Abi` implementations with the default target aliases.
+macro_rules! supplement_abi_target {
+    () => {
+        type I8 = Self::Ix<i8, Self::Align8>;
+        type I16 = Self::Ix<i16, Self::Align16>;
+        type I32 = Self::Ix<i32, Self::Align32>;
+        type I64 = Self::Ix<i64, Self::Align64>;
+        type I128 = Self::Ix<i128, Self::Align128>;
+
         type U8 = Self::Ux<u8, Self::Align8>;
         type U16 = Self::Ux<u16, Self::Align16>;
         type U32 = Self::Ux<u32, Self::Align32>;
         type U64 = Self::Ux<u64, Self::Align64>;
         type U128 = Self::Ux<u128, Self::Align128>;
 
-        type F32be = Self::Fxbe<f32, Self::Align32>;
-        type F64be = Self::Fxbe<f64, Self::Align64>;
-        type F32le = Self::Fxle<f32, Self::Align32>;
-        type F64le = Self::Fxle<f64, Self::Align64>;
         type F32 = Self::Fx<f32, Self::Align32>;
         type F64 = Self::Fx<f64, Self::Align64>;
     }
 }
 
-impl Abi for Abi32be {
-    type Align = PhantomAlign32;
-    type Align8 = PhantomAlign8;
-    type Align16 = PhantomAlign16;
-    type Align32 = Self::Align;
-    type Align64 = Self::Align;
-    type Align128 = Self::Align;
+impl Abi for Native {
+    type Align = PhantomAlign;
 
-    type Addr = Integer<BigEndian<core::num::NonZeroU32>, Self::Align, core::num::NonZeroU32>;
+    supplement_abi_common!();
+    supplement_abi_integer!();
+
+    type Addr = usize;
+    type Ptr<Target> = core::ptr::NonNull<Target>;
 
     type Ix<Native: Copy, Alignment: Copy> = Self::Ixbe<Native, Alignment>;
     type Ux<Native: Copy, Alignment: Copy> = Self::Uxbe<Native, Alignment>;
     type Fx<Native: Copy, Alignment: Copy> = Self::Fxbe<Native, Alignment>;
 
-    supplement_abi_aliases!();
+    type I8 = i8;
+    type I16 = i16;
+    type I32 = i32;
+    type I64 = i64;
+    type I128 = i128;
+
+    type U8 = u8;
+    type U16 = u16;
+    type U32 = u32;
+    type U64 = u64;
+    type U128 = u128;
+
+    type F32 = f32;
+    type F64 = f64;
+}
+
+impl Abi for Abi32be {
+    type Align = PhantomAlign32;
+
+    supplement_abi_common!();
+    supplement_abi_integer!();
+
+    type Addr = Integer<BigEndian<core::num::NonZeroU32>, Self::Align, core::num::NonZeroU32>;
+    type Ptr<Target> = Pointer<Self::Addr, Target>;
+
+    type Ix<Native: Copy, Alignment: Copy> = Self::Ixbe<Native, Alignment>;
+    type Ux<Native: Copy, Alignment: Copy> = Self::Uxbe<Native, Alignment>;
+    type Fx<Native: Copy, Alignment: Copy> = Self::Fxbe<Native, Alignment>;
+
+    supplement_abi_target!();
 }
 
 impl Abi for Abi32le {
     type Align = PhantomAlign32;
-    type Align8 = PhantomAlign8;
-    type Align16 = PhantomAlign16;
-    type Align32 = Self::Align;
-    type Align64 = Self::Align;
-    type Align128 = Self::Align;
+
+    supplement_abi_common!();
+    supplement_abi_integer!();
 
     type Addr = Integer<LittleEndian<core::num::NonZeroU32>, Self::Align, core::num::NonZeroU32>;
+    type Ptr<Target> = Pointer<Self::Addr, Target>;
 
     type Ix<Native: Copy, Alignment: Copy> = Self::Ixle<Native, Alignment>;
     type Ux<Native: Copy, Alignment: Copy> = Self::Uxle<Native, Alignment>;
     type Fx<Native: Copy, Alignment: Copy> = Self::Fxle<Native, Alignment>;
 
-    supplement_abi_aliases!();
+    supplement_abi_target!();
 }
 
 impl Abi for Abi64be {
     type Align = PhantomAlign64;
-    type Align8 = PhantomAlign8;
-    type Align16 = PhantomAlign16;
-    type Align32 = PhantomAlign32;
-    type Align64 = Self::Align;
-    type Align128 = Self::Align;
+
+    supplement_abi_common!();
+    supplement_abi_integer!();
 
     type Addr = Integer<BigEndian<core::num::NonZeroU64>, Self::Align, core::num::NonZeroU64>;
+    type Ptr<Target> = Pointer<Self::Addr, Target>;
 
     type Ix<Native: Copy, Alignment: Copy> = Self::Ixbe<Native, Alignment>;
     type Ux<Native: Copy, Alignment: Copy> = Self::Uxbe<Native, Alignment>;
     type Fx<Native: Copy, Alignment: Copy> = Self::Fxbe<Native, Alignment>;
 
-    supplement_abi_aliases!();
+    supplement_abi_target!();
 }
 
 impl Abi for Abi64le {
     type Align = PhantomAlign64;
-    type Align8 = PhantomAlign8;
-    type Align16 = PhantomAlign16;
-    type Align32 = PhantomAlign32;
-    type Align64 = Self::Align;
-    type Align128 = Self::Align;
+
+    supplement_abi_common!();
+    supplement_abi_integer!();
 
     type Addr = Integer<LittleEndian<core::num::NonZeroU64>, Self::Align, core::num::NonZeroU64>;
+    type Ptr<Target> = Pointer<Self::Addr, Target>;
 
     type Ix<Native: Copy, Alignment: Copy> = Self::Ixle<Native, Alignment>;
     type Ux<Native: Copy, Alignment: Copy> = Self::Uxle<Native, Alignment>;
     type Fx<Native: Copy, Alignment: Copy> = Self::Fxle<Native, Alignment>;
 
-    supplement_abi_aliases!();
+    supplement_abi_target!();
 }
 
+/// ## Abi Alias for Target Platform
+///
+/// This is an alias for one of the platform-specific ABI types (e.g.,
+/// `Abi64le`, `Abi32be`). This type aliases the type that corresponds to the
+/// ABI of the target platform.
 #[cfg(doc)]
-pub type Native = Abi64le;
+pub type Target = Abi64le;
 #[cfg(all(not(doc), target_endian = "big", target_pointer_width = "32"))]
-pub type Native = Abi32be;
+pub type Target = Abi32be;
 #[cfg(all(not(doc), target_endian = "little", target_pointer_width = "32"))]
-pub type Native = Abi32le;
+pub type Target = Abi32le;
 #[cfg(all(not(doc), target_endian = "big", target_pointer_width = "64"))]
-pub type Native = Abi64be;
+pub type Target = Abi64be;
 #[cfg(all(not(doc), target_endian = "little", target_pointer_width = "64"))]
-pub type Native = Abi64le;
+pub type Target = Abi64le;
 
 #[cfg(test)]
 mod tests {
