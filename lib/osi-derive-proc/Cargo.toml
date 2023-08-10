@@ -1,0 +1,31 @@
+[package]
+name = "osi-derive-proc"
+version = "0.1.0"
+
+categories = [
+        "development-tools",
+        "no-std",
+        "rust-patterns",
+]
+description = "Direct Derive Proc Macro"
+edition = "2021"
+homepage = "https://www.osiris.foo"
+keywords = [
+        "bounds",
+        "derive",
+        "direct",
+        "macro",
+        "traits",
+]
+license = "MIT OR Apache-2.0 OR LGPL-2.1-or-later"
+readme = "../README.md"
+repository = "https://github.com/osiris-apis/osi"
+rust-version = "1.70"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = { version = "1.0" }
+quote = { version = "1.0" }
+syn = { version = "2.0", features = ["full"] }
