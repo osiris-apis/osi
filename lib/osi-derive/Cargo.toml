@@ -1,0 +1,26 @@
+[package]
+name = "osi-derive"
+version = "0.1.0"
+
+categories = [
+        "development-tools",
+        "no-std",
+        "rust-patterns",
+]
+description = "Direct Derive"
+edition = "2021"
+homepage = "https://www.osiris.foo"
+keywords = [
+        "bounds",
+        "derive",
+        "direct",
+        "macro",
+        "traits",
+]
+license = "MIT OR Apache-2.0 OR LGPL-2.1-or-later"
+readme = "../README.md"
+repository = "https://github.com/osiris-apis/osi"
+rust-version = "1.70"
+
+[dependencies]
+osi-derive-proc = { path = "../osi-derive-proc" }
