@@ -1429,6 +1429,7 @@ macro_rules! ffi_util_constant {
 ///
 /// This function does not invoke the constructor, but mere evaluates to its
 /// path.
+#[doc(inline)]
 pub use ffi_util_constant as constant;
 
 macro_rules! supplement_abi_common {
