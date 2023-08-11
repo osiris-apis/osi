@@ -32,6 +32,16 @@
 //   evaluate macros in a position where a trait is expected. This would be
 //   a suitable alternative to trait-aliases and simplify the macro based
 //   dispatchers of `osi-derive-proc`.
+//
+// - Const-expressions in `repr(align(...))` (<missing>): It is currently not
+//   allowed to have constant-expressions in `repr(align(...))`, hence one
+//   cannot propagate alignments between types. Instead, we have to use
+//   phantom-markers from `mem::align` to achieve a similar result.
+//
+// - Guaranteed Nonnull-optimization (`rustc_nonnull_optimization_guaranteed`):
+//   There is no way to guarantee the nonnull-optimization rust uses for its
+//   builtin type. While we rely on its presence, and it is unlikely to break,
+//   the compiler does not guarantee it.
 
 #![no_std]
 
