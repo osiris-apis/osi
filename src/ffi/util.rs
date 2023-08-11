@@ -3,6 +3,8 @@
 //! This is a utility module for the other `ffi` modules. It provides common
 //! abstractions and type definitions used across many different interfaces.
 
+use crate::mem::align;
+
 /// ## Anonymous Pointer Content
 ///
 /// When interfaces (e.g., JNI) use anonymous pointer targets, we declare
@@ -16,61 +18,6 @@
 /// allowing bits to be recycled for other use. Use a different type if the
 /// given interface specifies a required target type alignment.
 pub type Anonymous = u8;
-
-/// ## A native aligned ZST
-///
-/// This type can be used to align structures to at least the native alignment
-/// by embedding it in the structure. It works similar to other phantom-marker
-/// types.
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[cfg_attr(target_pointer_width = "32", repr(C, align(4)))]
-#[cfg_attr(target_pointer_width = "64", repr(C, align(8)))]
-pub struct PhantomAlign {}
-
-/// ## An 8-bit aligned ZST
-///
-/// This type can be used to align structures to at least 8-bit by
-/// embedding it in the structure. It works similar to other phantom-marker
-/// types.
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[repr(C, align(1))]
-pub struct PhantomAlign8 {}
-
-/// ## A 16-bit aligned ZST
-///
-/// This type can be used to align structures to at least 16-bit by
-/// embedding it in the structure. It works similar to other phantom-marker
-/// types.
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[repr(C, align(2))]
-pub struct PhantomAlign16 {}
-
-/// ## A 32-bit aligned ZST
-///
-/// This type can be used to align structures to at least 32-bit by
-/// embedding it in the structure. It works similar to other phantom-marker
-/// types.
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[repr(C, align(4))]
-pub struct PhantomAlign32 {}
-
-/// ## A 64-bit aligned ZST
-///
-/// This type can be used to align structures to at least 64-bit by
-/// embedding it in the structure. It works similar to other phantom-marker
-/// types.
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[repr(C, align(8))]
-pub struct PhantomAlign64 {}
-
-/// ## A 128-bit aligned ZST
-///
-/// This type can be used to align structures to at least 128-bit by
-/// embedding it in the structure. It works similar to other phantom-marker
-/// types.
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-#[repr(C, align(16))]
-pub struct PhantomAlign128 {}
 
 /// ## Types as Native Addresses
 ///
@@ -364,15 +311,15 @@ pub trait Abi {
     /// raise alignment requirements of a type to the native alignment.
     type Align: Copy;
     /// ZST with alignment for 8-byte types of the platform.
-    type Align8: Copy;
+    type Align1: Copy;
     /// ZST with alignment for 16-byte types of the platform.
-    type Align16: Copy;
+    type Align2: Copy;
     /// ZST with alignment for 32-byte types of the platform.
-    type Align32: Copy;
+    type Align4: Copy;
     /// ZST with alignment for 64-byte types of the platform.
-    type Align64: Copy;
+    type Align8: Copy;
     /// ZST with alignment for 128-byte types of the platform.
-    type Align128: Copy;
+    type Align16: Copy;
 
     /// Native address type for non-NULL values.
     type Addr: Copy;
@@ -1406,10 +1353,10 @@ macro_rules! implement_constant_for {
 }
 
 implement_constant_for!(
-    (isize, PhantomAlign), (i8, PhantomAlign8), (i16, PhantomAlign16), (i32, PhantomAlign32),
-    (i64, PhantomAlign32, PhantomAlign64), (i128, PhantomAlign32, PhantomAlign64),
-    (usize, PhantomAlign), (u8, PhantomAlign8), (u16, PhantomAlign16), (u32, PhantomAlign32),
-    (u64, PhantomAlign32, PhantomAlign64), (u128, PhantomAlign32, PhantomAlign64),
+    (isize, align::AlignNative), (i8, align::Align1), (i16, align::Align2), (i32, align::Align4),
+    (i64, align::Align4, align::Align8), (i128, align::Align4, align::Align8),
+    (usize, align::AlignNative), (u8, align::Align1), (u16, align::Align2), (u32, align::Align4),
+    (u64, align::Align4, align::Align8), (u128, align::Align4, align::Align8),
 );
 
 #[doc(hidden)]
@@ -1434,13 +1381,13 @@ pub use ffi_util_constant as constant;
 
 macro_rules! supplement_abi_common {
     () => {
-        type Align8 = PhantomAlign8;
-        type Align16 = PhantomAlign16;
-        type Align32 = PhantomAlign32;
+        type Align1 = align::Align1;
+        type Align2 = align::Align2;
+        type Align4 = align::Align4;
 
         // Rely on `target_pointer_width` being 4 or 8.
-        type Align64 = Self::Align;
-        type Align128 = Self::Align;
+        type Align8 = Self::Align;
+        type Align16 = Self::Align;
 
         type Enum = Self::I32;
     }
@@ -1456,59 +1403,59 @@ macro_rules! supplement_abi_integer {
         type Fxbe<Native: Copy, Alignment: Copy> = Integer<BigEndian<Native>, Alignment, Native>;
         type Fxle<Native: Copy, Alignment: Copy> = Integer<LittleEndian<Native>, Alignment, Native>;
 
-        type I8be = Self::Ixbe<i8, Self::Align8>;
-        type I16be = Self::Ixbe<i16, Self::Align16>;
-        type I32be = Self::Ixbe<i32, Self::Align32>;
-        type I64be = Self::Ixbe<i64, Self::Align64>;
-        type I128be = Self::Ixbe<i128, Self::Align128>;
+        type I8be = Self::Ixbe<i8, Self::Align1>;
+        type I16be = Self::Ixbe<i16, Self::Align2>;
+        type I32be = Self::Ixbe<i32, Self::Align4>;
+        type I64be = Self::Ixbe<i64, Self::Align8>;
+        type I128be = Self::Ixbe<i128, Self::Align16>;
 
-        type I8le = Self::Ixle<i8, Self::Align8>;
-        type I16le = Self::Ixle<i16, Self::Align16>;
-        type I32le = Self::Ixle<i32, Self::Align32>;
-        type I64le = Self::Ixle<i64, Self::Align64>;
-        type I128le = Self::Ixle<i128, Self::Align128>;
+        type I8le = Self::Ixle<i8, Self::Align1>;
+        type I16le = Self::Ixle<i16, Self::Align2>;
+        type I32le = Self::Ixle<i32, Self::Align4>;
+        type I64le = Self::Ixle<i64, Self::Align8>;
+        type I128le = Self::Ixle<i128, Self::Align16>;
 
-        type U8be = Self::Uxbe<u8, Self::Align8>;
-        type U16be = Self::Uxbe<u16, Self::Align16>;
-        type U32be = Self::Uxbe<u32, Self::Align32>;
-        type U64be = Self::Uxbe<u64, Self::Align64>;
-        type U128be = Self::Uxbe<u128, Self::Align128>;
+        type U8be = Self::Uxbe<u8, Self::Align1>;
+        type U16be = Self::Uxbe<u16, Self::Align2>;
+        type U32be = Self::Uxbe<u32, Self::Align4>;
+        type U64be = Self::Uxbe<u64, Self::Align8>;
+        type U128be = Self::Uxbe<u128, Self::Align16>;
 
-        type U8le = Self::Uxle<u8, Self::Align8>;
-        type U16le = Self::Uxle<u16, Self::Align16>;
-        type U32le = Self::Uxle<u32, Self::Align32>;
-        type U64le = Self::Uxle<u64, Self::Align64>;
-        type U128le = Self::Uxle<u128, Self::Align128>;
+        type U8le = Self::Uxle<u8, Self::Align1>;
+        type U16le = Self::Uxle<u16, Self::Align2>;
+        type U32le = Self::Uxle<u32, Self::Align4>;
+        type U64le = Self::Uxle<u64, Self::Align8>;
+        type U128le = Self::Uxle<u128, Self::Align16>;
 
-        type F32be = Self::Fxbe<f32, Self::Align32>;
-        type F64be = Self::Fxbe<f64, Self::Align64>;
-        type F32le = Self::Fxle<f32, Self::Align32>;
-        type F64le = Self::Fxle<f64, Self::Align64>;
+        type F32be = Self::Fxbe<f32, Self::Align4>;
+        type F64be = Self::Fxbe<f64, Self::Align8>;
+        type F32le = Self::Fxle<f32, Self::Align4>;
+        type F64le = Self::Fxle<f64, Self::Align8>;
     }
 }
 
 // Supplement `Abi` implementations with the default target aliases.
 macro_rules! supplement_abi_target {
     () => {
-        type I8 = Self::Ix<i8, Self::Align8>;
-        type I16 = Self::Ix<i16, Self::Align16>;
-        type I32 = Self::Ix<i32, Self::Align32>;
-        type I64 = Self::Ix<i64, Self::Align64>;
-        type I128 = Self::Ix<i128, Self::Align128>;
+        type I8 = Self::Ix<i8, Self::Align1>;
+        type I16 = Self::Ix<i16, Self::Align2>;
+        type I32 = Self::Ix<i32, Self::Align4>;
+        type I64 = Self::Ix<i64, Self::Align8>;
+        type I128 = Self::Ix<i128, Self::Align16>;
 
-        type U8 = Self::Ux<u8, Self::Align8>;
-        type U16 = Self::Ux<u16, Self::Align16>;
-        type U32 = Self::Ux<u32, Self::Align32>;
-        type U64 = Self::Ux<u64, Self::Align64>;
-        type U128 = Self::Ux<u128, Self::Align128>;
+        type U8 = Self::Ux<u8, Self::Align1>;
+        type U16 = Self::Ux<u16, Self::Align2>;
+        type U32 = Self::Ux<u32, Self::Align4>;
+        type U64 = Self::Ux<u64, Self::Align8>;
+        type U128 = Self::Ux<u128, Self::Align16>;
 
-        type F32 = Self::Fx<f32, Self::Align32>;
-        type F64 = Self::Fx<f64, Self::Align64>;
+        type F32 = Self::Fx<f32, Self::Align4>;
+        type F64 = Self::Fx<f64, Self::Align8>;
     }
 }
 
 impl Abi for Native {
-    type Align = PhantomAlign;
+    type Align = align::AlignNative;
 
     supplement_abi_common!();
     supplement_abi_integer!();
@@ -1537,7 +1484,7 @@ impl Abi for Native {
 }
 
 impl Abi for Abi32be {
-    type Align = PhantomAlign32;
+    type Align = align::Align4;
 
     supplement_abi_common!();
     supplement_abi_integer!();
@@ -1553,7 +1500,7 @@ impl Abi for Abi32be {
 }
 
 impl Abi for Abi32le {
-    type Align = PhantomAlign32;
+    type Align = align::Align4;
 
     supplement_abi_common!();
     supplement_abi_integer!();
@@ -1569,7 +1516,7 @@ impl Abi for Abi32le {
 }
 
 impl Abi for Abi64be {
-    type Align = PhantomAlign64;
+    type Align = align::Align8;
 
     supplement_abi_common!();
     supplement_abi_integer!();
@@ -1585,7 +1532,7 @@ impl Abi for Abi64be {
 }
 
 impl Abi for Abi64le {
-    type Align = PhantomAlign64;
+    type Align = align::Align8;
 
     supplement_abi_common!();
     supplement_abi_integer!();
@@ -1630,19 +1577,6 @@ mod tests {
         assert_eq!(size_of::<Anonymous>(), 1);
         assert_eq!(align_of::<Anonymous>(), 1);
 
-        assert_eq!(align_of::<PhantomAlign>(), v32_v64(4, 8));
-        assert_eq!(align_of::<PhantomAlign8>(), 1);
-        assert_eq!(align_of::<PhantomAlign16>(), 2);
-        assert_eq!(align_of::<PhantomAlign32>(), 4);
-        assert_eq!(align_of::<PhantomAlign64>(), 8);
-        assert_eq!(align_of::<PhantomAlign128>(), 16);
-        assert_eq!(size_of::<PhantomAlign>(), 0);
-        assert_eq!(size_of::<PhantomAlign8>(), 0);
-        assert_eq!(size_of::<PhantomAlign16>(), 0);
-        assert_eq!(size_of::<PhantomAlign32>(), 0);
-        assert_eq!(size_of::<PhantomAlign64>(), 0);
-        assert_eq!(size_of::<PhantomAlign128>(), 0);
-
         assert_eq!(size_of::<BigEndian<i8>>(), size_of::<i8>());
         assert_eq!(align_of::<BigEndian<i8>>(), align_of::<i8>());
         assert_eq!(size_of::<BigEndian<i16>>(), size_of::<i16>());
@@ -1664,72 +1598,72 @@ mod tests {
         assert_eq!(size_of::<LittleEndian<i128>>(), size_of::<u128>());
         assert_eq!(align_of::<LittleEndian<i128>>(), align_of::<u128>());
 
-        assert_eq!(size_of::<Integer<i8, PhantomAlign8, i8>>(), 1);
-        assert_eq!(align_of::<Integer<i8, PhantomAlign8, i8>>(), 1);
-        assert_eq!(size_of::<Integer<i16, PhantomAlign16, i16>>(), 2);
-        assert_eq!(align_of::<Integer<i16, PhantomAlign16, i16>>(), 2);
-        assert_eq!(size_of::<Integer<i32, PhantomAlign32, i32>>(), 4);
-        assert_eq!(align_of::<Integer<i32, PhantomAlign32, i32>>(), 4);
-        assert_eq!(size_of::<Integer<i64, PhantomAlign64, i64>>(), 8);
-        assert_eq!(align_of::<Integer<i64, PhantomAlign64, i64>>(), 8);
-        assert_eq!(size_of::<Integer<i128, PhantomAlign128, i128>>(), 16);
-        assert_eq!(align_of::<Integer<i128, PhantomAlign128, i128>>(), 16);
-        assert_eq!(size_of::<Integer<u8, PhantomAlign8, u8>>(), 1);
-        assert_eq!(align_of::<Integer<u8, PhantomAlign8, u8>>(), 1);
-        assert_eq!(size_of::<Integer<u16, PhantomAlign16, u16>>(), 2);
-        assert_eq!(align_of::<Integer<u16, PhantomAlign16, u16>>(), 2);
-        assert_eq!(size_of::<Integer<u32, PhantomAlign32, u32>>(), 4);
-        assert_eq!(align_of::<Integer<u32, PhantomAlign32, u32>>(), 4);
-        assert_eq!(size_of::<Integer<u64, PhantomAlign64, u64>>(), 8);
-        assert_eq!(align_of::<Integer<u64, PhantomAlign64, u64>>(), 8);
-        assert_eq!(size_of::<Integer<u128, PhantomAlign128, u128>>(), 16);
-        assert_eq!(align_of::<Integer<u128, PhantomAlign128, u128>>(), 16);
+        assert_eq!(size_of::<Integer<i8, align::Align1, i8>>(), 1);
+        assert_eq!(align_of::<Integer<i8, align::Align1, i8>>(), 1);
+        assert_eq!(size_of::<Integer<i16, align::Align2, i16>>(), 2);
+        assert_eq!(align_of::<Integer<i16, align::Align2, i16>>(), 2);
+        assert_eq!(size_of::<Integer<i32, align::Align4, i32>>(), 4);
+        assert_eq!(align_of::<Integer<i32, align::Align4, i32>>(), 4);
+        assert_eq!(size_of::<Integer<i64, align::Align8, i64>>(), 8);
+        assert_eq!(align_of::<Integer<i64, align::Align8, i64>>(), 8);
+        assert_eq!(size_of::<Integer<i128, align::Align16, i128>>(), 16);
+        assert_eq!(align_of::<Integer<i128, align::Align16, i128>>(), 16);
+        assert_eq!(size_of::<Integer<u8, align::Align1, u8>>(), 1);
+        assert_eq!(align_of::<Integer<u8, align::Align1, u8>>(), 1);
+        assert_eq!(size_of::<Integer<u16, align::Align2, u16>>(), 2);
+        assert_eq!(align_of::<Integer<u16, align::Align2, u16>>(), 2);
+        assert_eq!(size_of::<Integer<u32, align::Align4, u32>>(), 4);
+        assert_eq!(align_of::<Integer<u32, align::Align4, u32>>(), 4);
+        assert_eq!(size_of::<Integer<u64, align::Align8, u64>>(), 8);
+        assert_eq!(align_of::<Integer<u64, align::Align8, u64>>(), 8);
+        assert_eq!(size_of::<Integer<u128, align::Align16, u128>>(), 16);
+        assert_eq!(align_of::<Integer<u128, align::Align16, u128>>(), 16);
 
-        assert_eq!(size_of::<Option<Integer<core::num::NonZeroI8, PhantomAlign8, core::num::NonZeroI8>>>(), 1);
-        assert_eq!(align_of::<Option<Integer<core::num::NonZeroI8, PhantomAlign8, core::num::NonZeroI8>>>(), 1);
-        assert_eq!(size_of::<Option<Integer<core::num::NonZeroI16, PhantomAlign16, core::num::NonZeroI16>>>(), 2);
-        assert_eq!(align_of::<Option<Integer<core::num::NonZeroI16, PhantomAlign16, core::num::NonZeroI16>>>(), 2);
-        assert_eq!(size_of::<Option<Integer<core::num::NonZeroI32, PhantomAlign32, core::num::NonZeroI32>>>(), 4);
-        assert_eq!(align_of::<Option<Integer<core::num::NonZeroI32, PhantomAlign32, core::num::NonZeroI32>>>(), 4);
-        assert_eq!(size_of::<Option<Integer<core::num::NonZeroI64, PhantomAlign64, core::num::NonZeroI64>>>(), 8);
-        assert_eq!(align_of::<Option<Integer<core::num::NonZeroI64, PhantomAlign64, core::num::NonZeroI64>>>(), 8);
-        assert_eq!(size_of::<Option<Integer<core::num::NonZeroI128, PhantomAlign128, core::num::NonZeroI128>>>(), 16);
-        assert_eq!(align_of::<Option<Integer<core::num::NonZeroI128, PhantomAlign128, core::num::NonZeroI128>>>(), 16);
-        assert_eq!(size_of::<Option<Integer<core::num::NonZeroU8, PhantomAlign8, core::num::NonZeroU8>>>(), 1);
-        assert_eq!(align_of::<Option<Integer<core::num::NonZeroU8, PhantomAlign8, core::num::NonZeroU8>>>(), 1);
-        assert_eq!(size_of::<Option<Integer<core::num::NonZeroU16, PhantomAlign16, core::num::NonZeroU16>>>(), 2);
-        assert_eq!(align_of::<Option<Integer<core::num::NonZeroU16, PhantomAlign16, core::num::NonZeroU16>>>(), 2);
-        assert_eq!(size_of::<Option<Integer<core::num::NonZeroU32, PhantomAlign32, core::num::NonZeroU32>>>(), 4);
-        assert_eq!(align_of::<Option<Integer<core::num::NonZeroU32, PhantomAlign32, core::num::NonZeroU32>>>(), 4);
-        assert_eq!(size_of::<Option<Integer<core::num::NonZeroU64, PhantomAlign64, core::num::NonZeroU64>>>(), 8);
-        assert_eq!(align_of::<Option<Integer<core::num::NonZeroU64, PhantomAlign64, core::num::NonZeroU64>>>(), 8);
-        assert_eq!(size_of::<Option<Integer<core::num::NonZeroU128, PhantomAlign128, core::num::NonZeroU128>>>(), 16);
-        assert_eq!(align_of::<Option<Integer<core::num::NonZeroU128, PhantomAlign128, core::num::NonZeroU128>>>(), 16);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroI8, align::Align1, core::num::NonZeroI8>>>(), 1);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroI8, align::Align1, core::num::NonZeroI8>>>(), 1);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroI16, align::Align2, core::num::NonZeroI16>>>(), 2);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroI16, align::Align2, core::num::NonZeroI16>>>(), 2);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroI32, align::Align4, core::num::NonZeroI32>>>(), 4);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroI32, align::Align4, core::num::NonZeroI32>>>(), 4);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroI64, align::Align8, core::num::NonZeroI64>>>(), 8);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroI64, align::Align8, core::num::NonZeroI64>>>(), 8);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroI128, align::Align16, core::num::NonZeroI128>>>(), 16);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroI128, align::Align16, core::num::NonZeroI128>>>(), 16);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroU8, align::Align1, core::num::NonZeroU8>>>(), 1);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroU8, align::Align1, core::num::NonZeroU8>>>(), 1);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroU16, align::Align2, core::num::NonZeroU16>>>(), 2);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroU16, align::Align2, core::num::NonZeroU16>>>(), 2);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroU32, align::Align4, core::num::NonZeroU32>>>(), 4);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroU32, align::Align4, core::num::NonZeroU32>>>(), 4);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroU64, align::Align8, core::num::NonZeroU64>>>(), 8);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroU64, align::Align8, core::num::NonZeroU64>>>(), 8);
+        assert_eq!(size_of::<Option<Integer<core::num::NonZeroU128, align::Align16, core::num::NonZeroU128>>>(), 16);
+        assert_eq!(align_of::<Option<Integer<core::num::NonZeroU128, align::Align16, core::num::NonZeroU128>>>(), 16);
 
         assert_eq!(align_of::<<Abi32be as Abi>::Align>(), 4);
-        assert_eq!(align_of::<<Abi32be as Abi>::Align8>(), 1);
-        assert_eq!(align_of::<<Abi32be as Abi>::Align16>(), 2);
-        assert_eq!(align_of::<<Abi32be as Abi>::Align32>(), 4);
-        assert_eq!(align_of::<<Abi32be as Abi>::Align64>(), 4);
-        assert_eq!(align_of::<<Abi32be as Abi>::Align128>(), 4);
+        assert_eq!(align_of::<<Abi32be as Abi>::Align1>(), 1);
+        assert_eq!(align_of::<<Abi32be as Abi>::Align2>(), 2);
+        assert_eq!(align_of::<<Abi32be as Abi>::Align4>(), 4);
+        assert_eq!(align_of::<<Abi32be as Abi>::Align8>(), 4);
+        assert_eq!(align_of::<<Abi32be as Abi>::Align16>(), 4);
         assert_eq!(align_of::<<Abi32le as Abi>::Align>(), 4);
-        assert_eq!(align_of::<<Abi32le as Abi>::Align8>(), 1);
-        assert_eq!(align_of::<<Abi32le as Abi>::Align16>(), 2);
-        assert_eq!(align_of::<<Abi32le as Abi>::Align32>(), 4);
-        assert_eq!(align_of::<<Abi32le as Abi>::Align64>(), 4);
-        assert_eq!(align_of::<<Abi32le as Abi>::Align128>(), 4);
+        assert_eq!(align_of::<<Abi32le as Abi>::Align1>(), 1);
+        assert_eq!(align_of::<<Abi32le as Abi>::Align2>(), 2);
+        assert_eq!(align_of::<<Abi32le as Abi>::Align4>(), 4);
+        assert_eq!(align_of::<<Abi32le as Abi>::Align8>(), 4);
+        assert_eq!(align_of::<<Abi32le as Abi>::Align16>(), 4);
         assert_eq!(align_of::<<Abi64be as Abi>::Align>(), 8);
-        assert_eq!(align_of::<<Abi64be as Abi>::Align8>(), 1);
-        assert_eq!(align_of::<<Abi64be as Abi>::Align16>(), 2);
-        assert_eq!(align_of::<<Abi64be as Abi>::Align32>(), 4);
-        assert_eq!(align_of::<<Abi64be as Abi>::Align64>(), 8);
-        assert_eq!(align_of::<<Abi64be as Abi>::Align128>(), 8);
+        assert_eq!(align_of::<<Abi64be as Abi>::Align1>(), 1);
+        assert_eq!(align_of::<<Abi64be as Abi>::Align2>(), 2);
+        assert_eq!(align_of::<<Abi64be as Abi>::Align4>(), 4);
+        assert_eq!(align_of::<<Abi64be as Abi>::Align8>(), 8);
+        assert_eq!(align_of::<<Abi64be as Abi>::Align16>(), 8);
         assert_eq!(align_of::<<Abi64le as Abi>::Align>(), 8);
-        assert_eq!(align_of::<<Abi64le as Abi>::Align8>(), 1);
-        assert_eq!(align_of::<<Abi64le as Abi>::Align16>(), 2);
-        assert_eq!(align_of::<<Abi64le as Abi>::Align32>(), 4);
-        assert_eq!(align_of::<<Abi64le as Abi>::Align64>(), 8);
-        assert_eq!(align_of::<<Abi64le as Abi>::Align128>(), 8);
+        assert_eq!(align_of::<<Abi64le as Abi>::Align1>(), 1);
+        assert_eq!(align_of::<<Abi64le as Abi>::Align2>(), 2);
+        assert_eq!(align_of::<<Abi64le as Abi>::Align4>(), 4);
+        assert_eq!(align_of::<<Abi64le as Abi>::Align8>(), 8);
+        assert_eq!(align_of::<<Abi64le as Abi>::Align16>(), 8);
     }
 
     // Verify `v32_v64()` selects correctly
@@ -1770,7 +1704,7 @@ mod tests {
             core::hash::Hasher::finish(&s)
         }
 
-        type Test16 = Integer<u16, PhantomAlign16, u16>;
+        type Test16 = Integer<u16, align::Align2, u16>;
 
         // `Debug` must print the raw value.
         assert_eq!(std::format!("{:?}", Test16::from_raw(1)), "Integer(1)");
@@ -1802,19 +1736,19 @@ mod tests {
     #[test]
     fn integer_typeinfo() {
         // verify that the alignment honors the request
-        assert_eq!(align_of::<Integer<u8, PhantomAlign128, u8>>(), 16);
-        assert_eq!(align_of::<Integer<u128, PhantomAlign8, u128>>(), align_of::<u128>());
+        assert_eq!(align_of::<Integer<u8, align::Align16, u8>>(), 16);
+        assert_eq!(align_of::<Integer<u128, align::Align1, u128>>(), align_of::<u128>());
 
         // verify that high alignments cause padding
-        assert_eq!(size_of::<Integer<u8, PhantomAlign128, u8>>(), 16);
+        assert_eq!(size_of::<Integer<u8, align::Align16, u8>>(), 16);
 
         // zero-optimization must propagate through `Integer<BigEndian<...>>`
         assert_eq!(
-            size_of::<Option<Integer<BigEndian<core::num::NonZeroI64>, PhantomAlign64, core::num::NonZeroI64>>>(),
+            size_of::<Option<Integer<BigEndian<core::num::NonZeroI64>, align::Align8, core::num::NonZeroI64>>>(),
             8,
         );
         assert_eq!(
-            align_of::<Option<Integer<BigEndian<core::num::NonZeroI64>, PhantomAlign64, core::num::NonZeroI64>>>(),
+            align_of::<Option<Integer<BigEndian<core::num::NonZeroI64>, align::Align8, core::num::NonZeroI64>>>(),
             8,
         );
     }
@@ -1828,14 +1762,14 @@ mod tests {
         // zero-optimization must propagate through `Pointer<Integer<BigEndian<...>>>`
         assert_eq!(
             size_of::<Option<Pointer<
-                Integer<BigEndian<core::num::NonZeroI64>, PhantomAlign64, core::num::NonZeroI64>,
+                Integer<BigEndian<core::num::NonZeroI64>, align::Align8, core::num::NonZeroI64>,
                 u8,
             >>>(),
             8,
         );
         assert_eq!(
             align_of::<Option<Pointer<
-                Integer<BigEndian<core::num::NonZeroI64>, PhantomAlign64, core::num::NonZeroI64>,
+                Integer<BigEndian<core::num::NonZeroI64>, align::Align8, core::num::NonZeroI64>,
                 u8,
             >>>(),
             8,
