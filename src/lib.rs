@@ -39,3 +39,4 @@
 extern crate std;
 
 pub mod ffi;
+pub mod mem;
