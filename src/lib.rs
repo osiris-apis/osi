@@ -50,3 +50,5 @@ extern crate std;
 
 pub mod ffi;
 pub mod mem;
+
+pub use osi_derive as dd;

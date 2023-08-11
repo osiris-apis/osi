@@ -24,3 +24,6 @@ license = "MIT OR Apache-2.0 OR LGPL-2.1-or-later"
 readme = "README.md"
 repository = "https://github.com/osiris-apis/osi"
 rust-version = "1.70"
+
+[dependencies]
+osi-derive = { path = "./lib/osi-derive" }
