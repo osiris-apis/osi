@@ -34,7 +34,7 @@
 //! names of builtin primitive integer types, which use bits for historic
 //! reasons.
 
-use osi_derive as dd;
+use crate::dd;
 
 /// ## A 1-byte (8-bit) aligned ZST
 ///
