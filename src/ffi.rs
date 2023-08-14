@@ -89,6 +89,7 @@ compile_error!("Target platform has an unsupported endianness.");
 )))]
 compile_error!("Target platform has an unsupported pointer-width.");
 
+pub mod abi;
 pub mod util;
 
 #[cfg(test)]
