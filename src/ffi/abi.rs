@@ -13,15 +13,15 @@ use crate::mem::align;
 /// This trait defines properties of a system ABI. It provides associated types
 /// for all common data-types used in a given ABI.
 pub trait Abi {
-    /// ZST with alignment for 8-byte types of the platform.
+    /// ZST with alignment for 1-byte types of the platform.
     type Align1: Copy;
-    /// ZST with alignment for 16-byte types of the platform.
+    /// ZST with alignment for 2-byte types of the platform.
     type Align2: Copy;
-    /// ZST with alignment for 32-byte types of the platform.
+    /// ZST with alignment for 4-byte types of the platform.
     type Align4: Copy;
-    /// ZST with alignment for 64-byte types of the platform.
+    /// ZST with alignment for 8-byte types of the platform.
     type Align8: Copy;
-    /// ZST with alignment for 128-byte types of the platform.
+    /// ZST with alignment for 16-byte types of the platform.
     type Align16: Copy;
     /// ZST with native alignment of the platform, used as phantom-type to
     /// raise alignment requirements of a type to the native alignment.
