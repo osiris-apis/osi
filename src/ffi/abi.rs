@@ -243,13 +243,19 @@ macro_rules! supplement_abi_target {
 }
 
 impl Abi for Native {
+    type Align1 = align::AlignOf<u8>;
+    type Align2 = align::AlignOf<u16>;
+    type Align4 = align::AlignOf<u32>;
+    type Align8 = align::AlignOf<u64>;
+    type Align16 = align::AlignOf<u128>;
     type AlignNative = align::AlignNative;
-
-    supplement_abi_common!();
-    supplement_abi_integer!();
 
     type Addr = usize;
     type Ptr<Target> = core::ptr::NonNull<Target>;
+
+    type Enum = Self::I32;
+
+    supplement_abi_integer!();
 
     type Ix<Native: Copy, Alignment: Copy> = Self::Ixbe<Native, Alignment>;
     type Ux<Native: Copy, Alignment: Copy> = Self::Uxbe<Native, Alignment>;
