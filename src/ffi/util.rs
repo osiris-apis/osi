@@ -294,7 +294,7 @@ where
     Alignment: Copy,
     Native: Copy,
 {
-    value: Value,
+    value: Packed<Value>,
     alignment: [Alignment; 0],
     native: core::marker::PhantomData<Native>,
 }
@@ -760,7 +760,7 @@ where
     #[must_use]
     pub const fn new(v: Value) -> Self {
         Self {
-            value: v,
+            value: Packed::new(v),
             alignment: [],
             native: core::marker::PhantomData::<Native>,
         }
@@ -782,7 +782,7 @@ where
     #[inline(always)]
     #[must_use]
     pub const fn value(&self) -> Value {
-        self.value
+        self.value.get()
     }
 }
 
@@ -1502,7 +1502,7 @@ mod tests {
     fn integer_typeinfo() {
         // verify that the alignment honors the request
         assert_eq!(align_of::<Integer<u8, align::Align16, u8>>(), 16);
-        assert_eq!(align_of::<Integer<u128, align::Align1, u128>>(), align_of::<u128>());
+        assert_eq!(align_of::<Integer<u128, align::Align1, u128>>(), 1);
 
         // verify that high alignments cause padding
         assert_eq!(size_of::<Integer<u8, align::Align16, u8>>(), 16);
