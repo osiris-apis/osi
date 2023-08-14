@@ -5,8 +5,7 @@
 //! to access data of native and foreign ABIs independent of the ABI of the
 //! calling platform.
 
-use crate::ffi;
-use crate::mem::align;
+use crate::{ffi, mem};
 
 /// ## ABI Description
 ///
@@ -237,12 +236,12 @@ macro_rules! supplement_abi_target {
 }
 
 impl Abi for Native {
-    type Align1 = align::AlignOf<u8>;
-    type Align2 = align::AlignOf<u16>;
-    type Align4 = align::AlignOf<u32>;
-    type Align8 = align::AlignOf<u64>;
-    type Align16 = align::AlignOf<u128>;
-    type AlignNative = align::AlignNative;
+    type Align1 = mem::align::AlignOf<u8>;
+    type Align2 = mem::align::AlignOf<u16>;
+    type Align4 = mem::align::AlignOf<u32>;
+    type Align8 = mem::align::AlignOf<u64>;
+    type Align16 = mem::align::AlignOf<u128>;
+    type AlignNative = mem::align::AlignNative;
 
     type Addr = usize;
     type Ptr<Target> = core::ptr::NonNull<Target>;
@@ -271,12 +270,12 @@ impl Abi for Native {
 }
 
 impl Abi for Sysv32be {
-    type Align1 = align::Align1;
-    type Align2 = align::Align2;
-    type Align4 = align::Align4;
-    type Align8 = align::Align4;
-    type Align16 = align::Align4;
-    type AlignNative = align::Align4;
+    type Align1 = mem::align::Align1;
+    type Align2 = mem::align::Align2;
+    type Align4 = mem::align::Align4;
+    type Align8 = mem::align::Align4;
+    type Align16 = mem::align::Align4;
+    type AlignNative = mem::align::Align4;
 
     type Addr = ffi::util::Integer<ffi::util::BigEndian<core::num::NonZeroU32>, Self::AlignNative, core::num::NonZeroU32>;
     type Ptr<Target> = ffi::util::Pointer<Self::Addr, Target>;
@@ -292,12 +291,12 @@ impl Abi for Sysv32be {
 }
 
 impl Abi for Sysv64be {
-    type Align1 = align::Align1;
-    type Align2 = align::Align2;
-    type Align4 = align::Align4;
-    type Align8 = align::Align8;
-    type Align16 = align::Align8;
-    type AlignNative = align::Align8;
+    type Align1 = mem::align::Align1;
+    type Align2 = mem::align::Align2;
+    type Align4 = mem::align::Align4;
+    type Align8 = mem::align::Align8;
+    type Align16 = mem::align::Align8;
+    type AlignNative = mem::align::Align8;
 
     type Addr = ffi::util::Integer<ffi::util::BigEndian<core::num::NonZeroU64>, Self::AlignNative, core::num::NonZeroU64>;
     type Ptr<Target> = ffi::util::Pointer<Self::Addr, Target>;
@@ -313,12 +312,12 @@ impl Abi for Sysv64be {
 }
 
 impl Abi for Sysv32le {
-    type Align1 = align::Align1;
-    type Align2 = align::Align2;
-    type Align4 = align::Align4;
-    type Align8 = align::Align4;
-    type Align16 = align::Align4;
-    type AlignNative = align::Align4;
+    type Align1 = mem::align::Align1;
+    type Align2 = mem::align::Align2;
+    type Align4 = mem::align::Align4;
+    type Align8 = mem::align::Align4;
+    type Align16 = mem::align::Align4;
+    type AlignNative = mem::align::Align4;
 
     type Addr = ffi::util::Integer<ffi::util::LittleEndian<core::num::NonZeroU32>, Self::AlignNative, core::num::NonZeroU32>;
     type Ptr<Target> = ffi::util::Pointer<Self::Addr, Target>;
@@ -334,12 +333,12 @@ impl Abi for Sysv32le {
 }
 
 impl Abi for Sysv64le {
-    type Align1 = align::Align1;
-    type Align2 = align::Align2;
-    type Align4 = align::Align4;
-    type Align8 = align::Align8;
-    type Align16 = align::Align8;
-    type AlignNative = align::Align8;
+    type Align1 = mem::align::Align1;
+    type Align2 = mem::align::Align2;
+    type Align4 = mem::align::Align4;
+    type Align8 = mem::align::Align8;
+    type Align16 = mem::align::Align8;
+    type AlignNative = mem::align::Align8;
 
     type Addr = ffi::util::Integer<ffi::util::LittleEndian<core::num::NonZeroU64>, Self::AlignNative, core::num::NonZeroU64>;
     type Ptr<Target> = ffi::util::Pointer<Self::Addr, Target>;
@@ -355,12 +354,12 @@ impl Abi for Sysv64le {
 }
 
 impl Abi for Win32le {
-    type Align1 = align::Align1;
-    type Align2 = align::Align2;
-    type Align4 = align::Align4;
-    type Align8 = align::Align8;
-    type Align16 = align::Align16;
-    type AlignNative = align::Align4;
+    type Align1 = mem::align::Align1;
+    type Align2 = mem::align::Align2;
+    type Align4 = mem::align::Align4;
+    type Align8 = mem::align::Align8;
+    type Align16 = mem::align::Align16;
+    type AlignNative = mem::align::Align4;
 
     type Addr = ffi::util::Integer<ffi::util::LittleEndian<core::num::NonZeroU32>, Self::AlignNative, core::num::NonZeroU32>;
     type Ptr<Target> = ffi::util::Pointer<Self::Addr, Target>;
@@ -376,12 +375,12 @@ impl Abi for Win32le {
 }
 
 impl Abi for Win64le {
-    type Align1 = align::Align1;
-    type Align2 = align::Align2;
-    type Align4 = align::Align4;
-    type Align8 = align::Align8;
-    type Align16 = align::Align16;
-    type AlignNative = align::Align8;
+    type Align1 = mem::align::Align1;
+    type Align2 = mem::align::Align2;
+    type Align4 = mem::align::Align4;
+    type Align8 = mem::align::Align8;
+    type Align16 = mem::align::Align16;
+    type AlignNative = mem::align::Align8;
 
     type Addr = ffi::util::Integer<ffi::util::LittleEndian<core::num::NonZeroU64>, Self::AlignNative, core::num::NonZeroU64>;
     type Ptr<Target> = ffi::util::Pointer<Self::Addr, Target>;
