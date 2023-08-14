@@ -340,8 +340,10 @@ impl Abi for Abi64le {
 /// This is an alias for one of the platform-specific ABI types (e.g.,
 /// `Abi64le`, `Abi32be`). This type aliases the type that corresponds to the
 /// ABI of the target platform.
+///
+/// For documentation reasons, it is an alias to `Native`.
 #[cfg(doc)]
-pub type Target = Abi64le;
+pub type Target = Native;
 #[cfg(all(not(doc), target_endian = "big", target_pointer_width = "32"))]
 pub type Target = Abi32be;
 #[cfg(all(not(doc), target_endian = "little", target_pointer_width = "32"))]
