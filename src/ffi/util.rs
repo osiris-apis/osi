@@ -780,7 +780,7 @@ where
     /// returned unmodified. See `new()` for the inverse operation.
     #[inline(always)]
     #[must_use]
-    pub const fn value(&self) -> Value {
+    pub const fn get(&self) -> Value {
         self.value.get()
     }
 }
@@ -820,7 +820,7 @@ where
         fmt: &mut core::fmt::Formatter<'_>,
     ) -> Result<(), core::fmt::Error> {
         fmt.debug_tuple("Integer")
-           .field(&self.value())
+           .field(&self.get())
            .finish()
     }
 }
@@ -842,7 +842,7 @@ where
     #[inline(always)]
     #[must_use]
     fn to_usize(self) -> usize {
-        self.value().to_usize()
+        self.get().to_usize()
     }
 }
 
@@ -862,7 +862,7 @@ where
     #[inline(always)]
     #[must_use]
     fn to_raw(self) -> Native {
-        self.value().to_raw()
+        self.get().to_raw()
     }
 
     #[inline]
@@ -874,7 +874,7 @@ where
     #[inline(always)]
     #[must_use]
     fn to_native(self) -> Native {
-        self.value().to_native()
+        self.get().to_native()
     }
 }
 
