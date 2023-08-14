@@ -13,9 +13,6 @@ use crate::mem::align;
 /// This trait defines properties of a system ABI. It provides associated types
 /// for all common data-types used in a given ABI.
 pub trait Abi {
-    /// ZST with native alignment of the platform, used as phantom-type to
-    /// raise alignment requirements of a type to the native alignment.
-    type Align: Copy;
     /// ZST with alignment for 8-byte types of the platform.
     type Align1: Copy;
     /// ZST with alignment for 16-byte types of the platform.
@@ -26,6 +23,9 @@ pub trait Abi {
     type Align8: Copy;
     /// ZST with alignment for 128-byte types of the platform.
     type Align16: Copy;
+    /// ZST with native alignment of the platform, used as phantom-type to
+    /// raise alignment requirements of a type to the native alignment.
+    type AlignNative: Copy;
 
     /// Native address type for non-NULL values.
     type Addr: Copy;
@@ -174,8 +174,8 @@ macro_rules! supplement_abi_common {
         type Align4 = align::Align4;
 
         // Rely on `target_pointer_width` being 4 or 8.
-        type Align8 = Self::Align;
-        type Align16 = Self::Align;
+        type Align8 = Self::AlignNative;
+        type Align16 = Self::AlignNative;
 
         type Enum = Self::I32;
     }
@@ -243,7 +243,7 @@ macro_rules! supplement_abi_target {
 }
 
 impl Abi for Native {
-    type Align = align::AlignNative;
+    type AlignNative = align::AlignNative;
 
     supplement_abi_common!();
     supplement_abi_integer!();
@@ -272,12 +272,12 @@ impl Abi for Native {
 }
 
 impl Abi for Abi32be {
-    type Align = align::Align4;
+    type AlignNative = align::Align4;
 
     supplement_abi_common!();
     supplement_abi_integer!();
 
-    type Addr = ffi::util::Integer<ffi::util::BigEndian<core::num::NonZeroU32>, Self::Align, core::num::NonZeroU32>;
+    type Addr = ffi::util::Integer<ffi::util::BigEndian<core::num::NonZeroU32>, Self::AlignNative, core::num::NonZeroU32>;
     type Ptr<Target> = ffi::util::Pointer<Self::Addr, Target>;
 
     type Ix<Native: Copy, Alignment: Copy> = Self::Ixbe<Native, Alignment>;
@@ -288,12 +288,12 @@ impl Abi for Abi32be {
 }
 
 impl Abi for Abi32le {
-    type Align = align::Align4;
+    type AlignNative = align::Align4;
 
     supplement_abi_common!();
     supplement_abi_integer!();
 
-    type Addr = ffi::util::Integer<ffi::util::LittleEndian<core::num::NonZeroU32>, Self::Align, core::num::NonZeroU32>;
+    type Addr = ffi::util::Integer<ffi::util::LittleEndian<core::num::NonZeroU32>, Self::AlignNative, core::num::NonZeroU32>;
     type Ptr<Target> = ffi::util::Pointer<Self::Addr, Target>;
 
     type Ix<Native: Copy, Alignment: Copy> = Self::Ixle<Native, Alignment>;
@@ -304,12 +304,12 @@ impl Abi for Abi32le {
 }
 
 impl Abi for Abi64be {
-    type Align = align::Align8;
+    type AlignNative = align::Align8;
 
     supplement_abi_common!();
     supplement_abi_integer!();
 
-    type Addr = ffi::util::Integer<ffi::util::BigEndian<core::num::NonZeroU64>, Self::Align, core::num::NonZeroU64>;
+    type Addr = ffi::util::Integer<ffi::util::BigEndian<core::num::NonZeroU64>, Self::AlignNative, core::num::NonZeroU64>;
     type Ptr<Target> = ffi::util::Pointer<Self::Addr, Target>;
 
     type Ix<Native: Copy, Alignment: Copy> = Self::Ixbe<Native, Alignment>;
@@ -320,12 +320,12 @@ impl Abi for Abi64be {
 }
 
 impl Abi for Abi64le {
-    type Align = align::Align8;
+    type AlignNative = align::Align8;
 
     supplement_abi_common!();
     supplement_abi_integer!();
 
-    type Addr = ffi::util::Integer<ffi::util::LittleEndian<core::num::NonZeroU64>, Self::Align, core::num::NonZeroU64>;
+    type Addr = ffi::util::Integer<ffi::util::LittleEndian<core::num::NonZeroU64>, Self::AlignNative, core::num::NonZeroU64>;
     type Ptr<Target> = ffi::util::Pointer<Self::Addr, Target>;
 
     type Ix<Native: Copy, Alignment: Copy> = Self::Ixle<Native, Alignment>;
@@ -364,29 +364,29 @@ mod tests {
     // guaranteed layout.
     #[test]
     fn typeinfo() {
-        assert_eq!(align_of::<<Abi32be as Abi>::Align>(), 4);
         assert_eq!(align_of::<<Abi32be as Abi>::Align1>(), 1);
         assert_eq!(align_of::<<Abi32be as Abi>::Align2>(), 2);
         assert_eq!(align_of::<<Abi32be as Abi>::Align4>(), 4);
         assert_eq!(align_of::<<Abi32be as Abi>::Align8>(), 4);
         assert_eq!(align_of::<<Abi32be as Abi>::Align16>(), 4);
-        assert_eq!(align_of::<<Abi32le as Abi>::Align>(), 4);
+        assert_eq!(align_of::<<Abi32be as Abi>::AlignNative>(), 4);
         assert_eq!(align_of::<<Abi32le as Abi>::Align1>(), 1);
         assert_eq!(align_of::<<Abi32le as Abi>::Align2>(), 2);
         assert_eq!(align_of::<<Abi32le as Abi>::Align4>(), 4);
         assert_eq!(align_of::<<Abi32le as Abi>::Align8>(), 4);
         assert_eq!(align_of::<<Abi32le as Abi>::Align16>(), 4);
-        assert_eq!(align_of::<<Abi64be as Abi>::Align>(), 8);
+        assert_eq!(align_of::<<Abi32le as Abi>::AlignNative>(), 4);
         assert_eq!(align_of::<<Abi64be as Abi>::Align1>(), 1);
         assert_eq!(align_of::<<Abi64be as Abi>::Align2>(), 2);
         assert_eq!(align_of::<<Abi64be as Abi>::Align4>(), 4);
         assert_eq!(align_of::<<Abi64be as Abi>::Align8>(), 8);
         assert_eq!(align_of::<<Abi64be as Abi>::Align16>(), 8);
-        assert_eq!(align_of::<<Abi64le as Abi>::Align>(), 8);
+        assert_eq!(align_of::<<Abi64be as Abi>::AlignNative>(), 8);
         assert_eq!(align_of::<<Abi64le as Abi>::Align1>(), 1);
         assert_eq!(align_of::<<Abi64le as Abi>::Align2>(), 2);
         assert_eq!(align_of::<<Abi64le as Abi>::Align4>(), 4);
         assert_eq!(align_of::<<Abi64le as Abi>::Align8>(), 8);
         assert_eq!(align_of::<<Abi64le as Abi>::Align16>(), 8);
+        assert_eq!(align_of::<<Abi64le as Abi>::AlignNative>(), 8);
     }
 }
