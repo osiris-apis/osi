@@ -360,7 +360,6 @@ where
     /// Change the underlying value of the wrapped type to the new value.
     /// This is equivalent to assigning a new wrapped object to this instance.
     #[inline]
-    #[must_use]
     pub fn set(&mut self, v: Value) {
         self.0 = v;
     }
