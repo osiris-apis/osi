@@ -19,6 +19,18 @@ use crate::mem::align;
 /// given interface specifies a required target type alignment.
 pub type Anonymous = u8;
 
+/// ## Packed Data
+///
+/// A wrapper type that applies `repr(packed)`. This means the packed type
+/// has a minimum alignment of 1, but the same size as the wrapped type.
+///
+/// Currently, the wrapped type must implement `Copy`, since otherwise a
+/// lot of `const fn` functions cannot be used due to restrictions of the
+/// Rust compiler.
+#[derive(Copy, Default)]
+#[repr(C, packed)]
+pub struct Packed<Value: Copy>(Value);
+
 /// ## Types as Native Addresses
 ///
 /// This trait annotates types that effectively wrap a native memory address.
@@ -319,6 +331,147 @@ where
     #[cfg(target_pointer_width = "64")]
     { v = v64; }
     v
+}
+
+impl<Value> Packed<Value>
+where
+    Value: Copy,
+{
+    /// ## Create a new packed object
+    ///
+    /// Create a new packed object with the specified value.
+    #[inline]
+    #[must_use]
+    pub const fn new(v: Value) -> Self {
+        Self(v)
+    }
+
+    /// ## Resolve into inner value
+    ///
+    /// Unwrap this object and return the inner value.
+    #[inline(always)]
+    #[must_use]
+    pub const fn into_inner(self) -> Value {
+        self.0
+    }
+
+    /// ## Set to new value
+    ///
+    /// Change the underlying value of the wrapped type to the new value.
+    /// This is equivalent to assigning a new wrapped object to this instance.
+    #[inline]
+    #[must_use]
+    pub fn set(&mut self, v: Value) {
+        self.0 = v;
+    }
+
+    /// ## Return wrapped value
+    ///
+    /// Return a copy of the wrapped value. The returned value will be
+    /// properly aligned with all restrictions lifted.
+    #[inline(always)]
+    #[must_use]
+    pub const fn get(&self) -> Value {
+        self.0
+    }
+
+    /// ## Return pointer to unaligned value
+    ///
+    /// Return a pointer to the unaligned value wrapped in this
+    /// packed object.
+    #[inline(always)]
+    #[must_use]
+    pub const fn as_ptr(&self) -> *const Value {
+        core::ptr::addr_of!(self.0)
+    }
+
+    /// ## Return mutable pointer to unaligned value
+    ///
+    /// Return a mutable pointer to the unaligned value wrapped in this
+    /// packed object.
+    #[inline(always)]
+    #[must_use]
+    pub fn as_mut_ptr(&mut self) -> *mut Value {
+        core::ptr::addr_of_mut!(self.0)
+    }
+}
+
+// Rely on `Copy` since we cannot get a reference to an unaligned value.
+impl<Value> Clone for Packed<Value>
+where
+    Value: Copy,
+{
+    #[inline]
+    #[must_use]
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+// Rely on `Copy` since we cannot get a reference to an unaligned value.
+impl<Value> core::fmt::Debug for Packed<Value>
+where
+    Value: Copy + core::fmt::Debug,
+{
+    fn fmt(
+        &self,
+        fmt: &mut core::fmt::Formatter<'_>,
+    ) -> Result<(), core::fmt::Error> {
+        <Value as core::fmt::Debug>::fmt(&self.get(), fmt)
+    }
+}
+
+// Rely on `Copy` since we cannot get a reference to an unaligned value.
+impl<Value> core::cmp::Eq for Packed<Value>
+where
+    Value: Copy + core::cmp::Eq,
+{
+}
+
+// Rely on `Copy` since we cannot get a reference to an unaligned value.
+impl<Value> core::hash::Hash for Packed<Value>
+where
+    Value: Copy + core::hash::Hash,
+{
+    fn hash<Op>(&self, state: &mut Op)
+    where
+        Op: core::hash::Hasher,
+    {
+        self.get().hash(state)
+    }
+}
+
+// Rely on `Copy` since we cannot get a reference to an unaligned value.
+impl<Value> core::cmp::Ord for Packed<Value>
+where
+    Value: Copy + core::cmp::Ord,
+{
+    #[must_use]
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.get().cmp(&other.get())
+    }
+}
+
+// Rely on `Copy` since we cannot get a reference to an unaligned value.
+impl<Value> core::cmp::PartialEq for Packed<Value>
+where
+    Value: Copy + core::cmp::PartialEq,
+{
+    #[must_use]
+    fn eq(&self, other: &Self) -> bool {
+        self.get().eq(&other.get())
+    }
+}
+
+// Rely on `Copy` since we cannot get a reference to an unaligned value.
+impl<Value> core::cmp::PartialOrd for Packed<Value>
+where
+    Value: Copy + core::cmp::PartialOrd,
+{
+    #[must_use]
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        self.get().partial_cmp(&other.get())
+    }
 }
 
 // Implement `NativeAddress` on native-sized primitive integers.
