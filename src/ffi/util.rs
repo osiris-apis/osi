@@ -631,26 +631,6 @@ where
     pub const fn value(&self) -> Value {
         self.value
     }
-
-    /// ## Cast to the value
-    ///
-    /// Return a reference to the underlying value. It is safe to do the
-    /// same via a transmute.
-    #[inline(always)]
-    #[must_use]
-    pub const fn as_value(&self) -> &Value {
-        &self.value
-    }
-
-    /// ## Cast to the mutable value
-    ///
-    /// Return a mutable reference to the underlying value. It is safe to
-    /// do the same via a transmute.
-    #[inline(always)]
-    #[must_use]
-    pub fn as_value_mut(&mut self) -> &mut Value {
-        &mut self.value
-    }
 }
 
 // Implement clone via propagation.
