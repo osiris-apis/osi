@@ -749,9 +749,6 @@ where
     /// unmodified and embedded into the new object. `value()` will yield
     /// the same value again.
     ///
-    /// Alternatively, if the size of `Self` matches the size of `Value`, then
-    /// you can also safely transmute the object to the value type.
-    ///
     /// Note that you cannot transmute pointers to `Value` to a pointer of
     /// `Self` since `Value` might have a lower alignment than is required for
     /// `Self`.
@@ -769,15 +766,6 @@ where
     ///
     /// Yield the value that is embedded in this object. The value is
     /// returned unmodified. See `new()` for the inverse operation.
-    ///
-    /// Alternatively, if the size of `Self` matches the size of `Value`, then
-    /// you can also safely transmute the object to the value type.
-    ///
-    /// Unlike `new()`, you can safely transmute pointers to this object
-    /// to pointers of the value, since the alignment requirements of `Value`
-    /// are equal to, or lower than, the alignment requirements of `Self`. Note
-    /// that the wrapped object might have trailing padding bytes to serve an
-    /// alignment request greater than its own size.
     #[inline(always)]
     #[must_use]
     pub const fn value(&self) -> Value {
