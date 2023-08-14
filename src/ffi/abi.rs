@@ -151,35 +151,29 @@ pub trait Abi {
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Native {}
 
-/// ## Big-endian 32-bit ABI
+/// ## SysV Big-endian 32-bit ABI
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Abi32be {}
+pub struct Sysv32be {}
 
-/// ## Little-endian 32-bit ABI
+/// ## SysV Big-endian 64-bit ABI
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Abi32le {}
+pub struct Sysv64be {}
 
-/// ## Big-endian 64-bit ABI
+/// ## SysV Little-endian 32-bit ABI
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Abi64be {}
+pub struct Sysv32le {}
 
-/// ## Little-endian 64-bit ABI
+/// ## SysV Little-endian 64-bit ABI
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Abi64le {}
+pub struct Sysv64le {}
 
-macro_rules! supplement_abi_common {
-    () => {
-        type Align1 = align::Align1;
-        type Align2 = align::Align2;
-        type Align4 = align::Align4;
+/// ## Windows Little-endian 32-bit ABI
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Win32le {}
 
-        // Rely on `target_pointer_width` being 4 or 8.
-        type Align8 = Self::AlignNative;
-        type Align16 = Self::AlignNative;
-
-        type Enum = Self::I32;
-    }
-}
+/// ## Windows Little-endian 64-bit ABI
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Win64le {}
 
 // Supplement `Abi` implementations with `Integer` based endian converters.
 macro_rules! supplement_abi_integer {
@@ -252,7 +246,6 @@ impl Abi for Native {
 
     type Addr = usize;
     type Ptr<Target> = core::ptr::NonNull<Target>;
-
     type Enum = Self::I32;
 
     supplement_abi_integer!();
@@ -277,14 +270,19 @@ impl Abi for Native {
     type F64 = f64;
 }
 
-impl Abi for Abi32be {
+impl Abi for Sysv32be {
+    type Align1 = align::Align1;
+    type Align2 = align::Align2;
+    type Align4 = align::Align4;
+    type Align8 = align::Align4;
+    type Align16 = align::Align4;
     type AlignNative = align::Align4;
-
-    supplement_abi_common!();
-    supplement_abi_integer!();
 
     type Addr = ffi::util::Integer<ffi::util::BigEndian<core::num::NonZeroU32>, Self::AlignNative, core::num::NonZeroU32>;
     type Ptr<Target> = ffi::util::Pointer<Self::Addr, Target>;
+    type Enum = Self::I32;
+
+    supplement_abi_integer!();
 
     type Ix<Native: Copy, Alignment: Copy> = Self::Ixbe<Native, Alignment>;
     type Ux<Native: Copy, Alignment: Copy> = Self::Uxbe<Native, Alignment>;
@@ -293,14 +291,40 @@ impl Abi for Abi32be {
     supplement_abi_target!();
 }
 
-impl Abi for Abi32le {
-    type AlignNative = align::Align4;
+impl Abi for Sysv64be {
+    type Align1 = align::Align1;
+    type Align2 = align::Align2;
+    type Align4 = align::Align4;
+    type Align8 = align::Align8;
+    type Align16 = align::Align8;
+    type AlignNative = align::Align8;
 
-    supplement_abi_common!();
+    type Addr = ffi::util::Integer<ffi::util::BigEndian<core::num::NonZeroU64>, Self::AlignNative, core::num::NonZeroU64>;
+    type Ptr<Target> = ffi::util::Pointer<Self::Addr, Target>;
+    type Enum = Self::I32;
+
     supplement_abi_integer!();
+
+    type Ix<Native: Copy, Alignment: Copy> = Self::Ixbe<Native, Alignment>;
+    type Ux<Native: Copy, Alignment: Copy> = Self::Uxbe<Native, Alignment>;
+    type Fx<Native: Copy, Alignment: Copy> = Self::Fxbe<Native, Alignment>;
+
+    supplement_abi_target!();
+}
+
+impl Abi for Sysv32le {
+    type Align1 = align::Align1;
+    type Align2 = align::Align2;
+    type Align4 = align::Align4;
+    type Align8 = align::Align4;
+    type Align16 = align::Align4;
+    type AlignNative = align::Align4;
 
     type Addr = ffi::util::Integer<ffi::util::LittleEndian<core::num::NonZeroU32>, Self::AlignNative, core::num::NonZeroU32>;
     type Ptr<Target> = ffi::util::Pointer<Self::Addr, Target>;
+    type Enum = Self::I32;
+
+    supplement_abi_integer!();
 
     type Ix<Native: Copy, Alignment: Copy> = Self::Ixle<Native, Alignment>;
     type Ux<Native: Copy, Alignment: Copy> = Self::Uxle<Native, Alignment>;
@@ -309,30 +333,61 @@ impl Abi for Abi32le {
     supplement_abi_target!();
 }
 
-impl Abi for Abi64be {
+impl Abi for Sysv64le {
+    type Align1 = align::Align1;
+    type Align2 = align::Align2;
+    type Align4 = align::Align4;
+    type Align8 = align::Align8;
+    type Align16 = align::Align8;
     type AlignNative = align::Align8;
 
-    supplement_abi_common!();
+    type Addr = ffi::util::Integer<ffi::util::LittleEndian<core::num::NonZeroU64>, Self::AlignNative, core::num::NonZeroU64>;
+    type Ptr<Target> = ffi::util::Pointer<Self::Addr, Target>;
+    type Enum = Self::I32;
+
     supplement_abi_integer!();
 
-    type Addr = ffi::util::Integer<ffi::util::BigEndian<core::num::NonZeroU64>, Self::AlignNative, core::num::NonZeroU64>;
-    type Ptr<Target> = ffi::util::Pointer<Self::Addr, Target>;
-
-    type Ix<Native: Copy, Alignment: Copy> = Self::Ixbe<Native, Alignment>;
-    type Ux<Native: Copy, Alignment: Copy> = Self::Uxbe<Native, Alignment>;
-    type Fx<Native: Copy, Alignment: Copy> = Self::Fxbe<Native, Alignment>;
+    type Ix<Native: Copy, Alignment: Copy> = Self::Ixle<Native, Alignment>;
+    type Ux<Native: Copy, Alignment: Copy> = Self::Uxle<Native, Alignment>;
+    type Fx<Native: Copy, Alignment: Copy> = Self::Fxle<Native, Alignment>;
 
     supplement_abi_target!();
 }
 
-impl Abi for Abi64le {
-    type AlignNative = align::Align8;
+impl Abi for Win32le {
+    type Align1 = align::Align1;
+    type Align2 = align::Align2;
+    type Align4 = align::Align4;
+    type Align8 = align::Align8;
+    type Align16 = align::Align16;
+    type AlignNative = align::Align4;
 
-    supplement_abi_common!();
+    type Addr = ffi::util::Integer<ffi::util::LittleEndian<core::num::NonZeroU32>, Self::AlignNative, core::num::NonZeroU32>;
+    type Ptr<Target> = ffi::util::Pointer<Self::Addr, Target>;
+    type Enum = Self::I32;
+
     supplement_abi_integer!();
+
+    type Ix<Native: Copy, Alignment: Copy> = Self::Ixle<Native, Alignment>;
+    type Ux<Native: Copy, Alignment: Copy> = Self::Uxle<Native, Alignment>;
+    type Fx<Native: Copy, Alignment: Copy> = Self::Fxle<Native, Alignment>;
+
+    supplement_abi_target!();
+}
+
+impl Abi for Win64le {
+    type Align1 = align::Align1;
+    type Align2 = align::Align2;
+    type Align4 = align::Align4;
+    type Align8 = align::Align8;
+    type Align16 = align::Align16;
+    type AlignNative = align::Align8;
 
     type Addr = ffi::util::Integer<ffi::util::LittleEndian<core::num::NonZeroU64>, Self::AlignNative, core::num::NonZeroU64>;
     type Ptr<Target> = ffi::util::Pointer<Self::Addr, Target>;
+    type Enum = Self::I32;
+
+    supplement_abi_integer!();
 
     type Ix<Native: Copy, Alignment: Copy> = Self::Ixle<Native, Alignment>;
     type Ux<Native: Copy, Alignment: Copy> = Self::Uxle<Native, Alignment>;
@@ -344,25 +399,173 @@ impl Abi for Abi64le {
 /// ## Abi Alias for Target Platform
 ///
 /// This is an alias for one of the platform-specific ABI types (e.g.,
-/// `Abi64le`, `Abi32be`). This type aliases the type that corresponds to the
-/// ABI of the target platform.
+/// `Sysv32le`). This type aliases the type that corresponds to the ABI of the
+/// target platform. If this ABI does not match any pre-defined ABI of this
+/// crate, it will be set to match `Native`.
 ///
-/// For documentation reasons, it is an alias to `Native`.
-#[cfg(doc)]
+/// In documentation this is always set to `Native`.
+#[cfg(any(
+        doc,
+        all(
+            not(all(target_endian = "big", target_family = "unix", target_pointer_width = "32")),
+            not(all(target_endian = "big", target_family = "unix", target_pointer_width = "64")),
+            not(all(target_endian = "little", target_family = "unix", target_pointer_width = "32")),
+            not(all(target_endian = "little", target_family = "unix", target_pointer_width = "64")),
+            not(all(target_endian = "little", target_family = "windows", target_pointer_width = "32")),
+            not(all(target_endian = "little", target_family = "windows", target_pointer_width = "64")),
+        ),
+))]
 pub type Target = Native;
-#[cfg(all(not(doc), target_endian = "big", target_pointer_width = "32"))]
-pub type Target = Abi32be;
-#[cfg(all(not(doc), target_endian = "little", target_pointer_width = "32"))]
-pub type Target = Abi32le;
-#[cfg(all(not(doc), target_endian = "big", target_pointer_width = "64"))]
-pub type Target = Abi64be;
-#[cfg(all(not(doc), target_endian = "little", target_pointer_width = "64"))]
-pub type Target = Abi64le;
+#[cfg(all(not(doc), target_endian = "big", target_family = "unix", target_pointer_width = "32"))]
+pub type Target = Sysv32be;
+#[cfg(all(not(doc), target_endian = "big", target_family = "unix", target_pointer_width = "64"))]
+pub type Target = Sysv64be;
+#[cfg(all(not(doc), target_endian = "little", target_family = "unix", target_pointer_width = "32"))]
+pub type Target = Sysv32le;
+#[cfg(all(not(doc), target_endian = "little", target_family = "unix", target_pointer_width = "64"))]
+pub type Target = Sysv64le;
+#[cfg(all(not(doc), target_endian = "little", target_family = "windows", target_pointer_width = "32"))]
+pub type Target = Win32le;
+#[cfg(all(not(doc), target_endian = "little", target_family = "windows", target_pointer_width = "64"))]
+pub type Target = Win64le;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use core::mem::align_of;
+    use core::mem::{align_of, size_of};
+
+    fn typeinfo_abi_static<B: Abi>() {
+        assert_eq!(size_of::<B::Align1>(), 0);
+        assert_eq!(size_of::<B::Align2>(), 0);
+        assert_eq!(size_of::<B::Align4>(), 0);
+        assert_eq!(size_of::<B::Align8>(), 0);
+        assert_eq!(size_of::<B::Align16>(), 0);
+        assert_eq!(size_of::<B::AlignNative>(), 0);
+
+        assert_eq!(size_of::<B::I8be>(), 1);
+        assert_eq!(align_of::<B::I8be>(), align_of::<B::Align1>());
+        assert_eq!(size_of::<B::I16be>(), 2);
+        assert_eq!(align_of::<B::I16be>(), align_of::<B::Align2>());
+        assert_eq!(size_of::<B::I32be>(), 4);
+        assert_eq!(align_of::<B::I32be>(), align_of::<B::Align4>());
+        assert_eq!(size_of::<B::I64be>(), 8);
+        assert_eq!(align_of::<B::I64be>(), align_of::<B::Align8>());
+        assert_eq!(size_of::<B::I128be>(), 16);
+        assert_eq!(align_of::<B::I128be>(), align_of::<B::Align16>());
+
+        assert_eq!(size_of::<B::I8le>(), 1);
+        assert_eq!(align_of::<B::I8le>(), align_of::<B::Align1>());
+        assert_eq!(size_of::<B::I16le>(), 2);
+        assert_eq!(align_of::<B::I16le>(), align_of::<B::Align2>());
+        assert_eq!(size_of::<B::I32le>(), 4);
+        assert_eq!(align_of::<B::I32le>(), align_of::<B::Align4>());
+        assert_eq!(size_of::<B::I64le>(), 8);
+        assert_eq!(align_of::<B::I64le>(), align_of::<B::Align8>());
+        assert_eq!(size_of::<B::I128le>(), 16);
+        assert_eq!(align_of::<B::I128le>(), align_of::<B::Align16>());
+
+        assert_eq!(size_of::<B::I8>(), 1);
+        assert_eq!(align_of::<B::I8>(), align_of::<B::Align1>());
+        assert_eq!(size_of::<B::I16>(), 2);
+        assert_eq!(align_of::<B::I16>(), align_of::<B::Align2>());
+        assert_eq!(size_of::<B::I32>(), 4);
+        assert_eq!(align_of::<B::I32>(), align_of::<B::Align4>());
+        assert_eq!(size_of::<B::I64>(), 8);
+        assert_eq!(align_of::<B::I64>(), align_of::<B::Align8>());
+        assert_eq!(size_of::<B::I128>(), 16);
+        assert_eq!(align_of::<B::I128>(), align_of::<B::Align16>());
+
+        assert_eq!(size_of::<B::U8be>(), 1);
+        assert_eq!(align_of::<B::U8be>(), align_of::<B::Align1>());
+        assert_eq!(size_of::<B::U16be>(), 2);
+        assert_eq!(align_of::<B::U16be>(), align_of::<B::Align2>());
+        assert_eq!(size_of::<B::U32be>(), 4);
+        assert_eq!(align_of::<B::U32be>(), align_of::<B::Align4>());
+        assert_eq!(size_of::<B::U64be>(), 8);
+        assert_eq!(align_of::<B::U64be>(), align_of::<B::Align8>());
+        assert_eq!(size_of::<B::U128be>(), 16);
+        assert_eq!(align_of::<B::U128be>(), align_of::<B::Align16>());
+
+        assert_eq!(size_of::<B::U8le>(), 1);
+        assert_eq!(align_of::<B::U8le>(), align_of::<B::Align1>());
+        assert_eq!(size_of::<B::U16le>(), 2);
+        assert_eq!(align_of::<B::U16le>(), align_of::<B::Align2>());
+        assert_eq!(size_of::<B::U32le>(), 4);
+        assert_eq!(align_of::<B::U32le>(), align_of::<B::Align4>());
+        assert_eq!(size_of::<B::U64le>(), 8);
+        assert_eq!(align_of::<B::U64le>(), align_of::<B::Align8>());
+        assert_eq!(size_of::<B::U128le>(), 16);
+        assert_eq!(align_of::<B::U128le>(), align_of::<B::Align16>());
+
+        assert_eq!(size_of::<B::U8>(), 1);
+        assert_eq!(align_of::<B::U8>(), align_of::<B::Align1>());
+        assert_eq!(size_of::<B::U16>(), 2);
+        assert_eq!(align_of::<B::U16>(), align_of::<B::Align2>());
+        assert_eq!(size_of::<B::U32>(), 4);
+        assert_eq!(align_of::<B::U32>(), align_of::<B::Align4>());
+        assert_eq!(size_of::<B::U64>(), 8);
+        assert_eq!(align_of::<B::U64>(), align_of::<B::Align8>());
+        assert_eq!(size_of::<B::U128>(), 16);
+        assert_eq!(align_of::<B::U128>(), align_of::<B::Align16>());
+
+        assert_eq!(size_of::<B::F32be>(), 4);
+        assert_eq!(align_of::<B::F32be>(), align_of::<B::Align4>());
+        assert_eq!(size_of::<B::F64be>(), 8);
+        assert_eq!(align_of::<B::F64be>(), align_of::<B::Align8>());
+
+        assert_eq!(size_of::<B::F32le>(), 4);
+        assert_eq!(align_of::<B::F32le>(), align_of::<B::Align4>());
+        assert_eq!(size_of::<B::F64le>(), 8);
+        assert_eq!(align_of::<B::F64le>(), align_of::<B::Align8>());
+
+        assert_eq!(size_of::<B::F32>(), 4);
+        assert_eq!(align_of::<B::F32>(), align_of::<B::Align4>());
+        assert_eq!(size_of::<B::F64>(), 8);
+        assert_eq!(align_of::<B::F64>(), align_of::<B::Align8>());
+    }
+
+    fn typeinfo_abi_dynamic<B: Abi>() {
+        assert_eq!(align_of::<B::Align1>(), align_of::<u8>());
+        assert_eq!(align_of::<B::Align2>(), align_of::<u16>());
+        assert_eq!(align_of::<B::Align4>(), align_of::<u32>());
+        assert_eq!(align_of::<B::Align8>(), align_of::<u64>());
+        assert_eq!(align_of::<B::Align16>(), align_of::<u128>());
+        assert_eq!(align_of::<B::AlignNative>(), align_of::<usize>());
+
+        assert_eq!(size_of::<B::Addr>(), size_of::<usize>());
+        assert_eq!(align_of::<B::Addr>(), align_of::<usize>());
+        assert_eq!(size_of::<B::Ptr<()>>(), size_of::<usize>());
+        assert_eq!(align_of::<B::Ptr<()>>(), align_of::<usize>());
+        assert_eq!(size_of::<B::Enum>(), size_of::<i32>());
+        assert_eq!(align_of::<B::Enum>(), align_of::<i32>());
+
+        assert_eq!(size_of::<B::I8>(), size_of::<i8>());
+        assert_eq!(align_of::<B::I8>(), align_of::<i8>());
+        assert_eq!(size_of::<B::I16>(), size_of::<i16>());
+        assert_eq!(align_of::<B::I16>(), align_of::<i16>());
+        assert_eq!(size_of::<B::I32>(), size_of::<i32>());
+        assert_eq!(align_of::<B::I32>(), align_of::<i32>());
+        assert_eq!(size_of::<B::I64>(), size_of::<i64>());
+        assert_eq!(align_of::<B::I64>(), align_of::<i64>());
+        assert_eq!(size_of::<B::I128>(), size_of::<i128>());
+        assert_eq!(align_of::<B::I128>(), align_of::<i128>());
+
+        assert_eq!(size_of::<B::U8>(), size_of::<u8>());
+        assert_eq!(align_of::<B::U8>(), align_of::<u8>());
+        assert_eq!(size_of::<B::U16>(), size_of::<u16>());
+        assert_eq!(align_of::<B::U16>(), align_of::<u16>());
+        assert_eq!(size_of::<B::U32>(), size_of::<u32>());
+        assert_eq!(align_of::<B::U32>(), align_of::<u32>());
+        assert_eq!(size_of::<B::U64>(), size_of::<u64>());
+        assert_eq!(align_of::<B::U64>(), align_of::<u64>());
+        assert_eq!(size_of::<B::U128>(), size_of::<u128>());
+        assert_eq!(align_of::<B::U128>(), align_of::<u128>());
+
+        assert_eq!(size_of::<B::F32>(), size_of::<f32>());
+        assert_eq!(align_of::<B::F32>(), align_of::<f32>());
+        assert_eq!(size_of::<B::F64>(), size_of::<f64>());
+        assert_eq!(align_of::<B::F64>(), align_of::<f64>());
+    }
 
     // Verify typeinfo of basic types
     //
@@ -370,29 +573,11 @@ mod tests {
     // guaranteed layout.
     #[test]
     fn typeinfo() {
-        assert_eq!(align_of::<<Abi32be as Abi>::Align1>(), 1);
-        assert_eq!(align_of::<<Abi32be as Abi>::Align2>(), 2);
-        assert_eq!(align_of::<<Abi32be as Abi>::Align4>(), 4);
-        assert_eq!(align_of::<<Abi32be as Abi>::Align8>(), 4);
-        assert_eq!(align_of::<<Abi32be as Abi>::Align16>(), 4);
-        assert_eq!(align_of::<<Abi32be as Abi>::AlignNative>(), 4);
-        assert_eq!(align_of::<<Abi32le as Abi>::Align1>(), 1);
-        assert_eq!(align_of::<<Abi32le as Abi>::Align2>(), 2);
-        assert_eq!(align_of::<<Abi32le as Abi>::Align4>(), 4);
-        assert_eq!(align_of::<<Abi32le as Abi>::Align8>(), 4);
-        assert_eq!(align_of::<<Abi32le as Abi>::Align16>(), 4);
-        assert_eq!(align_of::<<Abi32le as Abi>::AlignNative>(), 4);
-        assert_eq!(align_of::<<Abi64be as Abi>::Align1>(), 1);
-        assert_eq!(align_of::<<Abi64be as Abi>::Align2>(), 2);
-        assert_eq!(align_of::<<Abi64be as Abi>::Align4>(), 4);
-        assert_eq!(align_of::<<Abi64be as Abi>::Align8>(), 8);
-        assert_eq!(align_of::<<Abi64be as Abi>::Align16>(), 8);
-        assert_eq!(align_of::<<Abi64be as Abi>::AlignNative>(), 8);
-        assert_eq!(align_of::<<Abi64le as Abi>::Align1>(), 1);
-        assert_eq!(align_of::<<Abi64le as Abi>::Align2>(), 2);
-        assert_eq!(align_of::<<Abi64le as Abi>::Align4>(), 4);
-        assert_eq!(align_of::<<Abi64le as Abi>::Align8>(), 8);
-        assert_eq!(align_of::<<Abi64le as Abi>::Align16>(), 8);
-        assert_eq!(align_of::<<Abi64le as Abi>::AlignNative>(), 8);
+        typeinfo_abi_static::<Native>();
+        typeinfo_abi_static::<Sysv32le>();
+        typeinfo_abi_static::<Win32le>();
+
+        typeinfo_abi_dynamic::<Native>();
+        typeinfo_abi_dynamic::<Target>();
     }
 }
