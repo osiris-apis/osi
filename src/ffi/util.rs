@@ -762,6 +762,18 @@ where
         }
     }
 
+    /// ## Set to a new value
+    ///
+    /// Change the value that is embedded in this object to the specified
+    /// value. The previous value is lost unrecoverably.
+    ///
+    /// This operation is equivalent to assigning a new object of this wrapper
+    /// to the location of `self`.
+    #[inline]
+    pub fn set(&mut self, v: Value) {
+        self.value.set(v);
+    }
+
     /// ## Yield underlying value
     ///
     /// Yield the value that is embedded in this object. The value is
