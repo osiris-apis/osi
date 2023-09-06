@@ -134,6 +134,14 @@ pub trait Api {
     type NativeInterface: Copy;
 }
 
+// Suppress `improper_ctypes_definitions` since we use `Option<B::Ptr<...>>`
+// quite a lot, yet its zero-optimization is unstable. We verify the behavior
+// in our test-suite, so as long as tests pass, this will be fine.
+//
+// XXX: Preferably, we would want a way to just suppress the warning for a
+//      single type-alias. Unfortunately, this is not possible, so we disable
+//      the lint entirely for now.
+#[allow(improper_ctypes_definitions)]
 pub mod api {
     use crate::{dd, ffi};
     use crate::ffi::abi::Abi;
