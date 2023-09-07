@@ -13,3 +13,5 @@
 //! application build process of each platform. Alternatively, the platform
 //! integration can be left under control of the build system, thus hiding the
 //! entire native integration and instead using the provided abstractions.
+
+pub mod cargo;
