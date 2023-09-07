@@ -1,0 +1,23 @@
+[package]
+name = "cargo-osiris"
+version = "0.1.0"
+
+categories = [
+        "command-line-utilities",
+        "development-tools",
+        "os",
+]
+description = "Osiris Build System"
+edition = "2021"
+homepage = "https://www.osiris.foo"
+keywords = [
+        "app",
+        "build",
+        "osiris",
+        "platform",
+        "tooling",
+]
+license = "MIT OR Apache-2.0 OR LGPL-2.1-or-later"
+readme = "../README.md"
+repository = "https://github.com/osiris-apis/osi"
+rust-version = "1.70"
