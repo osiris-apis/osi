@@ -210,11 +210,12 @@ impl Blob {
         todo.insert(root);
         ids.insert(root.to_string());
         while let Some(next) = todo.pop_first() {
-            let deps = depmap.get(next).unwrap();
-            for &dep in deps.iter() {
-                if !ids.contains(dep) {
-                    todo.insert(dep);
-                    ids.insert(dep.to_string());
+            if let Some(deps) = depmap.get(next) {
+                for &dep in deps.iter() {
+                    if !ids.contains(dep) {
+                        todo.insert(dep);
+                        ids.insert(dep.to_string());
+                    }
                 }
             }
         }
