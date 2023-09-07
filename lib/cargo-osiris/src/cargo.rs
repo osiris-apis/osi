@@ -35,6 +35,28 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    /// Create from Cargo metadata object
+    ///
+    /// Create the `Metadata` object from the JSON-encoded Cargo metadata
+    /// object, obtained by the caller by querying Cargo.
+    fn from_json(bytes: &[u8]) -> Result<Self, Error> {
+        // Decode output as JSON value.
+        let data = std::str::from_utf8(bytes).map_err(|v| Error::Unicode(v))?;
+        let json: serde_json::Value = serde_json::from_str(data).map_err(|_| Error::Json)?;
+
+        // Extract `target_directory` from the blob. It is a mandatory field.
+        let data_target_directory = json.get("target_directory").ok_or(Error::Data)?
+            .as_str().ok_or(Error::Data)?
+            .to_string();
+
+        // Return the parsed `Metadata` object.
+        Ok(
+            Metadata {
+                target_directory: data_target_directory,
+            }
+        )
+    }
+
     /// Query metadata from Cargo
     ///
     /// Invoke `cargo metadata` and parse all the cargo metadata into the
@@ -69,24 +91,7 @@ impl Metadata {
             return Err(Error::Cargo);
         }
 
-        // Decode output as JSON value.
-        let data = std::str::from_utf8(&output.stdout).map_err(|v| Error::Unicode(v))?;
-        let json: serde_json::Value = serde_json::from_str(data).map_err(|_| Error::Json)?;
-
-        //
-        // Extract the required data from the JSON data. We are interested in:
-        //
-        //  * `.target_directory`: Directory used by cargo to store build artifacts.
-        //
-
-        let data_target_directory = json.get("target_directory").ok_or(Error::Data)?
-            .as_str().ok_or(Error::Data)?
-            .to_string();
-
-        Ok(
-            Metadata {
-                target_directory: data_target_directory,
-            }
-        )
+        // Parse data into a `Metadata` object.
+        Self::from_json(&output.stdout)
     }
 }
