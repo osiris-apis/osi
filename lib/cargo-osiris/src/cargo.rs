@@ -29,6 +29,7 @@ pub enum Error {
 ///
 /// This struct represents the reduced cargo metadata with only the bits that
 /// are required by the crate.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Metadata {
     pub target_directory: String,
 }
