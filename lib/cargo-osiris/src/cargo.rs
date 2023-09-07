@@ -11,6 +11,7 @@
 ///
 /// This error-enum describes the possible errors from the metadata extraction
 /// helper. See each error-code for details on when it is raised.
+#[derive(Debug)]
 pub enum Error {
     /// Execution of `cargo` could not commence.
     Exec(std::io::Error),
