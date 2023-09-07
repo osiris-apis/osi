@@ -1,4 +1,4 @@
-//! Cargo Integration
+//! # Cargo Interaction
 //!
 //! The cargo CLI allows embedding other utilities as its subcommands. That is,
 //! `cargo sub [...]` calls into `cargo-sub`. Cargo only does very basic setup
@@ -6,9 +6,6 @@
 //! about the cargo setup, they need to call into `cargo metadata`. This module
 //! provides a wrapper around that call, extracting the required information
 //! from the cargo metdata JSON blob.
-//!
-//! Additionally, this module provides all other cargo-integration related
-//! helper utilities. See their definitions for details.
 
 /// Metadata Extraction Errors
 ///
