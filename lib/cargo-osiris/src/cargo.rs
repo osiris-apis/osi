@@ -12,8 +12,6 @@
 /// This error-enum describes the possible errors from the metadata extraction
 /// helper. See each error-code for details on when it is raised.
 pub enum Error {
-    /// Standalone execution, not running under `cargo`.
-    Standalone,
     /// Execution of `cargo` could not commence.
     Exec(std::io::Error),
     /// `cargo` exited without success.
@@ -43,8 +41,8 @@ impl Metadata {
     pub fn cargo(path: &dyn AsRef<std::path::Path>) -> Result<Self, Error> {
         // Get the path to cargo via the `CARGO` env var. This is always set by
         // cargo when running external sub-commands. If unset, it means this is
-        // called outside cargo and we bail out.
-        let cargo = std::env::var_os("CARGO").ok_or(Error::Standalone)?;
+        // called outside cargo and we use the default.
+        let cargo = std::env::var_os("CARGO").unwrap_or("cargo".into());
 
         // Build the cargo-metadata invocation.
         let mut cmd = std::process::Command::new(cargo);
