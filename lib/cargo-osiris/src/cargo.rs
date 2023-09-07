@@ -95,3 +95,43 @@ impl Metadata {
         Self::from_json(&output.stdout)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Create `Metadata` from a set of predefined JSON blobs and verify it is
+    // parsed as expected.
+    #[test]
+    fn metadata_from_json() {
+        // Empty strings are invalid JSON.
+        assert!(
+            matches!(
+                Metadata::from_json("".as_bytes()).unwrap_err(),
+                Error::Json,
+            ),
+        );
+
+        // Empty sets lack mandatory metadata fields and must be rejected.
+        assert!(
+            matches!(
+                Metadata::from_json("{}".as_bytes()).unwrap_err(),
+                Error::Data,
+            ),
+        );
+
+        // As long as our mandatory fields are present, it must parse.
+        assert_eq!(
+            Metadata::from_json(
+                concat!(
+                    "{",
+                        r#""target_directory": ".""#,
+                    "}",
+                ).as_bytes()
+            ).unwrap(),
+            Metadata {
+                target_directory: ".".into(),
+            },
+        );
+    }
+}
