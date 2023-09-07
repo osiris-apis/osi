@@ -40,6 +40,8 @@ pub enum Error {
 pub struct Metadata {
     /// Target directory of the package build.
     pub target_directory: String,
+    pub java_sources: Vec<std::path::PathBuf>,
+    pub kotlin_sources: Vec<std::path::PathBuf>,
 }
 
 // Intermediate state after cargo-metadata returned, but the blob was not yet
@@ -232,12 +234,72 @@ impl Blob {
         // this compilation. We have to do this, since only the dependency
         // graph is affected by target-filtering and feature-selection, and we
         // want to avoid any build or dev dependencies.
-        let _ids = self.involved_ids(query.main_package.as_deref());
+        let ids = self.involved_ids(query.main_package.as_deref());
+
+        // Now walk the package list and extract all data we desire.
+        let mut java_sources = BTreeSet::new();
+        let mut kotlin_sources = BTreeSet::new();
+        if let Some(serde_json::Value::Array(packages)) = self.json.get("packages") {
+            for pkg in packages.iter() {
+                // Skip any packages that we are not interested in.
+                let id = match pkg.get("id") {
+                    Some(serde_json::Value::String(v)) => v,
+                    _ => continue
+                };
+                if !ids.contains(id) {
+                    continue;
+                }
+
+                // Get the absolute path to the package root. We need this
+                // normalize other paths in the package metadata.
+                let manifest_path = match pkg.get("manifest_path") {
+                    Some(serde_json::Value::String(v)) => v,
+                    _ => continue
+                };
+                let package_path = util::absdir(&manifest_path);
+
+                // Extract all metadata we desire.
+                if let Some(serde_json::Value::Object(metadata)) = pkg.get("metadata") {
+                    // We use `osi` as our reserved metadata namespace for all
+                    // features that have no standardized location. Once a more
+                    // standard metadata namespace is found, we will use it.
+                    if let Some(serde_json::Value::Object(osi)) = metadata.get("osi") {
+                        // The `java` and `kotlin` configurations allow
+                        // specifying an array of source-directories relative
+                        // to the manifest. This allows shipping Java and
+                        // Kotlin sources with a Rust crate, which are expected
+                        // by the Rust package to be available in the JVM when
+                        // it is loaded via JNI. It is up to the build system
+                        // to decide how to make them available.
+                        if let Some(serde_json::Value::Object(java)) = osi.get("java") {
+                            if let Some(serde_json::Value::Array(dirs)) = java.get("source-dirs") {
+                                for dir in dirs.iter() {
+                                    if let serde_json::Value::String(dir_str) = dir {
+                                        java_sources.insert(package_path.as_path().join(dir_str));
+                                    }
+                                }
+                            }
+                        }
+                        if let Some(serde_json::Value::Object(kotlin)) = osi.get("kotlin") {
+                            if let Some(serde_json::Value::Array(dirs)) = kotlin.get("source-dirs") {
+                                for dir in dirs.iter() {
+                                    if let serde_json::Value::String(dir_str) = dir {
+                                        kotlin_sources.insert(package_path.as_path().join(dir_str));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         // Return the parsed `Metadata` object.
         Ok(
             Metadata {
                 target_directory: data_target_directory,
+                java_sources: java_sources.into_iter().collect(),
+                kotlin_sources: kotlin_sources.into_iter().collect(),
             }
         )
     }
@@ -465,6 +527,98 @@ mod tests {
                 target_directory: ".".into(),
                 java_sources: Vec::new(),
                 kotlin_sources: Vec::new(),
+            },
+        );
+    }
+
+    // Verify that java and kotlin configurations are properly extracted from
+    // the dependency tree.
+    #[test]
+    fn metadata_java_kotlin() {
+        let query = Query {
+            workspace: ".".into(),
+            main_package: None,
+            target: None,
+        };
+
+        assert_eq!(
+            Blob::from_str(
+                r#"{
+                    "target_directory": ".",
+                    "resolve": {
+                        "root": "root (...)",
+                        "nodes": [
+                            {
+                                "id": "root (...)",
+                                "deps": [
+                                    { "pkg": "dep0 (...)", "dep_kinds": [{ "kind": null }] },
+                                    { "pkg": "dep1 (...)", "dep_kinds": [{ "kind": null }] }
+                                ]
+                            },
+                            {
+                                "id": "dep0 (...)",
+                                "deps": []
+                            },
+                            {
+                                "id": "dep1 (...)",
+                                "deps": []
+                            }
+                        ]
+                    },
+                    "packages": [
+                        {
+                            "id": "root (...)",
+                            "manifest_path": "./Cargo.toml",
+                            "metadata": null
+                        },
+                        {
+                            "id": "dep0 (...)",
+                            "manifest_path": "/foo/Cargo.toml",
+                            "metadata": {
+                                "osi": {
+                                    "java": {
+                                        "source-dirs": [
+                                            "foo",
+                                            "dep0"
+                                        ]
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "id": "dep1 (...)",
+                            "manifest_path": "/foo/Cargo.toml",
+                            "metadata": {
+                                "osi": {
+                                    "java": {
+                                        "source-dirs": [
+                                            "foo",
+                                            "dep1"
+                                        ]
+                                    },
+                                    "kotlin": {
+                                        "source-dirs": [
+                                            "foo",
+                                            "bar"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }"#,
+            ).unwrap().parse(&query).unwrap(),
+            Metadata {
+                target_directory: ".".into(),
+                java_sources: vec![
+                    "/foo/dep0".into(),
+                    "/foo/dep1".into(),
+                    "/foo/foo".into(),
+                ],
+                kotlin_sources: vec![
+                    "/foo/bar".into(),
+                    "/foo/foo".into(),
+                ],
             },
         );
     }
