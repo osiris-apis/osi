@@ -40,7 +40,11 @@ pub enum Error {
 pub struct Metadata {
     /// Target directory of the package build.
     pub target_directory: String,
+    /// Collection of all java-source-directories from the crate metadata of
+    /// all packages part of the main build.
     pub java_sources: Vec<std::path::PathBuf>,
+    /// Collection of all kotlin-source-directories from the crate metadata of
+    /// all packages part of the main build.
     pub kotlin_sources: Vec<std::path::PathBuf>,
 }
 
