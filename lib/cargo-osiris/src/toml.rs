@@ -72,12 +72,9 @@ pub struct RawPlatformAndroid {
     pub target_sdk: Option<u32>,
 
     pub abis: Option<Vec<String>>,
-    pub ndk_level: Option<u32>,
 
     pub version_code: Option<u32>,
     pub version_name: Option<String>,
-
-    pub sdk_path: Option<String>,
 }
 
 /// ## Platform Union
