@@ -24,3 +24,4 @@ rust-version = "1.70"
 
 [dependencies]
 serde_json = { version = "1.0.0", features = ["arbitrary_precision", "float_roundtrip"] }
+toml = { version = "0.7.0" }

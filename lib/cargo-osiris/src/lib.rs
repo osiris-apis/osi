@@ -15,4 +15,5 @@
 //! entire native integration and instead using the provided abstractions.
 
 pub mod cargo;
+pub mod toml;
 pub mod util;
