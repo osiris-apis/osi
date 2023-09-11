@@ -10,7 +10,7 @@
 use crate::util;
 use std::collections::{BTreeMap, BTreeSet};
 
-/// Metadata Extraction Errors
+/// ## Metadata Extraction Errors
 ///
 /// This error-enum describes the possible errors from the metadata extraction
 /// helper. See each error-code for details on when it is raised.
@@ -32,7 +32,7 @@ pub enum Error {
     Data,
 }
 
-/// Reduced Cargo Metadata
+/// ## Reduced Cargo Metadata
 ///
 /// This struct represents the reduced cargo metadata with only the bits that
 /// are required by us.
@@ -55,7 +55,7 @@ struct Blob {
     pub json: serde_json::Value,
 }
 
-/// Metadata query parameters
+/// ## Metadata query parameters
 ///
 /// This open-coded structure provides the parameters for a query to
 /// `cargo-metadata`. It is to be filled in by the caller.
@@ -311,7 +311,7 @@ impl Blob {
 }
 
 impl Query {
-    /// Query metadata from Cargo
+    /// ## Query metadata from Cargo
     ///
     /// Invoke `cargo metadata` and parse all the cargo metadata into the
     /// `Metadata` object. Only the bits required by the crate are fetched,
