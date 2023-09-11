@@ -145,8 +145,11 @@ impl Raw {
         }
     }
 
-    // Parse configuration from an in-memory string.
-    fn parse_str(content: &str) -> Result<Self, Error> {
+    /// ## Parse from in-memory string
+    ///
+    /// Take an in-memory TOML-encoded configuration and parse it into the
+    /// structured representation.
+    pub fn parse_str(content: &str) -> Result<Self, Error> {
         content.parse::<toml::Table>()
             .map_err(|v| Error::from_toml_syntax(&v))
             .and_then(|v| Self::parse_toml(v))
