@@ -23,6 +23,7 @@ repository = "https://github.com/osiris-apis/osi"
 rust-version = "1.70"
 
 [dependencies]
+clap = { version = "4.3.0", features = ["cargo"] }
 serde = { version = "1.0.0", features = ["derive"] }
 serde_json = { version = "1.0.0", features = ["arbitrary_precision", "float_roundtrip"] }
 toml = { version = "0.7.0" }
