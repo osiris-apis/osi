@@ -17,7 +17,7 @@
 pub mod cargo;
 pub mod config;
 pub mod exe;
-pub mod toml;
-pub mod util;
+mod toml;
+mod util;
 
 pub use exe::cargo_osiris;
