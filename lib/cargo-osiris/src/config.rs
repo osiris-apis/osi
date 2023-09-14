@@ -87,7 +87,7 @@ impl Config {
         let v_id = &platform.id;
 
         // Provide a default path based on the platform ID, if none is
-        // specified in the manifest.
+        // specified in the configuration.
         let v_path_platform = self.path_toml.as_path().join(
             match platform.path.as_ref() {
                 Some(v) => v.clone(),
