@@ -17,6 +17,7 @@
 pub mod cargo;
 pub mod config;
 pub mod exe;
+mod op;
 mod toml;
 mod util;
 

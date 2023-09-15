@@ -8,7 +8,7 @@
 //! the operations, but merely uses the APIs from the library.
 
 use clap;
-use crate::{cargo, config, toml};
+use crate::{cargo, config, op, toml};
 
 /// ## Cargo Osiris
 ///
@@ -80,7 +80,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
         }
 
         // Handle the `--config <...>` argument.
-        fn _config(
+        fn config(
             &self,
             m: &clap::ArgMatches,
         ) -> Result<(toml::Raw, config::Config), u8> {
@@ -184,7 +184,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
         }
 
         // Handle the `--platform <...>` argument.
-        fn _platform<'config>(
+        fn platform<'config>(
             &self,
             m: &clap::ArgMatches,
             config: &'config config::Config,
@@ -197,6 +197,47 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                     Err(1)
                 },
                 Some(v) => Ok(v),
+            }
+        }
+
+        fn op_emerge(
+            &self,
+            m: &clap::ArgMatches,
+            m_op: &clap::ArgMatches,
+        ) -> Result<(), u8> {
+            let (_, config) = self.config(m)?;
+            let platform = self.platform(m_op, &config)?;
+            let update = *m_op.get_one("update").expect("Update-flag lacks a value");
+
+            match op::emerge::emerge(
+                &config,
+                platform,
+                None,
+                update,
+            ) {
+                Err(op::emerge::Error::Already) => {
+                    eprintln!("Cannot emerge platform integration: Platform code already present");
+                    Err(1)
+                },
+                Err(op::emerge::Error::PlatformDirectory(dir)) => {
+                    eprintln!("Cannot emerge platform integration: Failed to access platform directory {:?}", dir);
+                    Err(1)
+                },
+                Err(op::emerge::Error::DirectoryCreation(dir)) => {
+                    eprintln!("Cannot emerge platform integration: Failed to create directory {:?}", dir);
+                    Err(1)
+                },
+                Err(op::emerge::Error::FileUpdate(file, error)) => {
+                    eprintln!("Cannot emerge platform integration: Failed to update {:?} ({})", file, error);
+                    Err(1)
+                },
+                Err(op::emerge::Error::FileRemoval(file, error)) => {
+                    eprintln!("Cannot emerge platform integration: Failed to remove {:?} ({})", file, error);
+                    Err(1)
+                },
+                Ok(_) => {
+                    Ok(())
+                },
             }
         }
 
@@ -226,6 +267,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
             }
 
             match m.subcommand() {
+                Some(("emerge", m_op)) => self.op_emerge(&m, &m_op),
                 _ => std::unreachable!(),
             }
         }
