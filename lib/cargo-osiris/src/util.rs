@@ -30,6 +30,15 @@ pub fn absdir(path: &dyn AsRef<std::path::Path>) -> std::path::PathBuf {
     b
 }
 
+/// ## Escape XML PCDATA
+///
+/// Create a new string that has the same content as the input but all special
+/// characters encoded suitably for XML PCDATA.
+pub fn escape_xml_pcdata(input: &str) -> String {
+    input.replace("&", "&amp;")
+         .replace("<", "&lt;")
+}
+
 /// ## Turn strings into valid symbol identifiers
 ///
 /// Create a new string that has the same content as the input but all
@@ -104,6 +113,16 @@ mod tests {
             cwd.as_path(),
         );
         cwd.pop();
+    }
+
+    // Verify that the XML-PCDATA escapes are properly handled.
+    #[test]
+    fn test_xml_pcdata() {
+        assert_eq!(escape_xml_pcdata(""), "");
+        assert_eq!(escape_xml_pcdata("foobar"), "foobar");
+        assert_eq!(escape_xml_pcdata("foo & bar"), "foo &amp; bar");
+        assert_eq!(escape_xml_pcdata("<foobar>"), "&lt;foobar>");
+        assert_eq!(escape_xml_pcdata("<&>"), "&lt;&amp;>");
     }
 
     // Run some basic string conversion tests on the `symbolize()` helper. It
