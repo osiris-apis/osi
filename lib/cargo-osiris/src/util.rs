@@ -35,8 +35,26 @@ pub fn absdir(path: &dyn AsRef<std::path::Path>) -> std::path::PathBuf {
 /// Create a new string that has the same content as the input but all special
 /// characters encoded suitably for XML PCDATA.
 pub fn escape_xml_pcdata(input: &str) -> String {
-    input.replace("&", "&amp;")
-         .replace("<", "&lt;")
+    let n_alloc = input.chars().fold(
+        0,
+        |acc, v| match v {
+            '&' => acc + 5,
+            '<' => acc + 4,
+            _ => acc + 1,
+        }
+    );
+
+    let mut v = String::with_capacity(n_alloc);
+
+    for c in input.chars() {
+        match c {
+            '&' => v.push_str("&amp;"),
+            '<' => v.push_str("&lt;"),
+            _ => v.push(c),
+        }
+    }
+
+    v
 }
 
 /// ## Turn strings into valid symbol identifiers
