@@ -1,0 +1,25 @@
+[package]
+name = "osi-demo"
+version = "0.1.0"
+
+categories = [
+        "development-tools",
+]
+description = "Osiris Demo Application"
+edition = "2021"
+homepage = "https://www.osiris.foo"
+keywords = [
+        "demo",
+        "direct",
+        "os",
+        "osiris",
+        "raw",
+]
+license = "MIT OR Apache-2.0 OR LGPL-2.1-or-later"
+readme = "../README.md"
+repository = "https://github.com/osiris-apis/osi"
+rust-version = "1.70"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+adw = { features = ["v1_2"], package = "libadwaita", version = "0.5" }
+gtk = { features = ["v4_8"], package = "gtk4", version = "0.7" }
