@@ -25,9 +25,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        container: ["ghcr.io/osiris-apis/osiris-ci:latest"]
         os: ["ubuntu-latest"]
         rust: ["nightly", "stable"]
 
+    container: ${{ matrix.container }}
     runs-on: ${{ matrix.os }}
 
     steps:
