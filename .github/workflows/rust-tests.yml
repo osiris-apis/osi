@@ -25,19 +25,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        container: ["ghcr.io/osiris-apis/osiris-ci:latest"]
         os: ["ubuntu-latest"]
         rust: ["nightly", "stable"]
 
-    container: ${{ matrix.container }}
+    env:
+      CTX_MATRIX_RUST: ${{ matrix.rust }}
+
     runs-on: ${{ matrix.os }}
 
     steps:
     - name: "Fetch Sources"
       uses: actions/checkout@v3
-    - name: "Install Rust Components"
-      run: rustup default "${{ matrix.rust }}"
     - name: "Build Project"
-      run: cargo build --verbose --all-targets
+      run: make rust-build "RUST_CHANNEL=${CTX_MATRIX_RUST}"
     - name: "Run Tests"
-      run: cargo test --verbose
+      run: make rust-test
