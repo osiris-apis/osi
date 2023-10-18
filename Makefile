@@ -12,26 +12,54 @@ SHELL			:= /bin/bash -eo pipefail
 BUILDDIR		?= ./build
 SRCDIR			?= .
 
+# Credentials of the caller.
+UID			:= $(shell id -u)
+GID			:= $(shell id -g)
+
 #
 # Build Images
 #
 
 # https://github.com/osiris-apis/plumbing/pkgs/container/osiris-ci
 IMG_CI			?= ghcr.io/osiris-apis/osiris-ci:latest
+# https://quay.io/repository/podman/stable
+IMG_PODMAN		?= quay.io/podman/stable:latest
 
 #
 # Common Commands
 #
 
+# Run one-shot container.
 DOCKER_RUN		= \
 	docker \
 		run \
 		--interactive \
 		--rm
 
-DOCKER_RUN_SELF		= \
+# Run one-shot privileged container.
+DOCKER_RUN_PRIV		= \
 	$(DOCKER_RUN) \
-		--user "$$(id -u):$$(id -g)"
+		--privileged \
+		--volume "/var/lib/containers:/var/lib/containers" \
+		--volume "/var/run/docker.sock:/var/run/docker.sock" \
+		--volume "/:/host"
+
+# Run one-shot container with uid/gid mapped to 1000/1000. The container is run
+# in a nested and privileged podman instance. Yet, the container itself does
+# not run in privileged mode.
+# The nesting allows running newer podman versions than available on the host.
+DOCKER_PRIV_PODMAN_RUN_1000	= \
+	$(DOCKER_RUN_PRIV) \
+		$(IMG_PODMAN) \
+		podman \
+			run \
+			--interactive \
+			--rm \
+			--gidmap "0:0:1000" \
+			--gidmap "+1000:$(GID):1" \
+			--uidmap "0:0:1000" \
+			--uidmap "+1000:$(UID):1" \
+			--user "1000:1000"
 
 #
 # Target: help
@@ -73,15 +101,19 @@ FORCE:
 # Target: rust-*
 #
 
+IDMAP			= idmap=uids=1000-1000-1;gids=1000-1000-1
 RUST_CHANNEL		?= stable
 
+.PHONY: rust-builddir
+rust-builddir: $(BUILDDIR)/cargo/ $(BUILDDIR)/rust/
+
 .PHONY: rust-build
-rust-build: $(BUILDDIR)/rust/ $(BUILDDIR)/cargo/
-	$(DOCKER_RUN_SELF) \
+rust-build: rust-builddir $(BUILDDIR)/src/
+	$(DOCKER_PRIV_PODMAN_RUN_1000) \
 		--env "CARGO_HOME=/srv/build/cargo" \
 		--init \
-		--volume "$(abspath $(BUILDDIR)):/srv/build" \
-		--volume "$(abspath $(SRCDIR)):/srv/src" \
+		--volume "/host/$(abspath $(BUILDDIR)):/srv/build" \
+		--volume "/host/$(abspath $(SRCDIR)):/srv/src" \
 		--workdir "/srv/src" \
 		"$(IMG_CI)" \
 			cargo \
@@ -94,11 +126,11 @@ rust-build: $(BUILDDIR)/rust/ $(BUILDDIR)/cargo/
 
 .PHONY: rust-test
 rust-test: $(BUILDDIR)/rust/
-	$(DOCKER_RUN_SELF) \
+	$(DOCKER_PRIV_PODMAN_RUN_1000) \
 		--env "CARGO_HOME=/srv/build/cargo" \
 		--init \
-		--volume "$(abspath $(BUILDDIR)):/srv/build" \
-		--volume "$(abspath $(SRCDIR)):/srv/src" \
+		--volume "/host/$(abspath $(BUILDDIR)):/srv/build" \
+		--volume "/host/$(abspath $(SRCDIR)):/srv/src" \
 		--workdir "/srv/src" \
 		"$(IMG_CI)" \
 			cargo \
