@@ -123,6 +123,25 @@ rust-build: rust-builddir
 				--verbose \
 				--workspace
 
+.PHONY: rust-doc
+rust-doc: rust-builddir
+	$(DOCKER_PRIV_PODMAN_RUN_1000) \
+		--env "CARGO_HOME=/srv/build/cargo" \
+		--init \
+		--volume "/host/$(abspath $(BUILDDIR)):/srv/build" \
+		--volume "/host/$(abspath $(SRCDIR)):/srv/src" \
+		--workdir "/srv/src" \
+		"$(IMG_CI)" \
+			cargo \
+				"+$(RUST_CHANNEL)" \
+				doc \
+				--lib \
+				--no-deps \
+				--target-dir "/srv/build/rust" \
+				--verbose \
+				--workspace
+	rm -f "$(BUILDDIR)/rust/doc/.lock"
+
 .PHONY: rust-test
 rust-test: rust-builddir
 	$(DOCKER_PRIV_PODMAN_RUN_1000) \

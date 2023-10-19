@@ -1,3 +1,10 @@
+#
+# Render GitHub Pages
+#
+# Build all resources that are deployed to GitHub Pages, and verify them. If
+# triggered manually, deploy the result.
+#
+
 name: "Github Pages"
 
 on:
@@ -6,10 +13,6 @@ on:
     branches-ignore: ["pr/**"]
     tags: ["**"]
   workflow_dispatch:
-
-concurrency:
-  cancel-in-progress: false
-  group: "github-pages"
 
 defaults:
   run:
@@ -30,7 +33,7 @@ jobs:
       run: mkdir "./pages"
 
     - name: "Build Rust Documentation"
-      uses: osiris-apis/plumbing/lib/actions/cargo-doc@main
+      run: make rust-doc
 
     - name: "Assemble Pages"
       run: cp -r "./target/doc" "./pages/doc"
@@ -41,6 +44,10 @@ jobs:
 
   deploy:
     name: "Deploy Pages to Github"
+
+    concurrency:
+      cancel-in-progress: false
+      group: "github-pages"
 
     environment:
       name: "github-pages"
