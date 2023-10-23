@@ -13,6 +13,13 @@ fn run() -> std::process::ExitCode {
     app.run()
 }
 
+#[cfg(target_os = "windows")]
+fn run() -> std::process::ExitCode {
+    let app = platform::windows::App::new();
+
+    app.run()
+}
+
 pub fn osi_demo() -> std::process::ExitCode {
     run()
 }
