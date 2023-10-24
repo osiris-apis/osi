@@ -17,15 +17,15 @@ pub struct App {
     log_window: Win32::Foundation::HWND,
 }
 
-impl App {
-    // This is missing from `windows-rs`, see MSDN for details. Turns an atom
-    // into a PCSTR (simply stores the atom in the lower word and sets the
-    // higher word to 0).
-    #[allow(non_snake_case)]
-    fn MAKEINTATOM(atom: u16) -> windows::core::PCSTR {
-        windows::core::PCSTR::from_raw(atom as usize as *const u8)
-    }
+// This is missing from `windows-rs`, see MSDN for details. Turns an ATOM into
+// a PCSTR (simply stores the ATOM in the lower word and sets the higher word
+// to 0).
+#[allow(non_snake_case)]
+fn MAKEINTATOM(atom: u16) -> windows::core::PCSTR {
+    windows::core::PCSTR::from_raw(atom as usize as *const u8)
+}
 
+impl App {
     extern "system" fn wndproc(
         window: Win32::Foundation::HWND,
         message: u32,
@@ -79,7 +79,7 @@ impl App {
         unsafe {
             let root = match Win32::UI::WindowsAndMessaging::CreateWindowExA(
                 Win32::UI::WindowsAndMessaging::WINDOW_EX_STYLE::default(),
-                Self::MAKEINTATOM(class),
+                MAKEINTATOM(class),
                 APP_NAME_ROOT,
                 Win32::UI::WindowsAndMessaging::WS_OVERLAPPEDWINDOW | Win32::UI::WindowsAndMessaging::WS_VISIBLE,
                 Win32::UI::WindowsAndMessaging::CW_USEDEFAULT,
@@ -141,7 +141,7 @@ impl Drop for App {
                 self.log_window,
             );
             let _ = Win32::UI::WindowsAndMessaging::UnregisterClassA(
-                App::MAKEINTATOM(self.root_class),
+                MAKEINTATOM(self.root_class),
                 self.module,
             );
         }
