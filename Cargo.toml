@@ -2,6 +2,13 @@
 default-members = [".", "lib/*"]
 members = [".", "lib/*"]
 
+[workspace.dependencies]
+osi-derive = { path = "./lib/osi-derive" }
+osi-derive-proc = { path = "./lib/osi-derive-proc" }
+proc-macro2 = { version = "1.0" }
+quote = { version = "1.0" }
+syn = { version = "2.0" }
+
 [package]
 name = "osi"
 version = "0.1.0"
@@ -26,4 +33,4 @@ repository = "https://github.com/osiris-apis/osi"
 rust-version = "1.70"
 
 [dependencies]
-osi-derive = { path = "./lib/osi-derive" }
+osi-derive = { workspace = true }

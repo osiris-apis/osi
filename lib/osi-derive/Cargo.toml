@@ -23,4 +23,4 @@ repository = "https://github.com/osiris-apis/osi"
 rust-version = "1.70"
 
 [dependencies]
-osi-derive-proc = { path = "../osi-derive-proc" }
+osi-derive-proc = { workspace = true }
