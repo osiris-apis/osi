@@ -6,8 +6,6 @@ categories = [
         "development-tools",
 ]
 description = "Osiris Demo Application"
-edition = "2021"
-homepage = "https://www.osiris.foo"
 keywords = [
         "demo",
         "direct",
@@ -15,10 +13,13 @@ keywords = [
         "osiris",
         "raw",
 ]
-license = "MIT OR Apache-2.0 OR LGPL-2.1-or-later"
-readme = "../README.md"
-repository = "https://github.com/osiris-apis/osi"
-rust-version = "1.70"
+
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+rust-version.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 adw = { features = ["v1_1"], package = "libadwaita", version = "0.5" }
