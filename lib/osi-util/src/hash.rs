@@ -73,7 +73,7 @@ pub trait Engine {
 /// can be used by the hashing functions to implement their hash type, if
 /// the hash is a fixed-size byte array.
 #[derive(Clone, Copy, Debug)]
-pub struct Hash<const SIZE: usize>([u8; SIZE]);
+pub struct Hash<const SIZE: usize>(pub [u8; SIZE]);
 
 /// ## Produce Instant Hash
 ///
