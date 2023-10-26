@@ -1,0 +1,20 @@
+[package]
+name = "osi-util"
+version = "0.0.1"
+
+description = "Osiris Shared Utilities"
+keywords = [
+        "api",
+        "os",
+        "osiris",
+        "shared",
+        "utilities",
+]
+
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+rust-version.workspace = true
