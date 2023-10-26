@@ -4,3 +4,4 @@
 //! Osiris crates.
 
 pub mod hash;
+pub mod hmac;
