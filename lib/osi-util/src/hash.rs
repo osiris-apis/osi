@@ -15,6 +15,11 @@ pub mod sha256;
 /// Hash engines operate on an input byte stream and produce a fixed hash
 /// type (usually a fixed-size byte array).
 pub trait Engine {
+    /// Hash Result
+    ///
+    /// This associated type represents the result of a hashing function.
+    /// In most cases it is a fixed size byte array. See `Hash` for a
+    /// common type used for this.
     type Hash;
 
     /// ## Reset Engine
