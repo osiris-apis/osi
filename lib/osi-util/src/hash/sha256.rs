@@ -178,6 +178,10 @@ impl Default for Engine {
 impl crate::hash::Engine for Engine {
     type Hash = crate::hash::Hash::<SHA256_HASH>;
 
+    fn is_reset(&self) -> bool {
+        self.total == 0
+    }
+
     fn reset(&mut self) {
         self.hash = SHA256_H;
         self.remaining = SHA256_CHUNK;

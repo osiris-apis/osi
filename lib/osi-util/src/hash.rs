@@ -22,6 +22,12 @@ pub trait Engine {
     /// common type used for this.
     type Hash;
 
+    /// ## Check whether the Engine is reset
+    ///
+    /// Return whether the engine is currently reset, or whether it has
+    /// data queued or processed.
+    fn is_reset(&self) -> bool;
+
     /// ## Reset Engine
     ///
     /// Reset the engine to its initial state. This allows discarding an
