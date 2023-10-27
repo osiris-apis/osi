@@ -5,3 +5,5 @@
 
 pub mod hash;
 pub mod hmac;
+
+pub use osi_derive as dd;
