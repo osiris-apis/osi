@@ -14,9 +14,12 @@
 //! integration can be left under control of the build system, thus hiding the
 //! entire native integration and instead using the provided abstractions.
 
-pub mod cargo;
-pub mod config;
-pub mod exe;
+// XXX: Re-enable lint once preparing for initial release.
+#![allow(dead_code)]
+
+mod cargo;
+mod config;
+mod exe;
 mod op;
 mod toml;
 mod util;
