@@ -3,7 +3,7 @@
 //! A collection of small utilities that extend the Rust standard library with
 //! features required by this crate.
 
-/// Return the absolute directory of a file path
+/// ## Return the absolute directory of a file path
 ///
 /// This takes a path to a file and returns the absolute path to the directory
 /// holding the file. This will query `std::env::current_dir()` if the

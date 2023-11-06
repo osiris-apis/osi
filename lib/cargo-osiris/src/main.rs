@@ -1,4 +1,4 @@
-//! Cargo Osiris
+//! # Cargo Osiris
 //!
 //! This executable is the main entrypoint of the Osiris Build System. It is
 //! meant as sub-command of `cargo` and to be invoked as `cargo osiris ...`.

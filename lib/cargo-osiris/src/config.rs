@@ -1,4 +1,4 @@
-//! Configuration
+//! # Configuration
 //!
 //! This provides structured and verified configuration data for the build
 //! system. Unlike the TOML-based module, this module provides all
