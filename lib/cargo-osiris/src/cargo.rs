@@ -51,7 +51,7 @@ pub struct Metadata {
 // Intermediate state after cargo-metadata returned, but the blob was not yet
 // parsed into the metadata object.
 #[derive(Debug)]
-struct Blob {
+struct MetadataBlob {
     pub json: serde_json::Value,
 }
 
@@ -60,7 +60,7 @@ struct Blob {
 /// This open-coded structure provides the parameters for a query to
 /// `cargo-metadata`. It is to be filled in by the caller.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct Query {
+pub struct MetadataQuery {
     /// Path to the workspace directory (or package directory) where
     /// `Cargo.toml` resides (preferably an absolute path).
     pub workspace: std::path::PathBuf,
@@ -72,9 +72,9 @@ pub struct Query {
     pub target: Option<String>,
 }
 
-impl Blob {
+impl MetadataBlob {
     fn from_str(data: &str) -> Result<Self, Error> {
-        Ok(Blob {
+        Ok(MetadataBlob {
             json: serde_json::from_str(data).map_err(|_| Error::Json)?,
         })
     }
@@ -229,7 +229,7 @@ impl Blob {
 
     // Parse all desired fields in the manifest blob and expose them as a
     // new Metadata object.
-    fn parse(&self, query: &Query) -> Result<Metadata, Error> {
+    fn parse(&self, query: &MetadataQuery) -> Result<Metadata, Error> {
         // Extract `target_directory` from the blob. It is a mandatory field.
         let data_target_directory = self.json.get("target_directory").ok_or(Error::Data)?
             .as_str().ok_or(Error::Data)?
@@ -310,7 +310,7 @@ impl Blob {
     }
 }
 
-impl Query {
+impl MetadataQuery {
     /// ## Query metadata from Cargo
     ///
     /// Invoke `cargo metadata` and parse all the cargo metadata into the
@@ -346,7 +346,7 @@ impl Query {
         }
 
         // Decode output as JSON value.
-        let blob = Blob::from_bytes(&output.stdout)?;
+        let blob = MetadataBlob::from_bytes(&output.stdout)?;
 
         // Parse data into a `Metadata` object.
         blob.parse(&self)
@@ -363,12 +363,12 @@ mod tests {
     fn package_resolver() {
         assert!(
             matches!(
-                Blob::from_str(r#"{}"#).unwrap().resolve_local_package("foo"),
+                MetadataBlob::from_str(r#"{}"#).unwrap().resolve_local_package("foo"),
                 Err(Error::UnknownPackage(_)),
             )
         );
         assert_eq!(
-            Blob::from_str(
+            MetadataBlob::from_str(
                 r#"{
                     "packages": [
                         { "name": "foo", "id": "foo (...)" }
@@ -379,7 +379,7 @@ mod tests {
         );
         assert!(
             matches!(
-                Blob::from_str(
+                MetadataBlob::from_str(
                     r#"{
                         "packages": [
                             { "name": "foo", "id": "foo (...)" },
@@ -391,7 +391,7 @@ mod tests {
             )
         );
         assert_eq!(
-            Blob::from_str(
+            MetadataBlob::from_str(
                 r#"{
                     "packages": [
                         { "name": "bar (...)", "id": "foo (...)" },
@@ -409,7 +409,7 @@ mod tests {
     #[test]
     fn id_collector() {
         assert_eq!(
-            Blob::from_str(
+            MetadataBlob::from_str(
                 r#"{
                     "resolve": {
                         "root": "root (...)",
@@ -499,7 +499,7 @@ mod tests {
     // parsed as expected.
     #[test]
     fn metadata_from_json() {
-        let query = Query {
+        let query = MetadataQuery {
             workspace: ".".into(),
             main_package: None,
             target: None,
@@ -508,7 +508,7 @@ mod tests {
         // Empty strings are invalid JSON.
         assert!(
             matches!(
-                Blob::from_str("").unwrap_err(),
+                MetadataBlob::from_str("").unwrap_err(),
                 Error::Json,
             ),
         );
@@ -516,14 +516,14 @@ mod tests {
         // Empty sets lack mandatory metadata fields and must be rejected.
         assert!(
             matches!(
-                Blob::from_str("{}").unwrap().parse(&query).unwrap_err(),
+                MetadataBlob::from_str("{}").unwrap().parse(&query).unwrap_err(),
                 Error::Data,
             ),
         );
 
         // As long as our mandatory fields are present, it must parse.
         assert_eq!(
-            Blob::from_str(
+            MetadataBlob::from_str(
                 r#"{
                     "target_directory": "."
                 }"#,
@@ -540,14 +540,14 @@ mod tests {
     // the dependency tree.
     #[test]
     fn metadata_java_kotlin() {
-        let query = Query {
+        let query = MetadataQuery {
             workspace: ".".into(),
             main_package: None,
             target: None,
         };
 
         assert_eq!(
-            Blob::from_str(
+            MetadataBlob::from_str(
                 r#"{
                     "target_directory": ".",
                     "resolve": {

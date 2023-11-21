@@ -141,7 +141,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
             config: &config::Config,
         ) -> Result<cargo::Metadata, u8> {
             // Build query parameters.
-            let query = cargo::Query {
+            let query = cargo::MetadataQuery {
                 workspace: config.path_application.clone(),
                 main_package: config.package.clone(),
                 target: None,
