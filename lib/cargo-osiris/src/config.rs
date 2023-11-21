@@ -55,6 +55,8 @@ pub struct ConfigPlatform {
 
     /// Platform ID sourced from TOML
     pub id: String,
+    /// Symbolized Platform ID
+    pub id_symbol: String,
 
     /// Platform-specific configuration
     pub configuration: ConfigPlatformConfiguration,
@@ -85,13 +87,14 @@ impl Config {
     fn add_platform(&mut self, platform: &toml::RawPlatform) -> Result<(), Error> {
         // The ID is always present. Nothing to normalize here.
         let v_id = &platform.id;
+        let v_id_symbol = util::symbolize(v_id);
 
         // Provide a default path based on the platform ID, if none is
         // specified in the configuration.
         let v_path_platform = self.path_toml.as_path().join(
             match platform.path.as_ref() {
                 Some(v) => v.clone(),
-                None => format!("platform/{}", v_id),
+                None => format!("platform/{}", v_id_symbol),
             },
         );
 
@@ -207,6 +210,7 @@ impl Config {
         let platform = ConfigPlatform {
             path_platform: v_path_platform,
             id: v_id.clone(),
+            id_symbol: v_id_symbol,
 
             configuration: v_configuration,
         };
