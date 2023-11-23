@@ -86,7 +86,7 @@ fn cargo_command() -> std::ffi::OsString {
 
 impl MetadataBlob {
     fn from_str(data: &str) -> Result<Self, Error> {
-        Ok(MetadataBlob {
+        Ok(Self {
             json: serde_json::from_str(data).map_err(|_| Error::Json)?,
         })
     }
