@@ -1,11 +1,8 @@
 //! # Cargo Interaction
 //!
-//! The cargo CLI allows embedding other utilities as its subcommands. That is,
-//! `cargo sub [...]` calls into `cargo-sub`. Cargo only does very basic setup
-//! before invoking such external commands. For them to get any information
-//! about the cargo setup, they need to call into `cargo metadata`. This module
-//! provides a wrapper around that call, extracting the required information
-//! from the cargo metdata JSON blob.
+//! Provide Cargo sub-command executors and parsers. These allow invoking Cargo
+//! subcommands programmatically, parsing the output into machine-readable
+//! types.
 
 use crate::util;
 use std::collections::{BTreeMap, BTreeSet};
@@ -70,6 +67,43 @@ pub struct MetadataQuery {
     /// The target platform to compile for (if `None`, a generic request for
     /// all possible targets is performed).
     pub target: Option<String>,
+}
+
+/// ## Reduced Cargo Build Output
+///
+/// This struct represents the reduced cargo build output with only the bits
+/// that are required by us.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct Build {
+    /// List of absolute paths to artifacts produced by the build. This is a
+    /// filtered list including only final production artifacts.
+    pub artifacts: Vec<String>,
+}
+
+// Intermediate state after cargo-build returned, but the blob was not yet
+// parsed into the `Build` object.
+#[derive(Debug)]
+struct BuildBlob {
+    pub json: Vec<serde_json::Value>,
+}
+
+/// ## Build query parameters
+///
+/// This open-coded structure provides the parameters for a query to
+/// `cargo-build`. It is to be filled in by the caller.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct BuildQuery {
+    /// Whether to enable default features.
+    pub default_features: bool,
+    /// Array of features to enable.
+    pub features: Vec<String>,
+    /// The build profile to use.
+    pub profile: Option<String>,
+    /// The target platform to compile for.
+    pub target: Option<String>,
+    /// Path to the workspace directory (or package directory) where
+    /// `Cargo.toml` resides (preferably an absolute path).
+    pub workspace: std::path::PathBuf,
 }
 
 // ## Return Cargo binary to use
@@ -357,6 +391,200 @@ impl MetadataQuery {
 
         // Parse data into a `Metadata` object.
         blob.parse(&self)
+    }
+}
+
+impl BuildBlob {
+    fn from_str(data: &str) -> Result<Self, Error> {
+        let stream = serde_json::Deserializer::from_str(data)
+            .into_iter::<serde_json::Value>();
+        let mut json = Vec::new();
+
+        for v in stream {
+            json.push(v.map_err(|_| Error::Json)?);
+        }
+
+        Ok(Self {
+            json: json,
+        })
+    }
+
+    fn from_bytes(data: &[u8]) -> Result<Self, Error> {
+        Self::from_str(
+            std::str::from_utf8(data).map_err(|v| Error::Unicode(v))?,
+        )
+    }
+
+    // Parse all desired fields in the `Build` blob and expose them as a
+    // new `Build` object.
+    fn parse(&self) -> Result<Build, Error> {
+        let mut success = false;
+        let mut artifacts = Vec::new();
+
+        // Iterate all reports of the build and handle the ones we are
+        // interested in.
+        for report in &self.json {
+            let reason = match report.get("reason") {
+                Some(serde_json::Value::String(v)) => v,
+                _ => continue
+            };
+
+            match reason.as_str() {
+                // A final `success` message tells whether the build was
+                // successful. Usually, this is caught early with a negative
+                // exit code, but we try to be pedantic and check this again.
+                "build-finished" => {
+                    if let Some(serde_json::Value::Bool(v)) = report.get("success") {
+                        success = *v;
+                    }
+                },
+
+                // We collect paths to all compiler-artifacts of interest. This
+                // means all shared libraries and executables produced by the
+                // build are collected. However, any non-production targets
+                // like examples and tests are ignored.
+                // We assume that a build pulls in exactly the dependencies it
+                // needs. Hence, any non-statically linked artifacts will be
+                // required at runtime, and thus we collect it.
+                "compiler-artifact" => {
+                    // See whether this artifact report is of interest. Any
+                    // auxiliary targets like examples and tests are ignored.
+                    let mut collect = false;
+                    if let Some(serde_json::Value::Object(target)) = report.get("target") {
+                        if let Some(serde_json::Value::Array(kinds)) = target.get("kind") {
+                            for kind in kinds.iter() {
+                                if let serde_json::Value::String(kind_str) = kind {
+                                    match kind_str.as_str() {
+                                        "bin" => collect = true,
+                                        "cdylib" => collect = true,
+                                        "dylib" => collect = true,
+                                        _ => {},
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // If this was a report of interest, remember the artifact
+                    // filenames. Unfortunately, targets like libraries will
+                    // report all their artifacts combined, with no way to tell
+                    // which artifact corresponds to each kind. Hence, we have
+                    // filter based on filename extension. We currently ignore:
+                    //
+                    // - *.a, *.lib, *.rlib: Static library that will be linked
+                    //   into another artifact as part of the build. Not needed
+                    //   at runtime.
+                    // - *.d, *.rmeta: Metadata about the build process, only
+                    //   needed at compile time.
+                    //
+                    // XXX: Cargo should do better and tell us which file
+                    //      corresponds to which target kind. We cannot predict
+                    //      the filename extensions of all supported platforms
+                    //      of Cargo. We do our best and blacklist artifacts we
+                    //      know we are not interested in.
+                    if collect {
+                        if let Some(serde_json::Value::Array(filenames)) = report.get("filenames") {
+                            for filename in filenames.iter() {
+                                if let serde_json::Value::String(filename_str) = filename {
+                                    let save = match filename_str.rsplit_once('.') {
+                                        Some((_, "a")) => false,
+                                        Some((_, "d")) => false,
+                                        Some((_, "lib")) => false,
+                                        Some((_, "rlib")) => false,
+                                        Some((_, "rmeta")) => false,
+                                        _ => true,
+                                    };
+
+                                    if save {
+                                        artifacts.push(filename_str.clone());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+
+                _ => {},
+            }
+        }
+
+        // If Cargo never reported a successfull build, we discard all data
+        // and report a generic error. Diagnostics have been rendered, so no
+        // need to include more information.
+        // Note that this is usually caught early by a non-0 exit code, but
+        // we try to be pendantic here.
+        if !success {
+            return Err(Error::Cargo(Default::default()));
+        }
+
+        // Return the fully parsed build result.
+        Ok(
+            Build {
+                artifacts: artifacts,
+            }
+        )
+    }
+}
+
+impl BuildQuery {
+    /// ## Query build results from Cargo
+    ///
+    /// Invoke `cargo build` and parse all the cargo output into a
+    /// `Build` object.
+    pub fn run(&self) -> Result<Build, Error> {
+        // Build the cargo-build invocation.
+        let mut cmd = std::process::Command::new(cargo_command());
+        cmd.args([
+            "build",
+            "--message-format=json-render-diagnostics",
+            "--quiet",
+        ]);
+
+        // Append all selected features.
+        for v in &self.features {
+            cmd.arg("--features");
+            cmd.arg(v);
+        }
+
+        // Append path to the manifest.
+        let mut path_manifest = std::path::PathBuf::new();
+        path_manifest.push(&self.workspace);
+        path_manifest.push("Cargo.toml");
+        cmd.arg("--manifest-path");
+        cmd.arg(&path_manifest);
+
+        // Disable default features, if requested.
+        if !self.default_features {
+            cmd.arg("--no-default-features");
+        }
+
+        // Select requested profile.
+        if let Some(ref profile) = self.profile {
+            cmd.arg("--profile");
+            cmd.arg(profile);
+        }
+
+        // Build for requested target.
+        if let Some(ref target) = self.target {
+            cmd.arg("--target");
+            cmd.arg(target);
+        }
+
+        // Always forward diagnostics to the parent error stream, so
+        // the user can inspect them.
+        cmd.stderr(std::process::Stdio::inherit());
+
+        // Run cargo and verify it exited successfully.
+        let output = cmd.output().map_err(|v| Error::Exec(v))?;
+        if !output.status.success() {
+            return Err(Error::Cargo(output.status));
+        }
+
+        // Decode output as JSON stream.
+        let blob = BuildBlob::from_bytes(&output.stdout)?;
+
+        // Parse data into a `Build` object.
+        blob.parse()
     }
 }
 
