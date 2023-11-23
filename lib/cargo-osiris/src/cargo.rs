@@ -72,6 +72,18 @@ pub struct MetadataQuery {
     pub target: Option<String>,
 }
 
+// ## Return Cargo binary to use
+//
+// Return the Cargo command to use for invocations of Cargo. This will
+// look at the `CARGO` environment variable first, and if unset use the
+// default `cargo` command.
+//
+// Note that Cargo sub-commands get the `CARGO` environment variable set
+// unconditionally, and thus ensure that the correct toolchain is used.
+fn cargo_command() -> std::ffi::OsString {
+    std::env::var_os("CARGO").unwrap_or("cargo".into())
+}
+
 impl MetadataBlob {
     fn from_str(data: &str) -> Result<Self, Error> {
         Ok(MetadataBlob {
@@ -317,13 +329,8 @@ impl MetadataQuery {
     /// `Metadata` object. Only the bits required by the crate are fetched,
     /// everything else is ignored.
     pub fn run(&self) -> Result<Metadata, Error> {
-        // Get the path to cargo via the `CARGO` env var. This is always set by
-        // cargo when running external sub-commands. If unset, it means this is
-        // called outside cargo and we use the default.
-        let cargo = std::env::var_os("CARGO").unwrap_or("cargo".into());
-
         // Build the cargo-metadata invocation.
-        let mut cmd = std::process::Command::new(cargo);
+        let mut cmd = std::process::Command::new(cargo_command());
         cmd.args([
             "metadata",
             "--format-version=1",
