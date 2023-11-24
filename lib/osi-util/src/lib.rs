@@ -6,5 +6,6 @@
 pub mod align;
 pub mod hash;
 pub mod hmac;
+pub mod str;
 
 pub use osi_derive as dd;
