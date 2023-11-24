@@ -5,6 +5,7 @@ members = [".", "lib/*"]
 [workspace.dependencies]
 osi-derive = { path = "./lib/osi-derive" }
 osi-derive-proc = { path = "./lib/osi-derive-proc" }
+osi-util = { path = "./lib/osi-util" }
 proc-macro2 = { version = "1.0" }
 quote = { version = "1.0" }
 syn = { version = "2.0" }

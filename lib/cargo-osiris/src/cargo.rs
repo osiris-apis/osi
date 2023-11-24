@@ -4,7 +4,7 @@
 //! subcommands programmatically, parsing the output into machine-readable
 //! types.
 
-use crate::util;
+use crate::misc;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// ## Metadata Extraction Errors
@@ -307,7 +307,7 @@ impl MetadataBlob {
                     Some(serde_json::Value::String(v)) => v,
                     _ => continue
                 };
-                let package_path = util::absdir(&manifest_path);
+                let package_path = misc::absdir(&manifest_path);
 
                 // Extract all metadata we desire.
                 if let Some(serde_json::Value::Object(metadata)) = pkg.get("metadata") {

@@ -20,8 +20,10 @@
 mod cargo;
 mod config;
 mod exe;
+mod misc;
 mod op;
 mod toml;
-mod util;
+
+use osi_util as util;
 
 pub use exe::cargo_osiris;
