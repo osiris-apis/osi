@@ -15,7 +15,7 @@ pub mod sha256;
 /// Hash engines operate on an input byte stream and produce a fixed hash
 /// type (usually a fixed-size byte array).
 pub trait Engine {
-    /// Hash Result
+    /// ## Hash Result
     ///
     /// This associated type represents the result of a hashing function.
     /// In most cases it is a fixed size byte array. See `Hash` for a
@@ -94,7 +94,7 @@ impl<const SIZE: usize> Hash<SIZE> {
         Self(*bytes)
     }
 
-    /// Return Byte Representation
+    /// ## Return Byte Representation
     ///
     /// Return a reference to the byte representation of the hash value. This
     /// is equivalent to `&h.0`
@@ -102,7 +102,7 @@ impl<const SIZE: usize> Hash<SIZE> {
         &self.0
     }
 
-    /// Produce Hex-String Representation
+    /// ## Produce Hex-String Representation
     ///
     /// Format the hash as a hex-string. That is, produce a string with only
     /// the characters '0'-'9' and 'a'-'f'. Each character represents 4-bits

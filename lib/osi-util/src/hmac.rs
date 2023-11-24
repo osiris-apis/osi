@@ -3,7 +3,7 @@
 //! This module implements `HMAC` (Keyed-Hashing for Message Authentication,
 //! [RFC 2104]).
 
-/// Hmac Engine
+/// ## Hmac Engine
 ///
 /// This type represents an Hmac engine. It takes the chunk size of the
 /// hash engine, as well as the hash engine itself as type arguments.
@@ -16,7 +16,7 @@ pub struct Hmac<const CHUNK: usize, Engine> {
     opad: [u8; CHUNK],
 }
 
-/// Hmac Engine with SHA-256
+/// ## Hmac Engine with SHA-256
 pub type HmacSha256 = Hmac<64, crate::hash::sha256::Engine>;
 
 impl<const HASH: usize, const CHUNK: usize, Engine> Hmac<CHUNK, Engine>
@@ -130,7 +130,7 @@ where
     Engine: crate::hash::Engine<Hash = crate::hash::Hash<HASH>>,
     Engine: Default,
 {
-    /// Create a new Hmac Engine
+    /// ## Create a new Hmac Engine
     ///
     /// Create a new Hmac engine with the given key. This creates a new hash
     /// engine and uses it. See `with_engine()` for how to provide the engine
