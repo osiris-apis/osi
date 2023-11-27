@@ -22,6 +22,7 @@ mod config;
 mod exe;
 mod misc;
 mod op;
+mod platform;
 mod toml;
 
 use osi_util as util;
