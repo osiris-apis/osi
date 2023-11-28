@@ -287,6 +287,13 @@ impl Sdk {
 }
 
 impl BuildTools {
+    /// ## Yield Path to `aapt` Binary
+    ///
+    /// Yield the path to the `aapt` binary of this build-tools component.
+    pub fn aapt(&self) -> std::path::PathBuf {
+        self.path.join("aapt")
+    }
+
     /// ## Yield Path to `aapt2` Binary
     ///
     /// Yield the path to the `aapt2` binary of this build-tools component.
