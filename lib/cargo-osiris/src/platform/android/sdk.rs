@@ -25,7 +25,7 @@ pub enum JdkError {
 /// is effectively a wrapper around a path to the JDK root directory.
 #[derive(Clone, Debug)]
 pub struct Jdk {
-    java_home: std::path::PathBuf,
+    java_home: Option<std::path::PathBuf>,
 }
 
 /// ## SDK Error
@@ -131,39 +131,43 @@ impl Jdk {
     ///
     /// The `java_home` path is retained verbatim. It is up to the
     /// caller to use an absolute path, if desired.
-    pub fn new(java_home: &std::path::Path) -> Result<Self, Box<JdkError>> {
-        // We expect the JDK to exist and be initialized.
-        if !java_home.is_dir() {
-            return Err(Box::new(JdkError::NoJdk(java_home.to_path_buf())));
-        }
+    ///
+    /// If no path is provided, the root installation of the JDK is used
+    /// instead. This usually assumes no `JAVA_HOME` environment variable is
+    /// required and all JDK utilities are accessible from the default
+    /// environment.
+    pub fn new(
+        java_home: Option<&std::path::Path>,
+    ) -> Result<Self, Box<JdkError>> {
+        if let Some(path) = java_home {
+            // We expect the JDK to exist and be initialized.
+            if !path.is_dir() {
+                return Err(Box::new(JdkError::NoJdk(path.to_path_buf())));
+            }
 
-        // We have no proper way to identify a JDK, but we simply check for
-        // presence of `bin/java` and `bin/javac`, since this is all we need.
-        // We also check for `include/jni.h` as sanity test.
-        if !java_home.join("bin/java").is_file()
-            || !java_home.join("bin/javac").is_file()
-            || !java_home.join("include/jni.h").is_file()
-        {
-            return Err(Box::new(JdkError::InvalidJdk(java_home.to_path_buf())));
+            // We have no proper way to identify a JDK, but we simply check for
+            // presence of `bin/java` and `bin/javac`, since this is all we need.
+            // We also check for `include/jni.h` as sanity test.
+            if !path.join("bin/java").is_file()
+                || !path.join("bin/javac").is_file()
+                || !path.join("include/jni.h").is_file()
+            {
+                return Err(Box::new(JdkError::InvalidJdk(path.to_path_buf())));
+            }
+        } else {
+            // If no `JAVA_HOME` is set, we assume everything is accessible
+            // from the default environment. Unfortunately, Rust does not
+            // expose a suitable way to verify execution of
+            // `std::process::Command` works, without actually executing it.
+            // Hence, we perform no sanity checks and just defer error
+            // detection to the actual JDK accessors.
         }
 
         // We perform no other checks. It is up to the caller to guarantee
         // that the JDK is usable.
         Ok(Self {
-            java_home: java_home.into(),
+            java_home: java_home.map(|v| v.into()),
         })
-    }
-
-    /// ## Query Java Home Directory
-    ///
-    /// Return the Java Home Directory, which is the path to the root
-    /// of the JDK.
-    ///
-    /// The path is a verbatim copy of the path passed to the constructor.
-    /// That is, this will be absolute if, and only if, the JDK was
-    /// initialized with an absolute path.
-    pub fn java_home(&self) -> &std::path::Path {
-        self.java_home.as_path()
     }
 
     /// ## Yield Command for `javac`
@@ -171,13 +175,15 @@ impl Jdk {
     /// Yield a new command object for the `javac` command suitable for this
     /// JDK installment.
     pub fn javac(&self) -> std::process::Command {
-        let mut cmd = std::process::Command::new(
-            self.java_home.join("bin/javac"),
-        );
+        if let Some(ref path) = self.java_home {
+            let mut cmd = std::process::Command::new(path.join("bin/javac"));
 
-        cmd.env("JAVA_HOME", &self.java_home);
+            cmd.env("JAVA_HOME", path);
 
-        cmd
+            cmd
+        } else {
+            std::process::Command::new("javac")
+        }
     }
 }
 
@@ -311,11 +317,11 @@ mod tests {
     #[test]
     fn jdk_basic() {
         assert!(matches!(
-            *Jdk::new(std::path::Path::new("/<invalid>")).unwrap_err(),
+            *Jdk::new(Some(std::path::Path::new("/<invalid>"))).unwrap_err(),
             JdkError::NoJdk(_),
         ));
         assert!(matches!(
-            *Jdk::new(std::path::Path::new("/")).unwrap_err(),
+            *Jdk::new(Some(std::path::Path::new("/"))).unwrap_err(),
             JdkError::InvalidJdk(_),
         ));
     }
