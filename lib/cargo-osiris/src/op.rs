@@ -4,7 +4,20 @@
 //! also exposed as Rust functions in this module. This allows performing
 //! the same operation from external tools.
 
-use crate::config;
+use crate::{cargo, config, platform};
+
+/// ## Build Errors
+///
+/// This is the exhaustive list of possible errors raised by the build
+/// operation. See each error for details.
+pub enum BuildError {
+    /// Cannot create the specified build artifact directory.
+    DirectoryCreation(std::ffi::OsString),
+    /// Command execution could not commence.
+    Exec(String, std::io::Error),
+    /// Platform build tools failed.
+    Build,
+}
 
 /// ## Emerge Errors
 ///
@@ -22,6 +35,41 @@ pub enum EmergeError {
     FileUpdate(std::ffi::OsString, std::io::Error),
     /// Removing the file at the specified path failed with the given error.
     FileRemoval(std::ffi::OsString, std::io::Error),
+}
+
+/// ## Build platform integration
+///
+/// Perform a full build of the platform integration of the specified platform.
+/// If no persistent platform integration is located in the platform directory,
+/// an ephemeral platform integration is created and built.
+///
+/// The target directory of the current crate is used to store any build
+/// artifacts. Hence, you likely want to call this through `cargo <external>`
+/// to ensure cargo integration is hooked up as expected.
+pub fn build(
+    config: &config::Config,
+    metadata: &cargo::Metadata,
+    platform: &config::ConfigPlatform,
+) -> Result<(), BuildError> {
+    let mut path_build = std::path::PathBuf::new();
+
+    // Create a build directory for all output artifacts of the build process.
+    // Re-use the existing directory, if possible, to speed up builds. The
+    // directory is created at: `<target>/osi/<platform>`.
+    path_build.push(&metadata.target_directory);
+    path_build.push("osi");
+    path_build.push(&platform.id_symbol);
+    std::fs::create_dir_all(path_build.as_path()).map_err(
+        |_| BuildError::DirectoryCreation(path_build.as_os_str().to_os_string())
+    )?;
+
+    // Invoke the platform-dependent handler. Grant the path-buffers to it, so
+    // it can reuse it for further operations.
+    match platform.configuration {
+        config::ConfigPlatformConfiguration::Android(ref v) => {
+            Ok(()) // XXX: To be implemented.
+        },
+    }
 }
 
 /// ## Emerge persistent platform integration

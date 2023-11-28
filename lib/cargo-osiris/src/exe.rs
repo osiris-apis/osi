@@ -136,7 +136,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
         }
 
         // Query Cargo for package metadata.
-        fn _metadata(
+        fn metadata(
             &self,
             config: &config::Config,
         ) -> Result<cargo::Metadata, u8> {
@@ -197,6 +197,38 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                     Err(1)
                 },
                 Some(v) => Ok(v),
+            }
+        }
+
+        fn op_build(
+            &self,
+            m: &clap::ArgMatches,
+            m_op: &clap::ArgMatches,
+        ) -> Result<(), u8> {
+            let (_, config) = self.config(m)?;
+            let metadata = self.metadata(&config)?;
+            let platform = self.platform(m_op, &config)?;
+
+            match op::build(
+                &config,
+                &metadata,
+                platform,
+            ) {
+                Err(op::BuildError::DirectoryCreation(dir)) => {
+                    eprintln!("Cannot build platform integration: Failed to create directory {:?}", dir);
+                    Err(1)
+                },
+                Err(op::BuildError::Exec(cmd, error)) => {
+                    eprintln!("Cannot build platform integration: Failed to invoke '{}' ({})", cmd, error);
+                    Err(1)
+                },
+                Err(op::BuildError::Build) => {
+                    eprintln!("Cannot build platform integration: Platform build failed");
+                    Err(1)
+                },
+                Ok(_) => {
+                    Ok(())
+                },
             }
         }
 
@@ -267,6 +299,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
             }
 
             match m.subcommand() {
+                Some(("build", m_op)) => self.op_build(&m, &m_op),
                 Some(("emerge", m_op)) => self.op_emerge(&m, &m_op),
                 _ => std::unreachable!(),
             }
