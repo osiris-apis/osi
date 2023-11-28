@@ -5,28 +5,51 @@
 
 use crate::util;
 
-/// ## Sdk Error
+/// ## JDK Error
 ///
-/// This is the error-enum of all possible errors raised by the Android Sdk
+/// This is the error-enum of all possible errors raised by the JDK
 /// abstraction.
 #[derive(Debug)]
-pub enum Error {
+pub enum JdkError {
+    /// Unexpected failure.
+    Failure(Box<dyn std::error::Error>),
+    /// There is no JDK at the given path.
+    NoJdk(std::path::PathBuf),
+    /// Specified path is not a valid JDK.
+    InvalidJdk(std::path::PathBuf),
+}
+
+/// ## JDK for Android
+///
+/// This object represents a JDK suitable for Android on the target machine. It
+/// is effectively a wrapper around a path to the JDK root directory.
+#[derive(Clone, Debug)]
+pub struct Jdk {
+    java_home: std::path::PathBuf,
+}
+
+/// ## SDK Error
+///
+/// This is the error-enum of all possible errors raised by the Android SDK
+/// abstraction.
+#[derive(Debug)]
+pub enum SdkError {
     /// Unexpected failure.
     Failure(Box<dyn std::error::Error>),
     /// There is no Android SDK at the given path.
     NoSdk(std::path::PathBuf),
-    /// Specified path is not a valid Android Sdk.
+    /// Specified path is not a valid Android SDK.
     InvalidSdk(std::path::PathBuf),
-    /// No Build Tools component is available in the Sdk.
+    /// No Build Tools component is available in the SDK.
     NoBuildTools,
     /// Specified Build Tools component is not available or invalid.
     InvalidBuildTools(std::ffi::OsString),
 }
 
-/// ## Android Sdk
+/// ## Android SDK
 ///
-/// This object represents an Android Sdk on the target machine. It is
-/// effectively a wrapper around a path to the Android Sdk root directory.
+/// This object represents an Android SDK on the target machine. It is
+/// effectively a wrapper around a path to the Android SDK root directory.
 #[derive(Clone, Debug)]
 pub struct Sdk {
     android_home: std::path::PathBuf,
@@ -91,39 +114,106 @@ fn dir_latest_entry(
         .map_err(|v|v.into())
 }
 
-impl Sdk {
-    /// ## Create Sdk Object from Path
+impl Jdk {
+    /// ## Create JDK Object from Path
     ///
-    /// Create a new Sdk Object from a path pointing to the root directory
-    /// of the Android Sdk.
+    /// Create a new JDK Object from a path pointing to the root directory
+    /// of the JDK.
     ///
-    /// This will perform rudimentory checks on the Sdk directory to ensure
-    /// it looks valid. This does not guarantee that the Sdk is properly
-    /// installed, nor does it lock the Sdk in any way. It is the
-    /// responsibility of the caller to ensure the Sdk is accessible and
+    /// This will perform rudimentory checks on the JDK directory to ensure
+    /// it looks valid. This does not guarantee that the JDK is properly
+    /// installed, nor does it lock the JDK in any way. It is the
+    /// responsibility of the caller to ensure the JDK is accessible and
     /// protected suitably.
     ///
     /// Returns `Err` if the path does not point at a valid directory, or
-    /// if the directory does not contain an initialized Android Sdk.
+    /// if the directory does not contain an initialized JDK.
     ///
-    /// The `android_home` path is retained verbatim. It is up to the
+    /// The `java_home` path is retained verbatim. It is up to the
     /// caller to use an absolute path, if desired.
-    pub fn new(android_home: &std::path::Path) -> Result<Self, Box<Error>> {
-        // We expect the Sdk to exist and be initialized.
-        if !android_home.is_dir() {
-            return Err(Box::new(Error::NoSdk(android_home.to_path_buf())));
+    pub fn new(java_home: &std::path::Path) -> Result<Self, Box<JdkError>> {
+        // We expect the JDK to exist and be initialized.
+        if !java_home.is_dir() {
+            return Err(Box::new(JdkError::NoJdk(java_home.to_path_buf())));
         }
 
-        // We have no proper way to identify an Android Sdk, since all its
-        // components are optional. Fortunately, the Sdk license must be
-        // present if any component is installed, so we use it to identify
-        // initialized Sdks.
-        if !android_home.join("licenses/android-sdk-license").is_file() {
-            return Err(Box::new(Error::InvalidSdk(android_home.to_path_buf())));
+        // We have no proper way to identify a JDK, but we simply check for
+        // presence of `bin/java` and `bin/javac`, since this is all we need.
+        // We also check for `include/jni.h` as sanity test.
+        if !java_home.join("bin/java").is_file()
+            || !java_home.join("bin/javac").is_file()
+            || !java_home.join("include/jni.h").is_file()
+        {
+            return Err(Box::new(JdkError::InvalidJdk(java_home.to_path_buf())));
         }
 
         // We perform no other checks. It is up to the caller to guarantee
-        // that the Sdk is usable.
+        // that the JDK is usable.
+        Ok(Self {
+            java_home: java_home.into(),
+        })
+    }
+
+    /// ## Query Java Home Directory
+    ///
+    /// Return the Java Home Directory, which is the path to the root
+    /// of the JDK.
+    ///
+    /// The path is a verbatim copy of the path passed to the constructor.
+    /// That is, this will be absolute if, and only if, the JDK was
+    /// initialized with an absolute path.
+    pub fn java_home(&self) -> &std::path::Path {
+        self.java_home.as_path()
+    }
+
+    /// ## Yield Command for `javac`
+    ///
+    /// Yield a new command object for the `javac` command suitable for this
+    /// JDK installment.
+    pub fn javac(&self) -> std::process::Command {
+        let mut cmd = std::process::Command::new(
+            self.java_home.join("bin/javac"),
+        );
+
+        cmd.env("JAVA_HOME", &self.java_home);
+
+        cmd
+    }
+}
+
+impl Sdk {
+    /// ## Create SDK Object from Path
+    ///
+    /// Create a new SDK Object from a path pointing to the root directory
+    /// of the Android SDK.
+    ///
+    /// This will perform rudimentory checks on the SDK directory to ensure
+    /// it looks valid. This does not guarantee that the SDK is properly
+    /// installed, nor does it lock the SDK in any way. It is the
+    /// responsibility of the caller to ensure the SDK is accessible and
+    /// protected suitably.
+    ///
+    /// Returns `Err` if the path does not point at a valid directory, or
+    /// if the directory does not contain an initialized Android SDK.
+    ///
+    /// The `android_home` path is retained verbatim. It is up to the
+    /// caller to use an absolute path, if desired.
+    pub fn new(android_home: &std::path::Path) -> Result<Self, Box<SdkError>> {
+        // We expect the SDK to exist and be initialized.
+        if !android_home.is_dir() {
+            return Err(Box::new(SdkError::NoSdk(android_home.to_path_buf())));
+        }
+
+        // We have no proper way to identify an Android SDK, since all its
+        // components are optional. Fortunately, the SDK license must be
+        // present if any component is installed, so we use it to identify
+        // initialized SDKs.
+        if !android_home.join("licenses/android-sdk-license").is_file() {
+            return Err(Box::new(SdkError::InvalidSdk(android_home.to_path_buf())));
+        }
+
+        // We perform no other checks. It is up to the caller to guarantee
+        // that the SDK is usable.
         Ok(Self {
             android_home: android_home.into(),
         })
@@ -132,16 +222,16 @@ impl Sdk {
     /// ## Query Android Home Directory
     ///
     /// Return the Android Home Directory, which is the path to the root
-    /// of the Android Sdk.
+    /// of the Android SDK.
     ///
     /// The path is a verbatim copy of the path passed to the constructor.
-    /// That is, this will be absolute if, and only if, the Sdk was
+    /// That is, this will be absolute if, and only if, the SDK was
     /// initialized with an absolute path.
     pub fn android_home(&self) -> &std::path::Path {
         self.android_home.as_path()
     }
 
-    /// ## Create Build-Tools Object from Sdk
+    /// ## Create Build-Tools Object from SDK
     ///
     /// Create a build-tools abstraction for the given Android SDK. Since
     /// multiple build-tools versions can be installed in parallel, the
@@ -150,11 +240,11 @@ impl Sdk {
     pub fn build_tools(
         &self,
         version: Option<&std::ffi::OsStr>,
-    ) -> Result<BuildTools, Box<Error>> {
+    ) -> Result<BuildTools, Box<SdkError>> {
         let mut path = self.android_home().join("build-tools");
 
         if !path.is_dir() {
-            return Err(Box::new(Error::NoBuildTools));
+            return Err(Box::new(SdkError::NoBuildTools));
         }
 
         match version {
@@ -163,8 +253,8 @@ impl Sdk {
             None => {
                 path.push(
                     dir_latest_entry(path.as_path())
-                        .map_err(|v| Box::new(Error::Failure(v)))?
-                        .ok_or_else(|| Box::new(Error::NoBuildTools))?
+                        .map_err(|v| Box::new(SdkError::Failure(v)))?
+                        .ok_or_else(|| Box::new(SdkError::NoBuildTools))?
                 );
             }
 
@@ -174,10 +264,10 @@ impl Sdk {
             Some(v) => {
                 match std::path::Path::new(v).parent() {
                     None => {
-                        return Err(Box::new(Error::InvalidBuildTools(v.into())));
+                        return Err(Box::new(SdkError::InvalidBuildTools(v.into())));
                     }
                     Some(parent) if parent.as_os_str().len() > 0 => {
-                        return Err(Box::new(Error::InvalidBuildTools(v.into())));
+                        return Err(Box::new(SdkError::InvalidBuildTools(v.into())));
                     }
                     _ => {},
                 }
@@ -185,7 +275,7 @@ impl Sdk {
                 path.push(v);
 
                 if !path.is_dir() {
-                    return Err(Box::new(Error::InvalidBuildTools(v.into())));
+                    return Err(Box::new(SdkError::InvalidBuildTools(v.into())));
                 }
             },
         }
@@ -209,17 +299,31 @@ impl BuildTools {
 mod tests {
     use super::*;
 
-    // Test Sdk initialization and verification, as well as basic functionality
+    // Test JDK initialization and verification, as well as basic functionality
+    // and sub-object initialization.
+    #[test]
+    fn jdk_basic() {
+        assert!(matches!(
+            *Jdk::new(std::path::Path::new("/<invalid>")).unwrap_err(),
+            JdkError::NoJdk(_),
+        ));
+        assert!(matches!(
+            *Jdk::new(std::path::Path::new("/")).unwrap_err(),
+            JdkError::InvalidJdk(_),
+        ));
+    }
+
+    // Test SDK initialization and verification, as well as basic functionality
     // and sub-object initialization.
     #[test]
     fn sdk_basic() {
         assert!(matches!(
             *Sdk::new(std::path::Path::new("/<invalid>")).unwrap_err(),
-            Error::NoSdk(_),
+            SdkError::NoSdk(_),
         ));
         assert!(matches!(
             *Sdk::new(std::path::Path::new("/")).unwrap_err(),
-            Error::InvalidSdk(_),
+            SdkError::InvalidSdk(_),
         ));
     }
 }
