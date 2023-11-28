@@ -209,29 +209,29 @@ pub fn cargo_osiris() -> std::process::ExitCode {
             let platform = self.platform(m_op, &config)?;
             let update = *m_op.get_one("update").expect("Update-flag lacks a value");
 
-            match op::emerge::emerge(
+            match op::emerge(
                 &config,
                 platform,
                 None,
                 update,
             ) {
-                Err(op::emerge::Error::Already) => {
+                Err(op::EmergeError::Already) => {
                     eprintln!("Cannot emerge platform integration: Platform code already present");
                     Err(1)
                 },
-                Err(op::emerge::Error::PlatformDirectory(dir)) => {
+                Err(op::EmergeError::PlatformDirectory(dir)) => {
                     eprintln!("Cannot emerge platform integration: Failed to access platform directory {:?}", dir);
                     Err(1)
                 },
-                Err(op::emerge::Error::DirectoryCreation(dir)) => {
+                Err(op::EmergeError::DirectoryCreation(dir)) => {
                     eprintln!("Cannot emerge platform integration: Failed to create directory {:?}", dir);
                     Err(1)
                 },
-                Err(op::emerge::Error::FileUpdate(file, error)) => {
+                Err(op::EmergeError::FileUpdate(file, error)) => {
                     eprintln!("Cannot emerge platform integration: Failed to update {:?} ({})", file, error);
                     Err(1)
                 },
-                Err(op::emerge::Error::FileRemoval(file, error)) => {
+                Err(op::EmergeError::FileRemoval(file, error)) => {
                     eprintln!("Cannot emerge platform integration: Failed to remove {:?} ({})", file, error);
                     Err(1)
                 },
