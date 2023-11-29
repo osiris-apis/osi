@@ -1,4 +1,4 @@
-//! # Osiris Shared Utilities
+//! # Osiris Shared Library
 //!
 //! This crate provides shared utility functions used across many
 //! Osiris crates.

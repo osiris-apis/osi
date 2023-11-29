@@ -1,11 +1,11 @@
 [package]
-name = "osi-util"
+name = "osi-lib"
 version = "0.0.1"
 
-description = "Osiris Shared Utilities"
+description = "Osiris Shared Library"
 keywords = [
         "api",
-        "os",
+        "library",
         "osiris",
         "shared",
         "utilities",
