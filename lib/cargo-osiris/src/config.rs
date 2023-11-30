@@ -13,7 +13,7 @@
 //! refuse validation if a mandatory key was missing. See the TOML parser
 //! for documentation on most keys, and how they are to be interpreted.
 
-use crate::{misc, toml, util};
+use crate::{lib, misc, toml};
 use std::collections::BTreeMap;
 
 /// ## Validation Error
@@ -87,7 +87,7 @@ impl Config {
     fn add_platform(&mut self, platform: &toml::RawPlatform) -> Result<(), Error> {
         // The ID is always present. Nothing to normalize here.
         let v_id = &platform.id;
-        let v_id_symbol = util::str::symbolize(v_id);
+        let v_id_symbol = lib::str::symbolize(v_id);
 
         // Provide a default path based on the platform ID, if none is
         // specified in the configuration.
@@ -253,7 +253,7 @@ impl Config {
         // not provide a filler. The user can do that, if they wish.
         let v_id = data_application.id.as_ref()
             .ok_or(Error::MissingKey(".application.id"))?;
-        let v_id_symbol = util::str::symbolize(v_id);
+        let v_id_symbol = lib::str::symbolize(v_id);
 
         // Use the application ID as name if none is given.
         let v_name = data_application.name.as_ref().unwrap_or(&v_id);

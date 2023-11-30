@@ -3,7 +3,7 @@
 //! This module provides access to the Android SDK on a target machine. It
 //! allows invoking a wide range of functionality of the SDK.
 
-use crate::util;
+use crate::lib;
 
 /// ## JDK Error
 ///
@@ -100,7 +100,7 @@ fn dir_latest_entry(
                             acc,
                             v,
                             |lhs, rhs| {
-                                util::str::cmp_natural(
+                                lib::str::cmp_natural(
                                     lhs.as_str(),
                                     rhs.as_str(),
                                 )

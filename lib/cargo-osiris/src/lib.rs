@@ -25,6 +25,6 @@ mod op;
 mod platform;
 mod toml;
 
-use osi_lib as util;
+use osi_lib as lib;
 
 pub use exe::cargo_osiris;
