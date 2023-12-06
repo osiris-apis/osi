@@ -28,6 +28,31 @@ pub struct Jdk {
     java_home: Option<std::path::PathBuf>,
 }
 
+/// ## KDK Error
+///
+/// This is the error-enum of all possible errors raised by the KDK
+/// abstraction.
+#[derive(Debug)]
+pub enum KdkError {
+    /// Unexpected failure.
+    Failure(Box<dyn std::error::Error>),
+    /// There is no KDK at the given path.
+    NoKdk(std::path::PathBuf),
+    /// Specified path is not a valid KDK.
+    InvalidKdk(std::path::PathBuf),
+}
+
+/// ## KDK for Android
+///
+/// This object represents a Kotlin Development Kit (KDK) suitable for Android
+/// on the target machine. It is effectively a wrapper around a path to the KDK
+/// root directory.
+#[derive(Clone, Debug)]
+pub struct Kdk {
+    kotlin_home: Option<std::path::PathBuf>,
+    kotlin_compose: Option<std::path::PathBuf>,
+}
+
 /// ## SDK Error
 ///
 /// This is the error-enum of all possible errors raised by the Android SDK
@@ -185,6 +210,122 @@ impl Jdk {
     }
 }
 
+impl Kdk {
+    /// ## Create KDK Object from Path
+    ///
+    /// Create a new KDK Object from a path pointing to the root directory
+    /// of the KDK.
+    ///
+    /// This will perform rudimentory checks on the KDK directory to ensure
+    /// it looks valid. This does not guarantee that the KDK is properly
+    /// installed, nor does it lock the KDK in any way. It is the
+    /// responsibility of the caller to ensure the KDK is accessible and
+    /// protected suitably.
+    ///
+    /// Returns `Err` if the path does not point at a valid directory, or
+    /// if the directory does not contain an initialized KDK.
+    ///
+    /// The `kotlin_home` path is retained verbatim. It is up to the
+    /// caller to use an absolute path, if desired.
+    ///
+    /// If no path is provided, `KOTLIN_HOME` is expected to be set by the
+    /// caller, or the root installation of the KDK is used instead. The
+    /// latter assumes no `KOTLIN_HOME` environment variable is required and
+    /// all KDK utilities are accessible from the default environment.
+    pub fn new(
+        kotlin_home: Option<&std::path::Path>,
+    ) -> Result<Self, Box<KdkError>> {
+        let kotlin_compose = if let Some(path) = kotlin_home {
+            // We expect the KDK to exist and be initialized.
+            if !path.is_dir() {
+                return Err(Box::new(KdkError::NoKdk(path.to_path_buf())));
+            }
+
+            // We have no proper way to identify a KDK, but we simply check for
+            // presence of `bin/kotlinc`, since this is all we need.
+            // Additionally, we check for the standard library to ensure the
+            // install looks reasonable.
+            if !path.join("bin/kotlinc").is_file()
+                || !path.join("lib/kotlin-stdlib.jar").is_file()
+            {
+                return Err(Box::new(KdkError::InvalidKdk(path.to_path_buf())));
+            }
+
+            // Check for the Jetpack-Compose compiler plugin. If it is
+            // available in the KDK, we remember its path.
+            let compose = path.join("lib/kotlin-compose.jar");
+            if compose.is_file() {
+                Some(compose)
+            } else {
+                None
+            }
+        } else {
+            // If no path is provided, `KOTLIN_HOME` is either inherited, or it
+            // is not necessary at all. We simply assume everything is
+            // accessible from the default environment, and we defer error
+            // detection to the actual KDK accessors.
+            //
+            // However, to evaluate whether the jetpack-compose compiler plugin
+            // is available, we still have to check for `KOTLIN_HOME`, or the
+            // platform default, and see whether the plugin is available.
+
+            let env = std::env::var_os("KOTLIN_HOME");
+            let maybe_home: Option<std::path::PathBuf> = match env {
+                Some(v) => Some(v.into()),
+                None => {
+                    if cfg!(target_os = "linux") {
+                        Some("/usr/share/kotlin".into())
+                    } else {
+                        None
+                    }
+                },
+            };
+
+            match maybe_home {
+                Some(home) => {
+                    let path = home.join("lib/kotlin-compose.jar");
+                    if path.is_file() {
+                        Some(path)
+                    } else {
+                        None
+                    }
+                },
+                None => None,
+            }
+        };
+
+        // We perform no other checks. It is up to the caller to guarantee
+        // that the KDK is usable.
+        Ok(Self {
+            kotlin_home: kotlin_home.map(|v| v.into()),
+            kotlin_compose: kotlin_compose,
+        })
+    }
+
+    /// ## Yield Command for `kotlinc`
+    ///
+    /// Yield a new command object for the `kotlinc` command suitable for this
+    /// KDK installment.
+    pub fn kotlinc(&self) -> std::process::Command {
+        let mut cmd = match self.kotlin_home {
+            Some(ref path) => std::process::Command::new(path.join("bin/kotlinc")),
+            None => std::process::Command::new("kotlinc"),
+        };
+
+        if let Some(ref path) = self.kotlin_home {
+            cmd.env("KOTLIN_HOME", path);
+        }
+
+        if let Some(ref path) = self.kotlin_compose {
+            let mut arg: std::ffi::OsString = "-Xplugin=".to_string().into();
+            arg.push(path);
+            cmd.arg(arg);
+        }
+
+        cmd
+    }
+}
+
 impl Sdk {
     /// ## Create SDK Object from Path
     ///
@@ -321,6 +462,20 @@ mod tests {
         assert!(matches!(
             *Jdk::new(Some(std::path::Path::new("/"))).unwrap_err(),
             JdkError::InvalidJdk(_),
+        ));
+    }
+
+    // Test KDK initialization and verification, as well as basic functionality
+    // and sub-object initialization.
+    #[test]
+    fn kdk_basic() {
+        assert!(matches!(
+            *Kdk::new(Some(std::path::Path::new("/<invalid>"))).unwrap_err(),
+            KdkError::NoKdk(_),
+        ));
+        assert!(matches!(
+            *Kdk::new(Some(std::path::Path::new("/"))).unwrap_err(),
+            KdkError::InvalidKdk(_),
         ));
     }
 
