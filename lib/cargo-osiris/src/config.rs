@@ -64,8 +64,8 @@ pub struct ConfigPlatform {
 
 /// ## Configuration Root
 pub struct Config {
-    /// Absolute path to the TOML configuration.
-    pub path_toml: std::path::PathBuf,
+    /// Absolute path to the root directory of the configuration.
+    pub path_root: std::path::PathBuf,
     /// Absolute path to the application root.
     pub path_application: std::path::PathBuf,
 
@@ -91,7 +91,7 @@ impl Config {
 
         // Provide a default path based on the platform ID, if none is
         // specified in the configuration.
-        let v_path_platform = self.path_toml.as_path().join(
+        let v_path_platform = self.path_root.as_path().join(
             match platform.path.as_ref() {
                 Some(v) => v.clone(),
                 None => format!("platform/{}", v_id_symbol),
@@ -242,7 +242,7 @@ impl Config {
     ) -> Result<Self, Error> {
         // Remember the absolute path to the directory of the configuration.
         // Other relative paths in the configuration are relative to it.
-        let v_path_toml = misc::absdir(path);
+        let v_path_root = misc::absdir(path);
 
         // `application.id` is required, so `[application]` must be there.
         let data_application = data.application.as_ref()
@@ -259,7 +259,7 @@ impl Config {
         let v_name = data_application.name.as_ref().unwrap_or(&v_id);
 
         // The default path to the application is the manifest directory.
-        let v_path_application = v_path_toml.as_path().join(
+        let v_path_application = v_path_root.as_path().join(
             data_application.path.as_deref().unwrap_or("."),
         );
 
@@ -269,7 +269,7 @@ impl Config {
         // Create initial configuration with basic data. Further information
         // will be procedurally added to it.
         let mut config = Config {
-            path_toml: v_path_toml,
+            path_root: v_path_root,
             path_application: v_path_application,
 
             id: v_id.clone(),
