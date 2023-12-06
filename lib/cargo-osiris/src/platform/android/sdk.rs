@@ -132,10 +132,10 @@ impl Jdk {
     /// The `java_home` path is retained verbatim. It is up to the
     /// caller to use an absolute path, if desired.
     ///
-    /// If no path is provided, the root installation of the JDK is used
-    /// instead. This usually assumes no `JAVA_HOME` environment variable is
-    /// required and all JDK utilities are accessible from the default
-    /// environment.
+    /// If no path is provided, `JAVA_HOME` is expected to be set by the
+    /// caller, or the root installation of the JDK is used instead. The
+    /// latter assumes no `JAVA_HOME` environment variable is required and all
+    /// JDK utilities are accessible from the default environment.
     pub fn new(
         java_home: Option<&std::path::Path>,
     ) -> Result<Self, Box<JdkError>> {
@@ -155,11 +155,9 @@ impl Jdk {
                 return Err(Box::new(JdkError::InvalidJdk(path.to_path_buf())));
             }
         } else {
-            // If no `JAVA_HOME` is set, we assume everything is accessible
-            // from the default environment. Unfortunately, Rust does not
-            // expose a suitable way to verify execution of
-            // `std::process::Command` works, without actually executing it.
-            // Hence, we perform no sanity checks and just defer error
+            // If no path is provided, `JAVA_HOME` is either inherited, or it
+            // is not necessary at all. We simply assume everything is
+            // accessible from the default environment, and we defer error
             // detection to the actual JDK accessors.
         }
 
