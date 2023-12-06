@@ -226,6 +226,73 @@ impl Config {
         }
     }
 
+    /// ## Create Configuration without TOML File
+    ///
+    /// Create a configuration simply based on the path to the application
+    /// directory. Almost all keys are filled with their default value. Default
+    /// platform integrations are provided as well.
+    ///
+    /// This configuration is useful to test application builds without
+    /// having to go through a lengthy configuration process. However, this
+    /// configuration is not suitable for deployments.
+    pub fn with_root(
+        path: &dyn AsRef<std::path::Path>,
+    ) -> Self {
+        // Remember the absolute path to the directory of the configuration.
+        // Other relative paths in the configuration are relative to it.
+        let v_path_root = misc::absdir(path);
+
+        // Provide default values for everything else.
+        let v_path_application = v_path_root.clone();
+        let v_id = "unknown";
+        let v_id_symbol = lib::str::symbolize(v_id);
+        let v_name = v_id;
+        let v_package = None;
+
+        // Create initial configuration with basic data. Further information
+        // will be procedurally added to it.
+        let mut config = Config {
+            path_root: v_path_root,
+            path_application: v_path_application,
+
+            id: v_id.to_string(),
+            id_symbol: v_id_symbol,
+            name: v_name.to_string(),
+            package: v_package,
+
+            platforms: BTreeMap::new(),
+        };
+
+        // Insert default Android platform configuration.
+        config.platforms.insert(
+            "android".to_string(),
+            ConfigPlatform {
+                path_platform: config.path_root.as_path().join("platform/android"),
+                id: "android".to_string(),
+                id_symbol: "android".to_string(),
+
+                configuration: ConfigPlatformConfiguration::Android(
+                    ConfigPlatformAndroid {
+                        application_id: "com.example.unknown".to_string(),
+                        namespace: "com.example".to_string(),
+
+                        compile_sdk: 31,
+                        min_sdk: 31,
+                        target_sdk: 31,
+
+                        abis: ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"]
+                            .iter().map(|v| v.to_string()).collect(),
+
+                        version_code: 1,
+                        version_name: "0.1.0".to_string(),
+                    },
+                ),
+            },
+        );
+
+        config
+    }
+
     /// ## Verify the TOML structured configuration
     ///
     /// Take the TOML-parsed structured configuration and verify all content.
