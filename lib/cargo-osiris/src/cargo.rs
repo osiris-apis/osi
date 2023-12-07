@@ -386,7 +386,6 @@ impl MetadataQuery {
         cmd.args([
             "metadata",
             "--format-version=1",
-            "--no-deps",
             "--offline",
             "--quiet",
         ]);
