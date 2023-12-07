@@ -37,12 +37,12 @@ pub enum Error {
 pub struct Metadata {
     /// Target directory of the package build.
     pub target_directory: String,
-    /// Collection of all java-source-directories from the crate metadata of
+    /// Collection of all android-resource-directories from the crate metadata
+    /// of all packages part of the main build.
+    pub android_resource_dirs: Vec<std::path::PathBuf>,
+    /// Collection of all android-java-directories from the crate metadata of
     /// all packages part of the main build.
-    pub java_sources: Vec<std::path::PathBuf>,
-    /// Collection of all kotlin-source-directories from the crate metadata of
-    /// all packages part of the main build.
-    pub kotlin_sources: Vec<std::path::PathBuf>,
+    pub android_java_dirs: Vec<std::path::PathBuf>,
 }
 
 // Intermediate state after cargo-metadata returned, but the blob was not yet
@@ -288,8 +288,8 @@ impl MetadataBlob {
         let ids = self.involved_ids(query.main_package.as_deref());
 
         // Now walk the package list and extract all data we desire.
-        let mut java_sources = BTreeSet::new();
-        let mut kotlin_sources = BTreeSet::new();
+        let mut java_dirs = BTreeSet::new();
+        let mut res_dirs = BTreeSet::new();
         if let Some(serde_json::Value::Array(packages)) = self.json.get("packages") {
             for pkg in packages.iter() {
                 // Skip any packages that we are not interested in.
@@ -311,32 +311,27 @@ impl MetadataBlob {
 
                 // Extract all metadata we desire.
                 if let Some(serde_json::Value::Object(metadata)) = pkg.get("metadata") {
-                    // We use `osi` as our reserved metadata namespace for all
-                    // features that have no standardized location. Once a more
-                    // standard metadata namespace is found, we will use it.
-                    if let Some(serde_json::Value::Object(osi)) = metadata.get("osi") {
-                        // The `java` and `kotlin` configurations allow
-                        // specifying an array of source-directories relative
-                        // to the manifest. This allows shipping Java and
-                        // Kotlin sources with a Rust crate, which are expected
-                        // by the Rust package to be available in the JVM when
-                        // it is loaded via JNI. It is up to the build system
-                        // to decide how to make them available.
-                        if let Some(serde_json::Value::Object(java)) = osi.get("java") {
+                    // The `android` namespace declares metadata required to
+                    // compile a crate for Android platforms. This includes
+                    // information on bundled JVM sources, as well as Android
+                    // resource files.
+                    //
+                    // XXX: We should reject paths that are absolute or point
+                    //      outside the package.
+                    if let Some(serde_json::Value::Object(android)) = metadata.get("android") {
+                        if let Some(serde_json::Value::Object(java)) = android.get("java") {
                             if let Some(serde_json::Value::Array(dirs)) = java.get("source-dirs") {
                                 for dir in dirs.iter() {
                                     if let serde_json::Value::String(dir_str) = dir {
-                                        java_sources.insert(package_path.as_path().join(dir_str));
+                                        java_dirs.insert(package_path.as_path().join(dir_str));
                                     }
                                 }
                             }
                         }
-                        if let Some(serde_json::Value::Object(kotlin)) = osi.get("kotlin") {
-                            if let Some(serde_json::Value::Array(dirs)) = kotlin.get("source-dirs") {
-                                for dir in dirs.iter() {
-                                    if let serde_json::Value::String(dir_str) = dir {
-                                        kotlin_sources.insert(package_path.as_path().join(dir_str));
-                                    }
+                        if let Some(serde_json::Value::Array(dirs)) = android.get("resource-dirs") {
+                            for dir in dirs.iter() {
+                                if let serde_json::Value::String(dir_str) = dir {
+                                    res_dirs.insert(package_path.as_path().join(dir_str));
                                 }
                             }
                         }
@@ -349,8 +344,8 @@ impl MetadataBlob {
         Ok(
             Metadata {
                 target_directory: data_target_directory,
-                java_sources: java_sources.into_iter().collect(),
-                kotlin_sources: kotlin_sources.into_iter().collect(),
+                android_java_dirs: java_dirs.into_iter().collect(),
+                android_resource_dirs: res_dirs.into_iter().collect(),
             }
         )
     }
@@ -765,8 +760,8 @@ mod tests {
             ).unwrap().parse(&query).unwrap(),
             Metadata {
                 target_directory: ".".into(),
-                java_sources: Vec::new(),
-                kotlin_sources: Vec::new(),
+                android_java_dirs: Vec::new(),
+                android_resource_dirs: Vec::new(),
             },
         );
     }
@@ -815,7 +810,7 @@ mod tests {
                             "id": "dep0 (...)",
                             "manifest_path": "/foo/Cargo.toml",
                             "metadata": {
-                                "osi": {
+                                "android": {
                                     "java": {
                                         "source-dirs": [
                                             "foo",
@@ -829,19 +824,17 @@ mod tests {
                             "id": "dep1 (...)",
                             "manifest_path": "/foo/Cargo.toml",
                             "metadata": {
-                                "osi": {
+                                "android": {
                                     "java": {
                                         "source-dirs": [
                                             "foo",
                                             "dep1"
                                         ]
                                     },
-                                    "kotlin": {
-                                        "source-dirs": [
-                                            "foo",
-                                            "bar"
-                                        ]
-                                    }
+                                    "resource-dirs": [
+                                        "foo",
+                                        "bar"
+                                    ]
                                 }
                             }
                         }
@@ -850,12 +843,12 @@ mod tests {
             ).unwrap().parse(&query).unwrap(),
             Metadata {
                 target_directory: ".".into(),
-                java_sources: vec![
+                android_java_dirs: vec![
                     "/foo/dep0".into(),
                     "/foo/dep1".into(),
                     "/foo/foo".into(),
                 ],
-                kotlin_sources: vec![
+                android_resource_dirs: vec![
                     "/foo/bar".into(),
                     "/foo/foo".into(),
                 ],
