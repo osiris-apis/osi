@@ -4,5 +4,6 @@
 //! supports direct builds via the Android SDK, or following the official
 //! Gradle build system.
 
+mod apk;
 mod flatres;
 mod sdk;
