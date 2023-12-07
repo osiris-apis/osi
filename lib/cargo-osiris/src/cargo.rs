@@ -183,20 +183,23 @@ impl MetadataBlob {
     }
 
     // Take a Cargo Metadata blob and collect the package IDs of all packages
-    // that are involved in a normal compilation of the package specified as
-    // `start` (or the root package of the workspace, if `None`).
+    // that are involved in a normal compilation. The caller can specify which
+    // packages are compiled.
     //
     // The `resolve.nodes` array usually contains exactly this set. However,
     // it also contains build and dev dependencies, as well as dependencies
     // of workspace packages other than the requested package. Hence, this
     // function collects exactly the required package IDs.
     fn involved_ids(&self, start: Option<&str>) -> BTreeSet<String> {
+        let mut roots = BTreeSet::<&str>::new();
         let mut ids = BTreeSet::<String>::new();
         let mut todo = BTreeSet::<&str>::new();
         let mut depmap = BTreeMap::<&str, BTreeSet<&str>>::new();
 
         // Fetch the objects in the resolved dependency map of the
-        // Cargo metadata blob.
+        // Cargo metadata blob. If no resolve-map is present, or if no
+        // nodes are listed, there is nothing to resolve and we return
+        // an empty set.
         let resolve = match self.json.get("resolve") {
             Some(serde_json::Value::Object(v)) => v,
             _ => return ids,
@@ -206,15 +209,31 @@ impl MetadataBlob {
             _ => return ids,
         };
 
-        // Resolve the root node, unless a start node is explicitly
-        // specified by the caller.
-        let root = match start {
-            Some(v) => v,
-            None => match resolve.get("root") {
-                Some(serde_json::Value::String(v)) => v.as_str(),
-                _ => return ids,
-            },
-        };
+        // Find the root nodes. If the caller specifies them, we use them.
+        // Otherwise, we use the resolved root package. If that is not
+        // suitable, we use the default workspace.
+        //
+        // If the resolved root nodes are an empty set, there is nothing
+        // to do and we yield an empty set to the caller.
+        //
+        // XXX: This should be extended to allow the caller to specify more
+        //      than one root package, and to select whether to compile the
+        //      entire workspace.
+        if let Some(root_str) = start {
+            roots.insert(root_str);
+        } else if let Some(serde_json::Value::String(root_str)) = resolve.get("root") {
+            roots.insert(root_str);
+        } else if let Some(serde_json::Value::Array(dirs)) = self.json.get("workspace_default_members") {
+            for dir in dirs.iter() {
+                if let serde_json::Value::String(dir_str) = dir {
+                    roots.insert(dir_str);
+                }
+            }
+        }
+
+        if roots.is_empty() {
+            return ids;
+        }
 
         // Iterate all nodes and collect their actual code-dependencies, but
         // ignore any build or dev dependencies. Push each node into the
@@ -255,16 +274,20 @@ impl MetadataBlob {
             depmap.insert(id.as_str(), acc);
         }
 
-        // Now start at the root package and collect all its dependencies in
-        // the final set. Repeat this for each dependency, avoiding cycles.
-        todo.insert(root);
-        ids.insert(root.to_string());
-        while let Some(next) = todo.pop_first() {
-            if let Some(deps) = depmap.get(next) {
-                for &dep in deps.iter() {
-                    if !ids.contains(dep) {
-                        todo.insert(dep);
-                        ids.insert(dep.to_string());
+        // For every root node, start at the root package and collect all its
+        // dependencies into the final set. Repeat this for each dependency,
+        // avoiding cycles. Yield the final set to the caller.
+        for root in roots {
+            todo.clear();
+            todo.insert(root);
+            ids.insert(root.to_string());
+            while let Some(next) = todo.pop_first() {
+                if let Some(deps) = depmap.get(next) {
+                    for &dep in deps.iter() {
+                        if !ids.contains(dep) {
+                            todo.insert(dep);
+                            ids.insert(dep.to_string());
+                        }
                     }
                 }
             }
