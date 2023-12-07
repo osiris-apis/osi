@@ -156,10 +156,10 @@ impl Query {
     ///
     /// Run the `aapt2` flat resource compiler, producing a flat resource for
     /// the given resource input.
-    pub fn run(&self) -> Result<std::path::PathBuf, Box<Error>> {
+    pub fn run(&self) -> Result<std::path::PathBuf, Error> {
         let output_file = self.output_dir.join(
             Self::output_file_name(&self.resource_file).ok_or_else(
-                || Box::new(Error::InvalidPath(self.resource_file.clone())),
+                || Error::InvalidPath(self.resource_file.clone()),
             )?,
         );
 
@@ -188,9 +188,9 @@ impl Query {
         cmd.stderr(std::process::Stdio::inherit());
 
         // Run and verify it exited successfully.
-        let output = cmd.output().map_err(|v| Box::new(Error::Exec(v)))?;
+        let output = cmd.output().map_err(|v| Error::Exec(v))?;
         if !output.status.success() {
-            return Err(Box::new(Error::Exit(output.status)));
+            return Err(Error::Exit(output.status));
         }
 
         // Not interested in the output of the tool.
