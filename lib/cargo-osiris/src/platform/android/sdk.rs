@@ -11,8 +11,6 @@ use crate::lib;
 /// abstraction.
 #[derive(Debug)]
 pub enum JdkError {
-    /// Unexpected failure.
-    Failure(Box<dyn std::error::Error>),
     /// There is no JDK at the given path.
     NoJdk(std::path::PathBuf),
     /// Specified path is not a valid JDK.
@@ -34,8 +32,6 @@ pub struct Jdk {
 /// abstraction.
 #[derive(Debug)]
 pub enum KdkError {
-    /// Unexpected failure.
-    Failure(Box<dyn std::error::Error>),
     /// There is no KDK at the given path.
     NoKdk(std::path::PathBuf),
     /// Specified path is not a valid KDK.
@@ -59,8 +55,8 @@ pub struct Kdk {
 /// abstraction.
 #[derive(Debug)]
 pub enum SdkError {
-    /// Unexpected failure.
-    Failure(Box<dyn std::error::Error>),
+    /// Uncaught error propagation.
+    Uncaught(lib::error::Uncaught),
     /// There is no Android SDK at the given path.
     NoSdk(std::path::PathBuf),
     /// Specified path is not a valid Android SDK.
@@ -137,6 +133,12 @@ fn dir_latest_entry(
         })
         .transpose()
         .map_err(|v|v.into())
+}
+
+impl From<lib::error::Uncaught> for SdkError {
+    fn from(v: lib::error::Uncaught) -> Self {
+        Self::Uncaught(v)
+    }
 }
 
 impl Jdk {
@@ -398,8 +400,10 @@ impl Sdk {
             None => {
                 path.push(
                     dir_latest_entry(path.as_path())
-                        .map_err(|v| Box::new(SdkError::Failure(v)))?
-                        .ok_or_else(|| Box::new(SdkError::NoBuildTools))?
+                        .map_err(|v| -> Box<SdkError> {
+                            Box::new(lib::error::Uncaught::fold_error(v).into())
+                        })?
+                        .ok_or_else(|| Box::new(SdkError::NoBuildTools))?,
                 );
             }
 
