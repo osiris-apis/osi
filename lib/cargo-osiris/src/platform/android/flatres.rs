@@ -36,23 +36,23 @@ pub struct Query {
 }
 
 impl Query {
-    // ## Compute Output File Name
-    //
-    // The `aapt2` tool uses fixed names for output files (mostly for
-    // compatibility reasons to `aapt`). In most cases, it simply appends
-    // `.flat` to the file name. However, for some file types it does
-    // some more elaborate logic. We duplicate this so we can reliably
-    // tell which file was produced by `aapt2`.
-    //
-    // Note that this strips leading path information and returns a file
-    // name only. The caller likely has to append this to the output directory.
-    //
-    // This mirrors the behavior of `ExtractResourcePathData()`, as well
-    // as `BuildIntermediateContainerFilename()` in
-    // `tools/aapt2/cmd/Compile.cpp` of `platforms/frameworks/base`.
-    fn output_file_name(
+    /// ## Compute Output File Name
+    ///
+    /// The `aapt2` tool uses fixed names for output files (mostly for
+    /// compatibility reasons to `aapt`). In most cases, it simply appends
+    /// `.flat` to the file name. However, for some file types it does
+    /// some more elaborate logic. We duplicate this so we can reliably
+    /// tell which file was produced by `aapt2`.
+    ///
+    /// Note that this strips leading path information and returns a file
+    /// name only. The caller likely has to append this to the output directory.
+    ///
+    /// This mirrors the behavior of `ExtractResourcePathData()`, as well
+    /// as `BuildIntermediateContainerFilename()` in
+    /// `tools/aapt2/cmd/Compile.cpp` of `platforms/frameworks/base`.
+    pub fn output_file_name(
         path: &std::path::Path,
-    ) -> Result<std::ffi::OsString, Box<Error>> {
+    ) -> Option<std::ffi::OsString> {
         // XXX: `std::path::Path` normalizes trailing slashes, which is not
         //      really correct for files. Yet, it is unlikely to lead to
         //      issues, so we ignore it. Same is true for trailing dot
@@ -65,7 +65,7 @@ impl Query {
         ) {
             // Error out if the path has no valid file name.
             (None, _) => {
-                return Err(Box::new(Error::InvalidPath(path.into())));
+                return None;
             },
 
             // If no extension is used, skip parsing it.
@@ -103,7 +103,7 @@ impl Query {
                 .flatten()
         {
             None => {
-                return Err(Box::new(Error::InvalidPath(path.into())));
+                return None;
             },
             Some(dir) => {
                 // Split at the first dash, if any.
@@ -149,7 +149,7 @@ impl Query {
         }
         output.push(".flat");
 
-        Ok(output)
+        Some(output)
     }
 
     /// ## Run `aapt2` compiler
@@ -158,7 +158,9 @@ impl Query {
     /// the given resource input.
     pub fn run(&self) -> Result<std::path::PathBuf, Box<Error>> {
         let output_file = self.output_dir.join(
-            Self::output_file_name(&self.resource_file)?
+            Self::output_file_name(&self.resource_file).ok_or_else(
+                || Box::new(Error::InvalidPath(self.resource_file.clone())),
+            )?,
         );
 
         // Set up basic `aapt2 compile` command.
@@ -207,16 +209,16 @@ mod tests {
     #[test]
     fn output_file_name_basic() {
         // Verify error handling for invalid paths.
-        assert!(Query::output_file_name("".as_ref()).is_err());
-        assert!(Query::output_file_name("/".as_ref()).is_err());
-        assert!(Query::output_file_name("/.".as_ref()).is_err());
-        assert!(Query::output_file_name("foo".as_ref()).is_err());
-        assert!(Query::output_file_name("foo/".as_ref()).is_err());
-        assert!(Query::output_file_name("foo/.".as_ref()).is_err());
-        assert!(Query::output_file_name("foo/..".as_ref()).is_err());
-        assert!(Query::output_file_name("/foo".as_ref()).is_err());
-        assert!(Query::output_file_name("./foo".as_ref()).is_err());
-        assert!(Query::output_file_name("../foo".as_ref()).is_err());
+        assert!(Query::output_file_name("".as_ref()).is_none());
+        assert!(Query::output_file_name("/".as_ref()).is_none());
+        assert!(Query::output_file_name("/.".as_ref()).is_none());
+        assert!(Query::output_file_name("foo".as_ref()).is_none());
+        assert!(Query::output_file_name("foo/".as_ref()).is_none());
+        assert!(Query::output_file_name("foo/.".as_ref()).is_none());
+        assert!(Query::output_file_name("foo/..".as_ref()).is_none());
+        assert!(Query::output_file_name("/foo".as_ref()).is_none());
+        assert!(Query::output_file_name("./foo".as_ref()).is_none());
+        assert!(Query::output_file_name("../foo".as_ref()).is_none());
 
         // Basic file name transformations.
         assert_eq!(
