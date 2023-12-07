@@ -345,10 +345,10 @@ impl Sdk {
     ///
     /// The `android_home` path is retained verbatim. It is up to the
     /// caller to use an absolute path, if desired.
-    pub fn new(android_home: &std::path::Path) -> Result<Self, Box<SdkError>> {
+    pub fn new(android_home: &std::path::Path) -> Result<Self, SdkError> {
         // We expect the SDK to exist and be initialized.
         if !android_home.is_dir() {
-            return Err(Box::new(SdkError::NoSdk(android_home.to_path_buf())));
+            return Err(SdkError::NoSdk(android_home.to_path_buf()));
         }
 
         // We have no proper way to identify an Android SDK, since all its
@@ -356,7 +356,7 @@ impl Sdk {
         // present if any component is installed, so we use it to identify
         // initialized SDKs.
         if !android_home.join("licenses/android-sdk-license").is_file() {
-            return Err(Box::new(SdkError::InvalidSdk(android_home.to_path_buf())));
+            return Err(SdkError::InvalidSdk(android_home.to_path_buf()));
         }
 
         // We perform no other checks. It is up to the caller to guarantee
@@ -387,11 +387,11 @@ impl Sdk {
     pub fn build_tools(
         &self,
         version: Option<&std::ffi::OsStr>,
-    ) -> Result<BuildTools, Box<SdkError>> {
+    ) -> Result<BuildTools, SdkError> {
         let mut path = self.android_home().join("build-tools");
 
         if !path.is_dir() {
-            return Err(Box::new(SdkError::NoBuildTools));
+            return Err(SdkError::NoBuildTools);
         }
 
         match version {
@@ -400,10 +400,10 @@ impl Sdk {
             None => {
                 path.push(
                     dir_latest_entry(path.as_path())
-                        .map_err(|v| -> Box<SdkError> {
-                            Box::new(lib::error::Uncaught::fold_error(v).into())
+                        .map_err(|v| -> SdkError {
+                            lib::error::Uncaught::fold_error(v).into()
                         })?
-                        .ok_or_else(|| Box::new(SdkError::NoBuildTools))?,
+                        .ok_or_else(|| SdkError::NoBuildTools)?,
                 );
             }
 
@@ -413,10 +413,10 @@ impl Sdk {
             Some(v) => {
                 match std::path::Path::new(v).parent() {
                     None => {
-                        return Err(Box::new(SdkError::InvalidBuildTools(v.into())));
+                        return Err(SdkError::InvalidBuildTools(v.into()));
                     }
                     Some(parent) if parent.as_os_str().len() > 0 => {
-                        return Err(Box::new(SdkError::InvalidBuildTools(v.into())));
+                        return Err(SdkError::InvalidBuildTools(v.into()));
                     }
                     _ => {},
                 }
@@ -424,7 +424,7 @@ impl Sdk {
                 path.push(v);
 
                 if !path.is_dir() {
-                    return Err(Box::new(SdkError::InvalidBuildTools(v.into())));
+                    return Err(SdkError::InvalidBuildTools(v.into()));
                 }
             },
         }
@@ -488,11 +488,11 @@ mod tests {
     #[test]
     fn sdk_basic() {
         assert!(matches!(
-            *Sdk::new(std::path::Path::new("/<invalid>")).unwrap_err(),
+            Sdk::new(std::path::Path::new("/<invalid>")).unwrap_err(),
             SdkError::NoSdk(_),
         ));
         assert!(matches!(
-            *Sdk::new(std::path::Path::new("/")).unwrap_err(),
+            Sdk::new(std::path::Path::new("/")).unwrap_err(),
             SdkError::InvalidSdk(_),
         ));
     }
