@@ -3,6 +3,7 @@ default-members = [".", "lib/*"]
 members = [".", "lib/*"]
 
 [workspace.dependencies]
+gio = { features = ["v2_70"], version = "0.18" }
 osi-derive = { path = "./lib/osi-derive" }
 osi-derive-proc = { path = "./lib/osi-derive-proc" }
 osi-lib = { path = "./lib/osi-lib" }
