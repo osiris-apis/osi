@@ -1,0 +1,23 @@
+[package]
+name = "osiris-linux"
+version = "0.0.1"
+
+description = "Osiris APIs for Linux"
+keywords = [
+        "api",
+        "interfaces",
+        "linux",
+        "os",
+        "osiris",
+]
+
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+gio = { workspace = true }
