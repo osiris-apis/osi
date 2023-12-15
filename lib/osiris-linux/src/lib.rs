@@ -1,4 +1,4 @@
-//! Osiris APIs for Linux
+//! # Osiris APIs for Linux
 //!
 //! This is an implementation of the Osiris APIs for the Linux platform. While
 //! the Linux platform is quite heterogeneous, a lot of common APIs are

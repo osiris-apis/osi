@@ -1,13 +1,13 @@
-//! User Notification APIs
+//! # User Notification APIs
 //!
 //! This module provides APIs to send notifications to the desktop environment
 //! to display to the user. These notifications are tied to an application but
 //! are retained by the system even if the application exits.
 //!
 //! The underlying mechanism is based on the Freedesktop Notification
-//! Specification [1].
+//! Specification[^spec].
 //!
-//! [1]: https://specifications.freedesktop.org/notification-spec/
+//! [^spec]: https://specifications.freedesktop.org/notification-spec/
 
 // XXX: The current implementation lacks a few advanced features of the
 //      Notification Specification. These can be added in the future. It
