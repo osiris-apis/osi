@@ -141,6 +141,57 @@ impl From<lib::error::Uncaught> for SdkError {
     }
 }
 
+/// ## Create a Class-path
+///
+/// Concatenate a set of paths into a class-path, suitable for use
+/// with JVM and Java tools, or set into the environment.
+///
+/// Not all paths can be put into a class-path, since there is no way to
+/// escape paths. Hence, if any path contains one of the unsupported
+/// characters, this will yield `Err` bundled with the unsupported path.
+pub fn class_path<T>(
+    paths: T,
+) -> Result<std::ffi::OsString, std::path::PathBuf>
+where
+    T: IntoIterator,
+    T::Item: AsRef<std::path::Path>,
+{
+    // Java class-paths use semicolons on Windows (similar to Windows
+    // environment variables), but colons everywhere else (similar to POSIX
+    // environment variables).
+    let (sep_ascii, sep_str) = if cfg!(target_os = "windows") {
+        (b';', ";")
+    } else {
+        (b':', ":")
+    };
+
+    let mut acc = std::ffi::OsString::new();
+    let mut first = true;
+
+    for i in paths.into_iter() {
+        let v = i.as_ref();
+
+        // Class-paths cannot escape the separators, so there is no way
+        // to include paths that contain a separator. Reject any such path
+        // outright.
+        if v.as_os_str()
+            .as_encoded_bytes()
+            .iter()
+            .any(|v| *v == sep_ascii)
+        {
+            return Err(v.into());
+        }
+
+        if !first {
+            acc.push(sep_str);
+            first = false;
+        }
+        acc.push(v);
+    }
+
+    Ok(acc)
+}
+
 impl Jdk {
     /// ## Create JDK Object from Path
     ///
