@@ -29,20 +29,32 @@ pub enum Error {
     Data,
 }
 
+/// ## Android Metadata
+///
+/// This struct represents the Android-related metadata embedded in a Cargo
+/// manifest of a single package.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct MetadataAndroid {
+    /// Java source directories to be included in an Android build.
+    pub java_dirs: Vec<std::path::PathBuf>,
+    /// Kotlin source directories to be included in an Android build.
+    pub kotlin_dirs: Vec<std::path::PathBuf>,
+    /// Android manifest to be included in an Android build.
+    pub manifest_file: Option<std::path::PathBuf>,
+    /// Android resource directories to be included in an Android build.
+    pub resource_dirs: Vec<std::path::PathBuf>,
+}
+
 /// ## Reduced Cargo Metadata
 ///
 /// This struct represents the reduced cargo metadata with only the bits that
 /// are required by us.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Metadata {
+    /// Sets of Android-related build metadata.
+    pub android_sets: Vec<MetadataAndroid>,
     /// Target directory of the package build.
     pub target_directory: String,
-    /// Collection of all android-resource-directories from the crate metadata
-    /// of all packages part of the main build.
-    pub android_resource_dirs: Vec<std::path::PathBuf>,
-    /// Collection of all android-java-directories from the crate metadata of
-    /// all packages part of the main build.
-    pub android_java_dirs: Vec<std::path::PathBuf>,
 }
 
 // Intermediate state after cargo-metadata returned, but the blob was not yet
@@ -311,10 +323,14 @@ impl MetadataBlob {
         let ids = self.involved_ids(query.main_package.as_deref());
 
         // Now walk the package list and extract all data we desire.
-        let mut java_dirs = BTreeSet::new();
-        let mut res_dirs = BTreeSet::new();
+        let mut android_sets = Vec::new();
         if let Some(serde_json::Value::Array(packages)) = self.json.get("packages") {
             for pkg in packages.iter() {
+                let mut java_dirs = Vec::new();
+                let mut kotlin_dirs = Vec::new();
+                let mut manifest_file = None;
+                let mut res_dirs = Vec::new();
+
                 // Skip any packages that we are not interested in.
                 let id = match pkg.get("id") {
                     Some(serde_json::Value::String(v)) => v,
@@ -346,19 +362,47 @@ impl MetadataBlob {
                             if let Some(serde_json::Value::Array(dirs)) = java.get("source-dirs") {
                                 for dir in dirs.iter() {
                                     if let serde_json::Value::String(dir_str) = dir {
-                                        java_dirs.insert(package_path.as_path().join(dir_str));
+                                        java_dirs.push(package_path.as_path().join(dir_str));
                                     }
                                 }
                             }
                         }
+                        if let Some(serde_json::Value::Object(kotlin)) = android.get("kotlin") {
+                            if let Some(serde_json::Value::Array(dirs)) = kotlin.get("source-dirs") {
+                                for dir in dirs.iter() {
+                                    if let serde_json::Value::String(dir_str) = dir {
+                                        kotlin_dirs.push(package_path.as_path().join(dir_str));
+                                    }
+                                }
+                            }
+                        }
+                        if let Some(serde_json::Value::String(manifest_str)) = android.get("manifest-file") {
+                            manifest_file = Some(manifest_str);
+                        }
                         if let Some(serde_json::Value::Array(dirs)) = android.get("resource-dirs") {
                             for dir in dirs.iter() {
                                 if let serde_json::Value::String(dir_str) = dir {
-                                    res_dirs.insert(package_path.as_path().join(dir_str));
+                                    res_dirs.push(package_path.as_path().join(dir_str));
                                 }
                             }
                         }
                     }
+                }
+
+                // Store the metadata if any value is set.
+                if java_dirs.len() > 0
+                    || kotlin_dirs.len() > 0
+                    || manifest_file.is_some()
+                    || res_dirs.len() > 0
+                {
+                    android_sets.push(MetadataAndroid {
+                        java_dirs: java_dirs,
+                        kotlin_dirs: kotlin_dirs,
+                        manifest_file: manifest_file.map(
+                            |v| std::path::Path::new(v).into(),
+                        ),
+                        resource_dirs: res_dirs,
+                    });
                 }
             }
         }
@@ -366,9 +410,8 @@ impl MetadataBlob {
         // Return the parsed `Metadata` object.
         Ok(
             Metadata {
+                android_sets: android_sets,
                 target_directory: data_target_directory,
-                android_java_dirs: java_dirs.into_iter().collect(),
-                android_resource_dirs: res_dirs.into_iter().collect(),
             }
         )
     }
@@ -781,9 +824,8 @@ mod tests {
                 }"#,
             ).unwrap().parse(&query).unwrap(),
             Metadata {
+                android_sets: Vec::new(),
                 target_directory: ".".into(),
-                android_java_dirs: Vec::new(),
-                android_resource_dirs: Vec::new(),
             },
         );
     }
@@ -864,16 +906,30 @@ mod tests {
                 }"#,
             ).unwrap().parse(&query).unwrap(),
             Metadata {
+                android_sets: vec![
+                    MetadataAndroid {
+                        java_dirs: vec![
+                            "/foo/foo".into(),
+                            "/foo/dep0".into(),
+                        ],
+                        kotlin_dirs: Vec::new(),
+                        manifest_file: None,
+                        resource_dirs: Vec::new(),
+                    },
+                    MetadataAndroid {
+                        java_dirs: vec![
+                            "/foo/foo".into(),
+                            "/foo/dep1".into(),
+                        ],
+                        kotlin_dirs: Vec::new(),
+                        manifest_file: None,
+                        resource_dirs: vec![
+                            "/foo/foo".into(),
+                            "/foo/bar".into(),
+                        ],
+                    },
+                ],
                 target_directory: ".".into(),
-                android_java_dirs: vec![
-                    "/foo/dep0".into(),
-                    "/foo/dep1".into(),
-                    "/foo/foo".into(),
-                ],
-                android_resource_dirs: vec![
-                    "/foo/bar".into(),
-                    "/foo/foo".into(),
-                ],
             },
         );
     }
