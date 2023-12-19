@@ -28,6 +28,8 @@ pub struct Query<'ctx, CpList, LibList, SrcList> {
     pub build_tools: &'ctx android::sdk::BuildTools,
     /// Directories and files to make up the class-path.
     pub class_paths: CpList,
+    /// Whether to include debug information.
+    pub debug: bool,
     /// Libraries to link to.
     pub libs: LibList,
     /// Output directory where to store the DEX files.
@@ -66,6 +68,11 @@ where
             cmd.arg(v.as_ref());
         }
 
+        // Append debug flag if requested.
+        if self.debug {
+            cmd.arg("--debug");
+        }
+
         // Append library entries.
         for v in self.libs.clone() {
             cmd.arg("--lib");
@@ -81,6 +88,11 @@ where
         // Select a suitable output directory.
         cmd.arg("--output");
         cmd.arg(&self.output_dir);
+
+        // Append release flag as default
+        if !self.debug {
+            cmd.arg("--release");
+        }
 
         // Append all source paths. We ensure they start with a path indicator,
         // since `d8` does not support `--` separators.

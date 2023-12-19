@@ -458,6 +458,7 @@ impl<'ctx> Direct<'ctx> {
             api: Some(self.build.android.min_sdk),
             build_tools: &self.build_tools,
             class_paths: &Vec::<std::path::PathBuf>::new(),
+            debug: false,
             libs: &[&self.platform_jar],
             output_dir: &self.build.dex_dir,
             source_files: &sources,
