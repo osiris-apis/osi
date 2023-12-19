@@ -186,9 +186,10 @@ where
             return Err(v.into());
         }
 
-        if !first {
-            acc.push(sep_str);
+        if first {
             first = false;
+        } else {
+            acc.push(sep_str);
         }
         acc.push(v);
     }
