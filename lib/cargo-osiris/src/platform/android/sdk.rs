@@ -65,6 +65,10 @@ pub enum SdkError {
     NoBuildTools,
     /// Specified Build Tools component is not available or invalid.
     InvalidBuildTools(std::ffi::OsString),
+    /// No platform component available for the given API version.
+    NoPlatform(u32),
+    /// Invalid platform component for the given API version.
+    InvalidPlatform(u32),
 }
 
 /// ## Android SDK
@@ -483,6 +487,29 @@ impl Sdk {
         Ok(BuildTools {
             path: path,
         })
+    }
+
+    /// ## Acquire Platform Path
+    ///
+    /// Check the Android SDK for platform files of the given API-level. Return
+    /// a path to the base directory of the platform if available. Return an
+    /// error no suitable platform component is installed in the Android SDK.
+    pub fn platform(
+        &self,
+        api: u32,
+    ) -> Result<std::path::PathBuf, SdkError> {
+        let mut path = self.android_home().join("platforms");
+
+        path.push(format!("android-{}", api));
+        if !path.is_dir() {
+            return Err(SdkError::NoPlatform(api));
+        }
+
+        if !path.as_path().join("android.jar").is_file() {
+            return Err(SdkError::InvalidPlatform(api));
+        }
+
+        Ok(path)
     }
 }
 
