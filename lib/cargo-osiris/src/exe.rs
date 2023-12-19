@@ -8,7 +8,7 @@
 //! the operations, but merely uses the APIs from the library.
 
 use clap;
-use crate::{cargo, config, op, toml};
+use crate::{cargo, config, op, platform, toml};
 
 /// ## Cargo Osiris
 ///
@@ -214,17 +214,129 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                 &metadata,
                 platform,
             ) {
+                Err(op::BuildError::Uncaught(v)) => {
+                    eprintln!("Cannot build platform integration: Uncaught failure: {}", v);
+                    Err(1)
+                },
+                Err(op::BuildError::DirectoryTraversal(dir)) => {
+                    eprintln!("Cannot build platform integration: Failed to traverse directory {:?}", dir);
+                    Err(1)
+                },
                 Err(op::BuildError::DirectoryCreation(dir)) => {
                     eprintln!("Cannot build platform integration: Failed to create directory {:?}", dir);
                     Err(1)
                 },
-                Err(op::BuildError::Exec(cmd, error)) => {
-                    eprintln!("Cannot build platform integration: Failed to invoke '{}' ({})", cmd, error);
+                Err(op::BuildError::DirectoryRemoval(dir)) => {
+                    eprintln!("Cannot build platform integration: Failed to remove directory {:?}", dir);
                     Err(1)
                 },
-                Err(op::BuildError::Build) => {
-                    eprintln!("Cannot build platform integration: Platform build failed");
+                Err(op::BuildError::FileUpdate(path, err)) => {
+                    eprintln!("Cannot build platform integration: Failed to update file {}: {}", path.display(), err);
                     Err(1)
+                },
+                Err(op::BuildError::Cargo(sub)) => match sub {
+                    cargo::Error::Exec(v) => {
+                        eprintln!("Cannot build Android platform integration: Execution of Cargo could not commence: {}", v);
+                        Err(1)
+                    },
+                    cargo::Error::Cargo(v) => {
+                        eprintln!("Cannot build Android platform integration: Cargo failed executing: {}", v);
+                        Err(1)
+                    },
+                    cargo::Error::Unicode(v) => {
+                        eprintln!("Cannot build Android platform integration: Invalid Unicode in Cargo output: {}", v);
+                        Err(1)
+                    },
+                    cargo::Error::Json => {
+                        eprintln!("Cannot build Android platform integration: Invalid JSON in Cargo output");
+                        Err(1)
+                    },
+                    cargo::Error::UnknownPackage(v) => {
+                        eprintln!("Cannot build Android platform integration: Unknown package name: {}", v);
+                        Err(1)
+                    },
+                    cargo::Error::AmbiguousPackage(v) => {
+                        eprintln!("Cannot build Android platform integration: Ambiguous package name: {}", v);
+                        Err(1)
+                    },
+                    cargo::Error::Data => {
+                        eprintln!("Cannot build Android platform integration: Unsupported data format in Cargo output");
+                        Err(1)
+                    },
+                },
+                Err(op::BuildError::AndroidPlatform(sub)) => match sub {
+                    platform::android::BuildError::UnsupportedPath(path) => {
+                        eprintln!("Cannot build Android platform integration: Path contains characters not supported by Android Builds (e.g., colons, semicolons): {}", path.display());
+                        Err(1)
+                    },
+                    platform::android::BuildError::NoAndroidHome => {
+                        eprintln!("Cannot build Android platform integration: No Android SDK available, `ANDROID_HOME` is not set");
+                        Err(1)
+                    },
+                    platform::android::BuildError::NoSdk(path) => {
+                        eprintln!("Cannot build Android platform integration: No Android SDK at {}", path.display());
+                        Err(1)
+                    },
+                    platform::android::BuildError::InvalidSdk(path) => {
+                        eprintln!("Cannot build Android platform integration: Invalid Android SDK at {}", path.display());
+                        Err(1)
+                    },
+                    platform::android::BuildError::NoJdk(path) => {
+                        eprintln!("Cannot build Android platform integration: No Android Java SDK at {}", path.display());
+                        Err(1)
+                    },
+                    platform::android::BuildError::InvalidJdk(path) => {
+                        eprintln!("Cannot build Android platform integration: Invalid Android Java SDK at {}", path.display());
+                        Err(1)
+                    },
+                    platform::android::BuildError::NoKdk(path) => {
+                        eprintln!("Cannot build Android platform integration: No Android Kotlin SDK at {}", path.display());
+                        Err(1)
+                    },
+                    platform::android::BuildError::InvalidKdk(path) => {
+                        eprintln!("Cannot build Android platform integration: Invalid Android Kotlin SDK at {}", path.display());
+                        Err(1)
+                    },
+                    platform::android::BuildError::NoBuildTools => {
+                        eprintln!("Cannot build Android platform integration: Android SDK lacks Build Tools");
+                        Err(1)
+                    },
+                    platform::android::BuildError::InvalidBuildTools(v) => {
+                        eprintln!("Cannot build Android platform integration: No valid Build Tools of the selected version available in the Android SDK: {:?}", v);
+                        Err(1)
+                    },
+                    platform::android::BuildError::NoPlatform(v) => {
+                        eprintln!("Cannot build Android platform integration: Android SDK lacks Platform for API-level {}", v);
+                        Err(1)
+                    },
+                    platform::android::BuildError::InvalidPlatform(v) => {
+                        eprintln!("Cannot build Android platform integration: No valid Platform for API-level {} available in the Android SDK", v);
+                        Err(1)
+                    },
+                    platform::android::BuildError::FlatresExec(v) => {
+                        eprintln!("Cannot build Android platform integration: Execution of Android flatres compiler could not commence: {}", v);
+                        Err(1)
+                    },
+                    platform::android::BuildError::FlatresExit(v) => {
+                        eprintln!("Cannot build Android platform integration: Android flatres compiler failed executing: {}", v);
+                        Err(1)
+                    },
+                    platform::android::BuildError::JavacExec(v) => {
+                        eprintln!("Cannot build Android platform integration: Execution of Java compiler could not commence: {}", v);
+                        Err(1)
+                    },
+                    platform::android::BuildError::JavacExit(v) => {
+                        eprintln!("Cannot build Android platform integration: Java compiler failed executing: {}", v);
+                        Err(1)
+                    },
+                    platform::android::BuildError::KotlincExec(v) => {
+                        eprintln!("Cannot build Android platform integration: Execution of Kotlin compiler could not commence: {}", v);
+                        Err(1)
+                    },
+                    platform::android::BuildError::KotlincExit(v) => {
+                        eprintln!("Cannot build Android platform integration: Kotlin compiler failed executing: {}", v);
+                        Err(1)
+                    },
                 },
                 Ok(_) => {
                     Ok(())
