@@ -375,7 +375,7 @@ impl<'ctx> Direct<'ctx> {
         // compiler deal with it.
 
         let query = java::Query {
-            class_paths: &[&self.platform_jar],
+            class_paths: &[&self.platform_jar, &self.build.class_dir],
             jdk: &self.jdk,
             output_dir: &self.build.class_dir,
             source_files: &sources,
@@ -418,7 +418,7 @@ impl<'ctx> Direct<'ctx> {
         // let the compiler deal with incremental compilation.
 
         let query = kotlin::Query {
-            class_paths: &[&self.platform_jar],
+            class_paths: &[&self.platform_jar, &self.build.class_dir],
             kdk: &self.kdk,
             output_dir: &self.build.class_dir,
             source_files: &sources,
