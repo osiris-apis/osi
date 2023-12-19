@@ -528,6 +528,13 @@ impl BuildTools {
     pub fn aapt2(&self) -> std::path::PathBuf {
         self.path.join("aapt2")
     }
+
+    /// ## Yield Path to `d8` Binary
+    ///
+    /// Yield the path to the `d8` binary of this build-tools component.
+    pub fn d8(&self) -> std::path::PathBuf {
+        self.path.join("d8")
+    }
 }
 
 #[cfg(test)]

@@ -337,6 +337,14 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                         eprintln!("Cannot build Android platform integration: Kotlin compiler failed executing: {}", v);
                         Err(1)
                     },
+                    platform::android::BuildError::DexExec(v) => {
+                        eprintln!("Cannot build Android platform integration: Execution of DEX compiler could not commence: {}", v);
+                        Err(1)
+                    },
+                    platform::android::BuildError::DexExit(v) => {
+                        eprintln!("Cannot build Android platform integration: DEX compiler failed executing: {}", v);
+                        Err(1)
+                    },
                 },
                 Ok(_) => {
                     Ok(())

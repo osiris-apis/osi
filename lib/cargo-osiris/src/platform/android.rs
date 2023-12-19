@@ -8,6 +8,7 @@ use crate::{cargo, config, lib, op};
 use std::collections::BTreeMap;
 
 mod apk;
+mod dex;
 mod flatres;
 mod java;
 mod kotlin;
@@ -58,6 +59,10 @@ pub enum BuildError {
     KotlincExec(std::io::Error),
     /// Kotlin compiler failed executing.
     KotlincExit(std::process::ExitStatus),
+    /// Execution of the DEX compiler could not commence.
+    DexExec(std::io::Error),
+    /// DEX compiler failed executing.
+    DexExit(std::process::ExitStatus),
 }
 
 struct Build<'ctx> {
@@ -71,6 +76,7 @@ struct Build<'ctx> {
     // Build directories
     pub artifact_dir: std::path::PathBuf,
     pub class_dir: std::path::PathBuf,
+    pub dex_dir: std::path::PathBuf,
     pub java_dir: std::path::PathBuf,
     pub resource_dir: std::path::PathBuf,
 
@@ -103,6 +109,7 @@ impl<'ctx> Build<'ctx> {
         // Prepare build directory paths
         let v_artifact_dir = build_dir.join("artifacts");
         let v_class_dir = build_dir.join("classes");
+        let v_dex_dir = build_dir.join("dex");
         let v_java_dir = build_dir.join("java");
         let v_resource_dir = build_dir.join("resources");
 
@@ -119,6 +126,7 @@ impl<'ctx> Build<'ctx> {
 
             artifact_dir: v_artifact_dir,
             class_dir: v_class_dir,
+            dex_dir: v_dex_dir,
             java_dir: v_java_dir,
             resource_dir: v_resource_dir,
 
@@ -161,6 +169,7 @@ impl<'ctx> Build<'ctx> {
         // Create build directories
         op::mkdir(self.artifact_dir.as_path())?;
         op::mkdir(self.class_dir.as_path())?;
+        op::mkdir(self.dex_dir.as_path())?;
         op::mkdir(self.java_dir.as_path())?;
         op::mkdir(self.resource_dir.as_path())?;
 
@@ -435,6 +444,35 @@ impl<'ctx> Direct<'ctx> {
         Ok(true)
     }
 
+    fn build_dex(
+        &self,
+    ) -> Result<bool, op::BuildError> {
+        let mut sources = op::lsrdir(self.build.class_dir.as_path())?;
+        sources.retain(|v| v.extension() == Some(std::ffi::OsStr::new("class")));
+
+        if sources.is_empty() {
+            return Ok(false);
+        }
+
+        let query = dex::Query {
+            api: Some(self.build.android.min_sdk),
+            build_tools: &self.build_tools,
+            class_paths: &Vec::<std::path::PathBuf>::new(),
+            libs: &[&self.platform_jar],
+            output_dir: &self.build.dex_dir,
+            source_files: &sources,
+        };
+
+        query.run().map_err(|v| -> op::BuildError {
+            match v {
+                dex::Error::Exec(v) => BuildError::DexExec(v).into(),
+                dex::Error::Exit(v) => BuildError::DexExit(v).into(),
+            }
+        })?;
+
+        Ok(true)
+    }
+
     fn build_cargo(
         &self,
     ) -> Result<bool, op::BuildError> {
@@ -470,6 +508,9 @@ fn build_direct(
 
     eprintln!("Compile Android Kotlin sources..");
     direct.build_kotlin()?;
+
+    eprintln!("Build DEX files..");
+    direct.build_dex()?;
 
     eprintln!("Build Cargo package..");
     direct.build_cargo()?;
