@@ -23,6 +23,8 @@ pub enum BuildError {
     DirectoryRemoval(std::ffi::OsString),
     /// Updating the file at the specified path failed with the given error.
     FileUpdate(std::path::PathBuf, std::io::Error),
+    /// Copying a file failed with the given error.
+    FileCopy(std::path::PathBuf, std::path::PathBuf, std::io::Error),
     /// Cargo specific errors.
     Cargo(cargo::Error),
     /// Android platform specific errors.
@@ -144,6 +146,21 @@ pub fn rmdir(path: &std::path::Path) -> Result<(), BuildError> {
             |_| BuildError::DirectoryRemoval(path.into()),
         )?;
     }
+
+    Ok(())
+}
+
+/// ## Copy a file
+///
+/// This is a wrapper around `std::fs::copy()` that converts errors into
+/// the local error domain.
+pub fn copy_file(
+    src: &std::path::Path,
+    dst: &std::path::Path,
+) -> Result<(), BuildError> {
+    std::fs::copy(src, dst).map_err(
+        |v| BuildError::FileCopy(src.into(), dst.into(), v),
+    )?;
 
     Ok(())
 }

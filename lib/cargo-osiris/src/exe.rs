@@ -230,6 +230,10 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                     eprintln!("Cannot build platform integration: Failed to remove directory {:?}", dir);
                     Err(1)
                 },
+                Err(op::BuildError::FileCopy(src, dst, err)) => {
+                    eprintln!("Cannot build platform integration: Failed to copy file {} -> {}: {}", src.display(), dst.display(), err);
+                    Err(1)
+                },
                 Err(op::BuildError::FileUpdate(path, err)) => {
                     eprintln!("Cannot build platform integration: Failed to update file {}: {}", path.display(), err);
                     Err(1)
