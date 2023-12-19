@@ -63,6 +63,10 @@ pub enum BuildError {
     DexExec(std::io::Error),
     /// DEX compiler failed executing.
     DexExit(std::process::ExitStatus),
+    /// Execution of the Android APK linker could not commence.
+    AaptExec(std::io::Error),
+    /// Android APK linker failed executing.
+    AaptExit(std::process::ExitStatus),
 }
 
 struct Build<'ctx> {
@@ -74,6 +78,7 @@ struct Build<'ctx> {
     pub platform: &'ctx config::ConfigPlatform,
 
     // Build directories
+    pub apk_dir: std::path::PathBuf,
     pub artifact_dir: std::path::PathBuf,
     pub class_dir: std::path::PathBuf,
     pub dex_dir: std::path::PathBuf,
@@ -82,6 +87,8 @@ struct Build<'ctx> {
 
     // Artifact files
     pub apk_file: std::path::PathBuf,
+    pub apkbase_file: std::path::PathBuf,
+    pub classes_dex_file: std::path::PathBuf,
     pub manifest_file: std::path::PathBuf,
 }
 
@@ -107,6 +114,7 @@ impl<'ctx> Build<'ctx> {
         build_dir: &'ctx std::path::Path,
     ) -> Self {
         // Prepare build directory paths
+        let v_apk_dir = build_dir.join("apk");
         let v_artifact_dir = build_dir.join("artifacts");
         let v_class_dir = build_dir.join("classes");
         let v_dex_dir = build_dir.join("dex");
@@ -115,6 +123,8 @@ impl<'ctx> Build<'ctx> {
 
         // Prepare artifact file paths
         let v_apk_file = v_artifact_dir.join("package.apk");
+        let v_apkbase_file = v_artifact_dir.join("base.apk");
+        let v_classes_dex_file = v_dex_dir.join("classes.dex");
         let v_manifest_file = v_artifact_dir.join("AndroidManifest.xml");
 
         Self {
@@ -124,6 +134,7 @@ impl<'ctx> Build<'ctx> {
             metadata: metadata,
             platform: platform,
 
+            apk_dir: v_apk_dir,
             artifact_dir: v_artifact_dir,
             class_dir: v_class_dir,
             dex_dir: v_dex_dir,
@@ -131,6 +142,8 @@ impl<'ctx> Build<'ctx> {
             resource_dir: v_resource_dir,
 
             apk_file: v_apk_file,
+            apkbase_file: v_apkbase_file,
+            classes_dex_file: v_classes_dex_file,
             manifest_file: v_manifest_file,
         }
     }
@@ -167,6 +180,7 @@ impl<'ctx> Build<'ctx> {
         op::mkdir(self.build_dir)?;
 
         // Create build directories
+        op::mkdir(self.apk_dir.as_path())?;
         op::mkdir(self.artifact_dir.as_path())?;
         op::mkdir(self.class_dir.as_path())?;
         op::mkdir(self.dex_dir.as_path())?;
@@ -338,7 +352,7 @@ impl<'ctx> Direct<'ctx> {
             asset_dirs: Vec::new(),
             link_files: link_files,
             manifest_file: self.build.manifest_file.clone(),
-            output_file: self.build.apk_file.clone(),
+            output_file: self.build.apkbase_file.clone(),
             output_java_dir: Some(self.build.java_dir.clone()),
             resource_files: resources.1.clone(),
         };
@@ -491,6 +505,52 @@ impl<'ctx> Direct<'ctx> {
 
         Ok(true)
     }
+
+    fn link_apk(
+        &self,
+    ) -> Result<bool, op::BuildError> {
+        let mut path: std::path::PathBuf = self.build.apk_dir.clone();
+        let mut add = Vec::new();
+
+        // Copy the intermediate APK to avoid operating on intermediates
+        // multiple times, and thus modifying timestamps needlessly.
+        op::copy_file(&self.build.apkbase_file, &self.build.apk_file)?;
+
+        // Assemble the APK directory. Since `aapt` retains paths verbatim
+        // in the APK, we need to assemble a directory with the exact
+        // contents we want in the APK. Unfortunately, this means copying
+        // our artifacts to the desired sub-paths in the APK assembly
+        // directory.
+
+        path.push("classes.dex");
+        add.push("classes.dex".into());
+        op::copy_file(&self.build.classes_dex_file, path.as_path())?;
+        path.pop();
+
+        // Now invoke the `aapt` tools to alter and thus link the final
+        // APK. Preferably, we would just invoke a standard ZIP tool, but
+        // they are not packaged with the Android SDK, and thus would mean
+        // we have another build-time dependency.
+        //
+        // XXX: Ideally, we would ship, or depend, on a simple ZIP archive
+        //      builder in pure Rust, and thus avoid all this dance.
+
+        let query = apk::AlterQuery {
+            base_dir: Some(self.build.apk_dir.clone()),
+            build_tools: self.build_tools.clone(),
+            add_files: add,
+            apk_file: self.build.apk_file.clone(),
+        };
+
+        query.run().map_err(|v| -> op::BuildError {
+            match v {
+                apk::AlterError::Exec(v) => BuildError::AaptExec(v).into(),
+                apk::AlterError::Exit(v) => BuildError::AaptExit(v).into(),
+            }
+        })?;
+
+        Ok(true)
+    }
 }
 
 fn build_direct(
@@ -515,6 +575,9 @@ fn build_direct(
 
     eprintln!("Build Cargo package..");
     direct.build_cargo()?;
+
+    eprintln!("Link APK..");
+    direct.link_apk()?;
 
     Ok(())
 }

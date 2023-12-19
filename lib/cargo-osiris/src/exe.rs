@@ -349,6 +349,14 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                         eprintln!("Cannot build Android platform integration: DEX compiler failed executing: {}", v);
                         Err(1)
                     },
+                    platform::android::BuildError::AaptExec(v) => {
+                        eprintln!("Cannot build Android platform integration: Execution of Android APK linker could not commence: {}", v);
+                        Err(1)
+                    },
+                    platform::android::BuildError::AaptExit(v) => {
+                        eprintln!("Cannot build Android platform integration: Android APK linker failed executing: {}", v);
+                        Err(1)
+                    },
                 },
                 Ok(_) => {
                     Ok(())

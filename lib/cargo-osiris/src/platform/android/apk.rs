@@ -57,6 +57,10 @@ pub enum AlterError {
 /// This represents the parameters to an APK alteration operation. It is to
 /// be filled in by the caller.
 pub struct AlterQuery {
+    /// Base directory to run the command in (to ensure relative paths are
+    /// anchored correctly). Note that paths are retained in the APK, so
+    /// very likely relative paths are desired.
+    pub base_dir: Option<std::path::PathBuf>,
     /// Android SDK build tools to use for the link.
     pub build_tools: android::sdk::BuildTools,
     /// Files to add to the APK.
@@ -148,6 +152,13 @@ impl AlterQuery {
         // proper path prefix, since `aapt` does not support `--` separators.
         for v in &self.add_files {
             cmd.arg(std::path::Path::new(".").join(v));
+        }
+
+        // Set the working directory for `aapt` to allow paths to be specified
+        // as relative paths, given that they are retained verbatim in the
+        // target archive.
+        if let Some(ref v) = self.base_dir {
+            cmd.current_dir(v);
         }
 
         // Always forward diagnostics to the parent error stream, so
