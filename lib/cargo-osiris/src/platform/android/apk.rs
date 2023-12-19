@@ -148,10 +148,11 @@ impl AlterQuery {
         // Append path to the APK, but ensure proper path prefixes.
         cmd.arg(std::path::Path::new(".").join(&self.apk_file));
 
-        // Append all input resource files. Ensure that they start with a
-        // proper path prefix, since `aapt` does not support `--` separators.
+        // Append all input resource files. Pass them verbatim. While `--` is
+        // not supported as separator, the caller should ensure the paths are
+        // provided suitably.
         for v in &self.add_files {
-            cmd.arg(std::path::Path::new(".").join(v));
+            cmd.arg(v);
         }
 
         // Set the working directory for `aapt` to allow paths to be specified
