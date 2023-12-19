@@ -529,11 +529,25 @@ impl BuildTools {
         self.path.join("aapt2")
     }
 
+    /// ## Yield Path to `apksigner` Binary
+    ///
+    /// Yield the path to the `apksigner` binary of this build-tools component.
+    pub fn apksigner(&self) -> std::path::PathBuf {
+        self.path.join("apksigner")
+    }
+
     /// ## Yield Path to `d8` Binary
     ///
     /// Yield the path to the `d8` binary of this build-tools component.
     pub fn d8(&self) -> std::path::PathBuf {
         self.path.join("d8")
+    }
+
+    /// ## Yield Path to `zipalign` Binary
+    ///
+    /// Yield the path to the `zipalign` binary of this build-tools component.
+    pub fn zipalign(&self) -> std::path::PathBuf {
+        self.path.join("zipalign")
     }
 }
 
