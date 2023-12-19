@@ -25,21 +25,21 @@ pub enum Error {
 /// be filled in by the caller.
 pub struct Query<'ctx, CpList, SrcList> {
     /// Directories and files to make up the Java class-path.
-    pub class_paths: &'ctx CpList,
+    pub class_paths: CpList,
     /// JDK to use for the compilation.
     pub jdk: &'ctx android::sdk::Jdk,
     /// Output directory where to store the class files.
     pub output_dir: &'ctx std::path::Path,
     /// Source files to compile.
-    pub source_files: &'ctx SrcList,
+    pub source_files: SrcList,
 }
 
 impl<'ctx, CpList, SrcList> Query<'ctx, CpList, SrcList>
 where
-    &'ctx CpList: IntoIterator,
-    <&'ctx CpList as IntoIterator>::Item: AsRef<std::path::Path>,
-    &'ctx SrcList: IntoIterator,
-    <&'ctx SrcList as IntoIterator>::Item: AsRef<std::path::Path>,
+    CpList: Clone + IntoIterator,
+    <CpList as IntoIterator>::Item: AsRef<std::path::Path>,
+    SrcList: Clone + IntoIterator,
+    <SrcList as IntoIterator>::Item: AsRef<std::path::Path>,
 {
     /// ## Run `javac` compiler
     ///
@@ -52,7 +52,7 @@ where
         // Append the class-path.
         cmd.arg("--class-path");
         cmd.arg(
-            android::sdk::class_path(self.class_paths)
+            android::sdk::class_path(self.class_paths.clone())
                 .map_err(|v| Error::UnsupportedPath(v))?,
         );
 
@@ -67,7 +67,7 @@ where
 
         // Append all source paths. We ensure they start with a path indicator,
         // since `javac` does not support `--` separators.
-        for v in self.source_files {
+        for v in self.source_files.clone() {
             cmd.arg(std::path::Path::new(".").join(v));
         }
 
