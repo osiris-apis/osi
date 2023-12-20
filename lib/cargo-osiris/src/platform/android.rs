@@ -701,6 +701,30 @@ impl<'ctx> Direct<'ctx> {
             }
         })?;
 
+        // As last step sign the APK using the debug-keystore. Android requires
+        // APKs to be signed (and uses key-information for optional process
+        // sharing). Hence, we must sign APKs even during development. For
+        // final production, online signing on the Android Store servers is
+        // mandatory, so no such support is currently provided here. This can
+        // be extended in the future, if offline signing becomes a thing again.
+
+        let query = apk::SignQuery {
+            build_tools: self.build_tools.clone(),
+            input_file: self.build.apk_aligned_file.clone(),
+            keystore: self.build.debug_keystore_file.clone(),
+            keystore_key_alias: Some(keystore::DEBUG_KEY_ALIAS.into()),
+            keystore_phrase: Some(keystore::DEBUG_PHRASE.into()),
+            key_phrase: Some(keystore::DEBUG_KEY_PHRASE.into()),
+            output_file: self.build.apk_signed_file.clone(),
+        };
+
+        query.run().map_err(|v| -> op::BuildError {
+            match v {
+                apk::SignError::Exec(v) => op::BuildError::Exec("apksigner".into(), v),
+                apk::SignError::Exit(v) => op::BuildError::Exit("apksigner".into(), v),
+            }
+        })?;
+
         Ok(true)
     }
 }
