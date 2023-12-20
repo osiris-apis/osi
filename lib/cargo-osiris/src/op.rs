@@ -25,6 +25,10 @@ pub enum BuildError {
     FileUpdate(std::path::PathBuf, std::io::Error),
     /// Copying a file failed with the given error.
     FileCopy(std::path::PathBuf, std::path::PathBuf, std::io::Error),
+    /// Execution of the given tool could not commence.
+    Exec(String, std::io::Error),
+    /// Given tool failed executing.
+    Exit(String, std::process::ExitStatus),
     /// Cargo specific errors.
     Cargo(cargo::Error),
     /// Android platform specific errors.

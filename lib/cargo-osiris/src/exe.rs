@@ -238,6 +238,14 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                     eprintln!("Cannot build platform integration: Failed to update file {}: {}", path.display(), err);
                     Err(1)
                 },
+                Err(op::BuildError::Exec(tool, v)) => {
+                    eprintln!("Cannot build platform integration: Execution of {} could not commence: {}", tool, v);
+                    Err(1)
+                },
+                Err(op::BuildError::Exit(tool, v)) => {
+                    eprintln!("Cannot build platform integration: {} failed executing: {}", tool, v);
+                    Err(1)
+                },
                 Err(op::BuildError::Cargo(sub)) => match sub {
                     cargo::Error::Exec(v) => {
                         eprintln!("Cannot build Android platform integration: Execution of Cargo could not commence: {}", v);

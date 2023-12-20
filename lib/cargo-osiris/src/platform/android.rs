@@ -94,8 +94,10 @@ struct Build<'ctx> {
     pub resource_dir: std::path::PathBuf,
 
     // Artifact files
-    pub apk_file: std::path::PathBuf,
-    pub apkbase_file: std::path::PathBuf,
+    pub apk_aligned_file: std::path::PathBuf,
+    pub apk_base_file: std::path::PathBuf,
+    pub apk_linked_file: std::path::PathBuf,
+    pub apk_signed_file: std::path::PathBuf,
     pub classes_dex_file: std::path::PathBuf,
     pub manifest_file: std::path::PathBuf,
 }
@@ -131,8 +133,10 @@ impl<'ctx> Build<'ctx> {
         let v_resource_dir = build_dir.join("resources");
 
         // Prepare artifact file paths
-        let v_apk_file = v_artifact_dir.join("package.apk");
-        let v_apkbase_file = v_artifact_dir.join("base.apk");
+        let v_apk_aligned_file = v_artifact_dir.join("package-aligned.apk");
+        let v_apk_base_file = v_artifact_dir.join("package-base.apk");
+        let v_apk_linked_file = v_artifact_dir.join("package-linked.apk");
+        let v_apk_signed_file = v_artifact_dir.join("package-signed.apk");
         let v_classes_dex_file = v_dex_dir.join("classes.dex");
         let v_manifest_file = v_artifact_dir.join("AndroidManifest.xml");
 
@@ -150,8 +154,10 @@ impl<'ctx> Build<'ctx> {
             java_dir: v_java_dir,
             resource_dir: v_resource_dir,
 
-            apk_file: v_apk_file,
-            apkbase_file: v_apkbase_file,
+            apk_aligned_file: v_apk_aligned_file,
+            apk_base_file: v_apk_base_file,
+            apk_linked_file: v_apk_linked_file,
+            apk_signed_file: v_apk_signed_file,
             classes_dex_file: v_classes_dex_file,
             manifest_file: v_manifest_file,
         }
@@ -368,7 +374,7 @@ impl<'ctx> Direct<'ctx> {
             asset_dirs: Vec::new(),
             link_files: link_files,
             manifest_file: self.build.manifest_file.clone(),
-            output_file: self.build.apkbase_file.clone(),
+            output_file: self.build.apk_base_file.clone(),
             output_java_dir: Some(self.build.java_dir.clone()),
             resource_files: resources.1.clone(),
         };
@@ -612,7 +618,7 @@ impl<'ctx> Direct<'ctx> {
 
         // Copy the intermediate APK to avoid operating on intermediates
         // multiple times, and thus modifying timestamps needlessly.
-        op::copy_file(&self.build.apkbase_file, &self.build.apk_file)?;
+        op::copy_file(&self.build.apk_base_file, &self.build.apk_linked_file)?;
 
         // Assemble the APK directory. Since `aapt` retains paths verbatim
         // in the APK, we need to assemble a directory with the exact
@@ -660,13 +666,30 @@ impl<'ctx> Direct<'ctx> {
             base_dir: Some(self.build.apk_dir.clone()),
             build_tools: self.build_tools.clone(),
             add_files: add,
-            apk_file: self.build.apk_file.clone(),
+            apk_file: self.build.apk_linked_file.clone(),
         };
 
         query.run().map_err(|v| -> op::BuildError {
             match v {
                 apk::AlterError::Exec(v) => BuildError::AaptExec(v).into(),
                 apk::AlterError::Exit(v) => BuildError::AaptExit(v).into(),
+            }
+        })?;
+
+        // Since APKs are normal zip-files, and those have no alignment
+        // restrictions, we have to align the file explicitly to ensure
+        // Android can run it directly.
+
+        let query = apk::AlignQuery {
+            build_tools: self.build_tools.clone(),
+            input_file: self.build.apk_linked_file.clone(),
+            output_file: self.build.apk_aligned_file.clone(),
+        };
+
+        query.run().map_err(|v| -> op::BuildError {
+            match v {
+                apk::AlignError::Exec(v) => op::BuildError::Exec("zipalign".into(), v),
+                apk::AlignError::Exit(v) => op::BuildError::Exit("zipalign".into(), v),
             }
         })?;
 
