@@ -249,7 +249,7 @@ impl<'ctx> Direct<'ctx> {
         &self,
     ) -> Result<(bool, Vec<std::path::PathBuf>), op::BuildError> {
         let mut res_files: BTreeMap::<std::path::PathBuf, std::path::PathBuf>;
-        let mut fresh = false;
+        let mut new = false;
 
         // Collect all resource files to be compiled. We get a list of
         // resource directories. Each of these contains a list of resource
@@ -334,10 +334,10 @@ impl<'ctx> Direct<'ctx> {
                 }
             })?;
 
-            fresh = true;
+            new = true;
         }
 
-        Ok((fresh, res_files.into_keys().collect()))
+        Ok((new, res_files.into_keys().collect()))
     }
 
     fn build_apk(

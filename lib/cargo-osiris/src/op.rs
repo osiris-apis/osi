@@ -175,7 +175,7 @@ pub fn copy_file(
 /// Note that this reads in the entire file content. Thus, use it only on
 /// trusted and small'ish content.
 ///
-/// Returns `true` if the file has fresh content and thus changed. Returns
+/// Returns `true` if the file has new content and thus changed. Returns
 /// `false` if the file was not modified.
 pub fn update_file(
     path: &std::path::Path,
@@ -205,7 +205,7 @@ pub fn update_file(
 
     // If the file has to be updated, rewind the position, truncate the file
     // and write the new contents.
-    let fresh = if old != content {
+    let new = if old != content {
         <std::fs::File as std::io::Seek>::rewind(&mut f)
             .map_err(
                 |v| BuildError::FileUpdate(path.into(), v),
@@ -226,12 +226,12 @@ pub fn update_file(
 
         true
     } else {
-        // The file matches the desired content. Hence, it is only fresh if the
+        // The file matches the desired content. Hence, it is only new if the
         // file was created with empty content when opening it.
         maybe_new
     };
 
-    Ok(fresh)
+    Ok(new)
 }
 
 /// ## Build platform integration
