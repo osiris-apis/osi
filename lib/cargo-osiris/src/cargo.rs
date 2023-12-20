@@ -107,6 +107,8 @@ struct BuildBlob {
 pub struct BuildQuery {
     /// Whether to enable default features.
     pub default_features: bool,
+    /// Environment variables to set for the build.
+    pub envs: Vec<(std::ffi::OsString, std::ffi::OsString)>,
     /// Array of features to enable.
     pub features: Vec<String>,
     /// The build profile to use.
@@ -599,6 +601,11 @@ impl BuildQuery {
             "--message-format=json-render-diagnostics",
             "--quiet",
         ]);
+
+        // Append all desired environment variables.
+        for (k, v) in &self.envs {
+            cmd.env(k, v);
+        }
 
         // Append all selected features.
         for v in &self.features {

@@ -273,6 +273,14 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                         eprintln!("Cannot build Android platform integration: Path contains characters not supported by Android Builds (e.g., colons, semicolons): {}", path.display());
                         Err(1)
                     },
+                    platform::android::BuildError::UnsupportedHost => {
+                        eprintln!("Cannot build Android platform integration: Host platform not supported by the Android SDK");
+                        Err(1)
+                    },
+                    platform::android::BuildError::UnsupportedAbi(v) => {
+                        eprintln!("Cannot build Android platform integration: Selected target ABI is not supported: {}", v);
+                        Err(1)
+                    },
                     platform::android::BuildError::NoAndroidHome => {
                         eprintln!("Cannot build Android platform integration: No Android SDK available, `ANDROID_HOME` is not set");
                         Err(1)
@@ -299,6 +307,14 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                     },
                     platform::android::BuildError::InvalidKdk(path) => {
                         eprintln!("Cannot build Android platform integration: Invalid Android Kotlin SDK at {}", path.display());
+                        Err(1)
+                    },
+                    platform::android::BuildError::NoNdk => {
+                        eprintln!("Cannot build Android platform integration: Android SDK lacks NDK component");
+                        Err(1)
+                    },
+                    platform::android::BuildError::InvalidNdk(v) => {
+                        eprintln!("Cannot build Android platform integration: No valid NDK of the selected version available in the Android SDK: {:?}", v);
                         Err(1)
                     },
                     platform::android::BuildError::NoBuildTools => {

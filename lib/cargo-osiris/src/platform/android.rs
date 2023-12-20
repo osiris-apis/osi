@@ -23,6 +23,10 @@ pub enum BuildError {
     /// Path contains characters that are not supported by the required tools.
     /// This very likely means the path contains colons or semicolons.
     UnsupportedPath(std::path::PathBuf),
+    /// Host platform not supported by the Android SDK.
+    UnsupportedHost,
+    /// Unsupported target ABI for the Android platform.
+    UnsupportedAbi(String),
     /// No Android SDK available, `ANDROID_HOME` is not set.
     NoAndroidHome,
     /// No Android SDK available at the selected location.
@@ -37,6 +41,10 @@ pub enum BuildError {
     NoKdk(std::path::PathBuf),
     /// Invalid Android Kotlin SDK at the selected location.
     InvalidKdk(std::path::PathBuf),
+    /// No NDK available in the selected Android SDK.
+    NoNdk,
+    /// Invalid NDK with the selected version in the Android SDK.
+    InvalidNdk(std::ffi::OsString),
     /// No Build Tools available in the selected Android SDK.
     NoBuildTools,
     /// Invalid Build Tools with the selected version in the Android SDK.
@@ -100,6 +108,7 @@ struct Direct<'ctx> {
     pub build_tools: sdk::BuildTools,
     pub jdk: sdk::Jdk,
     pub kdk: sdk::Kdk,
+    pub ndk: sdk::Ndk,
     pub platform: std::path::PathBuf,
     pub platform_jar: std::path::PathBuf,
     pub sdk: sdk::Sdk,
@@ -207,6 +216,12 @@ impl<'ctx> Build<'ctx> {
             Err(sdk::SdkError::InvalidSdk(v)) => Err(BuildError::InvalidSdk(v).into()),
             Err(v) => Err(lib::error::Uncaught::box_debug(v).into()),
         }?;
+        let v_ndk = match v_sdk.ndk(None) {
+            Ok(v) => Ok::<_, op::BuildError>(v),
+            Err(sdk::SdkError::NoNdk) => Err(BuildError::NoNdk.into()),
+            Err(sdk::SdkError::InvalidNdk(v)) => Err(BuildError::InvalidNdk(v).into()),
+            Err(v) => Err(lib::error::Uncaught::box_debug(v).into()),
+        }?;
         let v_build_tools = match v_sdk.build_tools(None) {
             Ok(v) => Ok::<_, op::BuildError>(v),
             Err(sdk::SdkError::NoBuildTools) => Err(BuildError::NoBuildTools.into()),
@@ -237,6 +252,7 @@ impl<'ctx> Build<'ctx> {
             build_tools: v_build_tools,
             jdk: v_jdk,
             kdk: v_kdk,
+            ndk: v_ndk,
             platform: v_platform,
             platform_jar: v_platform_jar,
             sdk: v_sdk,
@@ -490,24 +506,106 @@ impl<'ctx> Direct<'ctx> {
 
     fn build_cargo(
         &self,
-    ) -> Result<bool, op::BuildError> {
-        let query = cargo::BuildQuery {
-            default_features: true,
-            features: Vec::new(),
-            profile: None,
-            target: None,
-            workspace: self.build.config.path_application.clone(),
+    ) -> Result<(bool, BTreeMap<String, cargo::Build>), op::BuildError> {
+        let mut res = BTreeMap::new();
+
+        // Android SDKs ship prebuilt toolchains for `x86_64` on linux, macos
+        // and windows. However, you can likely call it from `x86` (given the
+        // OS runs in 64-bit mode), or on macos via emulators.
+        //
+        // XXX: The target platform of the calling binary does not have to
+        //      match the host-os, nor does it prevent emulators from running
+        //      foreign-platform SDKs. We should support selecting the host-os
+        //      via cmdline.
+        let host = if cfg!(
+            all(
+                target_os = "linux",
+                any(
+                    target_arch = "x86",
+                    target_arch = "x86_64",
+                ),
+            ),
+        ) {
+            "linux-x86_64"
+        } else if cfg!(
+            all(
+                target_os = "macos",
+                any(
+                    target_arch = "aarch64",
+                    target_arch = "x86",
+                    target_arch = "x86_64",
+                ),
+            ),
+        ) {
+            "darwin-x86_64"
+        } else if cfg!(
+            all(
+                target_os = "windows",
+                any(
+                    target_arch = "x86",
+                    target_arch = "x86_64",
+                ),
+            ),
+        ) {
+            "windows-x86_64"
+        } else {
+            return Err(BuildError::UnsupportedHost.into());
         };
 
-        let _build = query.run().map_err(
-            |v| -> op::BuildError { v.into() },
-        )?;
+        for abi in &self.build.android.abis {
+            let (target, linker_env, linker_prefix) = match abi.as_str() {
+                "armeabi-v7a" => Ok((
+                    "armv7-linux-androideabi",
+                    "CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER",
+                    "armv7a-linux-androideabi",
+                )),
+                "arm64-v8a" => Ok((
+                    "aarch64-linux-android",
+                    "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER",
+                    "aarch64-linux-android",
+                )),
+                "x86" => Ok((
+                    "i686-linux-android",
+                    "CARGO_TARGET_I686_LINUX_ANDROID_LINKER",
+                    "i686-linux-android",
+                )),
+                "x86_64" => Ok((
+                    "x86_64-linux-android",
+                    "CARGO_TARGET_X86_64_LINUX_ANDROID_LINKER",
+                    "x86_64-linux-android",
+                )),
+                v => Err(BuildError::UnsupportedAbi(v.into())),
+            }?;
+            let linker_bin = format!(
+                "toolchains/llvm/prebuilt/{}/bin/{}{}-clang",
+                host,
+                linker_prefix,
+                self.build.android.min_sdk,
+            );
+            let linker_path = self.ndk.root().join(linker_bin);
 
-        Ok(true)
+            let query = cargo::BuildQuery {
+                default_features: true,
+                envs: vec![(linker_env.into(), linker_path.into())],
+                features: Vec::new(),
+                profile: None,
+                target: Some(target.into()),
+                workspace: self.build.config.path_application.clone(),
+            };
+
+            let build = query.run().map_err(
+                |v| -> op::BuildError { v.into() },
+            )?;
+
+            res.insert(abi.into(), build);
+        }
+
+        Ok((true, res))
     }
 
     fn link_apk(
         &self,
+        bins: &(bool, BTreeMap<String, cargo::Build>),
     ) -> Result<bool, op::BuildError> {
         let mut path: std::path::PathBuf = self.build.apk_dir.clone();
         let mut add = Vec::new();
@@ -525,6 +623,29 @@ impl<'ctx> Direct<'ctx> {
         path.push("classes.dex");
         add.push("classes.dex".into());
         op::copy_file(&self.build.classes_dex_file, path.as_path())?;
+        path.pop();
+
+        path.push("lib");
+        op::mkdir(path.as_path())?;
+        for (abi, set) in &bins.1 {
+            path.push(abi);
+            op::mkdir(path.as_path())?;
+            for v in &set.artifacts {
+                let file_name = std::path::Path::new(v)
+                    .file_name()
+                    .expect("Cargo artifact has no file-name");
+
+                let mut lib_path = std::ffi::OsString::new();
+                lib_path.push(format!("lib/{}/", abi));
+                lib_path.push(file_name);
+
+                path.push(file_name);
+                add.push(lib_path.into());
+                op::copy_file(std::path::Path::new(v), path.as_path())?;
+                path.pop();
+            }
+            path.pop();
+        }
         path.pop();
 
         // Now invoke the `aapt` tools to alter and thus link the final
@@ -574,10 +695,10 @@ fn build_direct(
     direct.build_dex()?;
 
     eprintln!("Build Cargo package..");
-    direct.build_cargo()?;
+    let bins = direct.build_cargo()?;
 
     eprintln!("Link APK..");
-    direct.link_apk()?;
+    direct.link_apk(&bins)?;
 
     Ok(())
 }
