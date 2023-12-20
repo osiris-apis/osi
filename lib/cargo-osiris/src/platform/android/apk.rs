@@ -69,6 +69,31 @@ pub struct AlterQuery {
     pub apk_file: std::path::PathBuf,
 }
 
+/// ## Align Error
+///
+/// This is the error-enum of all possible errors raised by this
+/// align abstraction.
+#[derive(Debug)]
+pub enum AlignError {
+    /// Program execution failed with the given error.
+    Exec(std::io::Error),
+    /// Program exited with a failure condition.
+    Exit(std::process::ExitStatus),
+}
+
+/// ## APK Align Query
+///
+/// This represents the parameters to an APK align operation. It is to
+/// be filled in by the caller.
+pub struct AlignQuery {
+    /// Android SDK build tools to use for the link.
+    pub build_tools: android::sdk::BuildTools,
+    /// Input path for the unaligned APK.
+    pub input_file: std::path::PathBuf,
+    /// Output path for the aligned APK.
+    pub output_file: std::path::PathBuf,
+}
+
 impl LinkQuery {
     /// ## Run `aapt2` linker
     ///
@@ -170,6 +195,43 @@ impl AlterQuery {
         let output = cmd.output().map_err(|v| AlterError::Exec(v))?;
         if !output.status.success() {
             return Err(AlterError::Exit(output.status));
+        }
+
+        // Not interested in the output of the tool.
+        drop(output);
+
+        Ok(())
+    }
+}
+
+impl AlignQuery {
+    /// ## Run `zipalign`
+    ///
+    /// Run the `zipalign` APK tool to align an existing APK.
+    pub fn run(&self) -> Result<(), AlignError> {
+        // Set up basic `zipalign` command.
+        let mut cmd = std::process::Command::new(
+            self.build_tools.zipalign()
+        );
+        cmd.args([
+            "-f",
+            "-p",
+            "-v",
+            "4",
+        ]);
+
+        // Append paths to the APK, but ensure proper path prefixes.
+        cmd.arg(std::path::Path::new(".").join(&self.input_file));
+        cmd.arg(std::path::Path::new(".").join(&self.output_file));
+
+        // Always forward diagnostics to the parent error stream, so
+        // the user can inspect them.
+        cmd.stderr(std::process::Stdio::inherit());
+
+        // Run and verify it exited successfully.
+        let output = cmd.output().map_err(|v| AlignError::Exec(v))?;
+        if !output.status.success() {
+            return Err(AlignError::Exit(output.status));
         }
 
         // Not interested in the output of the tool.
