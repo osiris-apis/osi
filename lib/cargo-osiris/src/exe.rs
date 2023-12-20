@@ -455,8 +455,8 @@ pub fn cargo_osiris() -> std::process::ExitCode {
             }
 
             match m.subcommand() {
-                Some(("build", m_op)) => self.op_build(&m, &m_op),
-                Some(("emerge", m_op)) => self.op_emerge(&m, &m_op),
+                Some(("build", m_op)) => self.op_build(&m, m_op),
+                Some(("emerge", m_op)) => self.op_emerge(&m, m_op),
                 _ => std::unreachable!(),
             }
         }

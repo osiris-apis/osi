@@ -99,8 +99,7 @@ impl Query {
         let (dir, config)  = match
             path.parent()
                 .filter(|v| v.as_os_str().len() > 0)
-                .map(|v| v.file_name())
-                .flatten()
+                .and_then(|v| v.file_name())
         {
             None => {
                 return None;

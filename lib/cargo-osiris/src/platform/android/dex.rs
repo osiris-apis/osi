@@ -87,7 +87,7 @@ where
 
         // Select a suitable output directory.
         cmd.arg("--output");
-        cmd.arg(&self.output_dir);
+        cmd.arg(self.output_dir);
 
         // Append release flag as default
         if !self.debug {

@@ -25,7 +25,7 @@ pub fn absdir(path: &dyn AsRef<std::path::Path>) -> std::path::PathBuf {
     // We want the parent directory of the file, so strip the final component.
     // Since the path is absolute at this point, this cannot fail, and is never
     // ambiguous. So `pop()` cannot fail and will never yield an empty path.
-    assert_eq!(b.pop(), true);
+    assert!(b.pop());
 
     b
 }

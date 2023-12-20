@@ -323,7 +323,7 @@ impl Config {
         let v_id_symbol = lib::str::symbolize(v_id);
 
         // Use the application ID as name if none is given.
-        let v_name = data_application.name.as_ref().unwrap_or(&v_id);
+        let v_name = data_application.name.as_ref().unwrap_or(v_id);
 
         // The default path to the application is the manifest directory.
         let v_path_application = v_path_root.as_path().join(

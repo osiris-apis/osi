@@ -58,7 +58,7 @@ where
 
         // Select a suitable output directory.
         cmd.arg("-d");
-        cmd.arg(&self.output_dir);
+        cmd.arg(self.output_dir);
 
         // Append all source paths. We ensure they start with a path indicator,
         // since `kotlinc` does not support `--` separators.

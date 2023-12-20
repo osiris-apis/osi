@@ -116,16 +116,15 @@ fn dir_latest_entry(
     dir: &std::path::Path,
 ) -> Result<Option<String>, Box<dyn std::error::Error>> {
     std::fs::read_dir(dir)?
-        // Convert each entry into its Unicode file name, or `None`.
-        .map(|v| {
+        // Convert each entry into its Unicode file name, and drop any non
+        // Unicode file names.
+        .filter_map(|v| {
             v.map(|v| {
                 v.file_name()
                     .into_string()
                     .ok()
             }).transpose()
         })
-        // Filter all non-Unicode file names.
-        .filter_map(std::convert::identity)
         .reduce(move |acc, v| {
             match (acc, v) {
                 // Preserve earliest error, if any.

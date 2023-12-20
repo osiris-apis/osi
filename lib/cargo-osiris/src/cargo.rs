@@ -452,7 +452,7 @@ impl MetadataQuery {
         let blob = MetadataBlob::from_bytes(&output.stdout)?;
 
         // Parse data into a `Metadata` object.
-        blob.parse(&self)
+        blob.parse(self)
     }
 }
 

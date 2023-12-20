@@ -58,7 +58,7 @@ where
 
         // Select a suitable output directory.
         cmd.arg("-d");
-        cmd.arg(&self.output_dir);
+        cmd.arg(self.output_dir);
 
         // Do not create class-files for implicitly loaded sources. We always
         // specify all sources explicitly, so we want to see linker errors if

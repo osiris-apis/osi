@@ -287,8 +287,7 @@ impl<'ctx> Direct<'ctx> {
         // stray entries are silently ignored.
         res_files = BTreeMap::new();
         for rdir in self.build.metadata.android_sets.iter()
-            .map(|v| v.resource_dirs.iter())
-            .flatten()
+            .flat_map(|v| v.resource_dirs.iter())
         {
             let sdirs = std::fs::read_dir(rdir).map_err(
                 |_| op::BuildError::DirectoryTraversal(rdir.into()),
@@ -339,11 +338,9 @@ impl<'ctx> Direct<'ctx> {
         // invoke the Android flat-resource compiler.
         for (to, from) in &res_files {
             let to_mod = to.metadata().ok()
-                .map(|v| v.modified().ok())
-                .flatten();
+                .and_then(|v| v.modified().ok());
             let from_mod = from.metadata().ok()
-                .map(|v| v.modified().ok())
-                .flatten();
+                .and_then(|v| v.modified().ok());
             if let (Some(dst), Some(src)) = (to_mod, from_mod) {
                 if src < dst {
                     continue;
