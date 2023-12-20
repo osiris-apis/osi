@@ -61,6 +61,10 @@ pub enum SdkError {
     NoSdk(std::path::PathBuf),
     /// Specified path is not a valid Android SDK.
     InvalidSdk(std::path::PathBuf),
+    /// No NDK component is available in the SDK.
+    NoNdk,
+    /// Specified NDK component is not available or invalid.
+    InvalidNdk(std::ffi::OsString),
     /// No Build Tools component is available in the SDK.
     NoBuildTools,
     /// Specified Build Tools component is not available or invalid.
@@ -78,6 +82,16 @@ pub enum SdkError {
 #[derive(Clone, Debug)]
 pub struct Sdk {
     android_home: std::path::PathBuf,
+}
+
+/// ## Android NDK
+///
+/// This represents a specific instance of the Android SDK NDK component
+/// It is effectively a wrapper around a path to an NDK root directory in the
+/// Android SDK.
+#[derive(Clone, Debug)]
+pub struct Ndk {
+    path: std::path::PathBuf,
 }
 
 /// ## Android Build Tools
@@ -434,6 +448,62 @@ impl Sdk {
         self.android_home.as_path()
     }
 
+    /// ## Create NDK Object from SDK
+    ///
+    /// Create an NDK abstraction for the given Android SDK. Since
+    /// multiple NDK versions can be installed in parallel, the
+    /// caller must either specify the desired version, or the latest
+    /// version is used as default.
+    pub fn ndk(
+        &self,
+        version: Option<&std::ffi::OsStr>,
+    ) -> Result<Ndk, SdkError> {
+        let mut path = self.android_home().join("ndk");
+
+        if !path.is_dir() {
+            return Err(SdkError::NoNdk);
+        }
+
+        match version {
+            // If no version is specified, we iterate all possible
+            // NDKs and pick the latest one.
+            None => {
+                path.push(
+                    dir_latest_entry(path.as_path())
+                        .map_err(|v| -> SdkError {
+                            lib::error::Uncaught::fold_error(v).into()
+                        })?
+                        .ok_or_else(|| SdkError::NoNdk)?,
+                );
+            }
+
+            // If a version is provided, it must be a single non-absolute
+            // path component. Hence, `v.parent()` returns
+            // `Some(std::path::Path::new(""))`.
+            Some(v) => {
+                match std::path::Path::new(v).parent() {
+                    None => {
+                        return Err(SdkError::InvalidNdk(v.into()));
+                    }
+                    Some(parent) if parent.as_os_str().len() > 0 => {
+                        return Err(SdkError::InvalidNdk(v.into()));
+                    }
+                    _ => {},
+                }
+
+                path.push(v);
+
+                if !path.is_dir() {
+                    return Err(SdkError::InvalidNdk(v.into()));
+                }
+            },
+        }
+
+        Ok(Ndk {
+            path: path,
+        })
+    }
+
     /// ## Create Build-Tools Object from SDK
     ///
     /// Create a build-tools abstraction for the given Android SDK. Since
@@ -511,6 +581,15 @@ impl Sdk {
         }
 
         Ok(path)
+    }
+}
+
+impl Ndk {
+    /// ## Yield Path to NDK Root Directory
+    ///
+    /// Yield the path to the root directory of the NDK component.
+    pub fn root(&self) -> &std::path::Path {
+        self.path.as_path()
     }
 }
 
