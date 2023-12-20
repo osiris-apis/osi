@@ -94,6 +94,39 @@ pub struct AlignQuery {
     pub output_file: std::path::PathBuf,
 }
 
+/// ## Sign Error
+///
+/// This is the error-enum of all possible errors raised by this
+/// sign abstraction.
+#[derive(Debug)]
+pub enum SignError {
+    /// Program execution failed with the given error.
+    Exec(std::io::Error),
+    /// Program exited with a failure condition.
+    Exit(std::process::ExitStatus),
+}
+
+/// ## APK Sign Query
+///
+/// This represents the parameters to an APK sign operation. It is to
+/// be filled in by the caller.
+pub struct SignQuery {
+    /// Android SDK build tools to use for the link.
+    pub build_tools: android::sdk::BuildTools,
+    /// Input path for the unsigned APK.
+    pub input_file: std::path::PathBuf,
+    /// Path to the keystore file.
+    pub keystore: std::path::PathBuf,
+    /// Key alias of the key in the keystore.
+    pub keystore_key_alias: Option<String>,
+    /// Pass phrase for the keystore.
+    pub keystore_phrase: Option<String>,
+    /// Pass phrase for the key.
+    pub key_phrase: Option<String>,
+    /// Output path for the signed APK.
+    pub output_file: std::path::PathBuf,
+}
+
 impl LinkQuery {
     /// ## Run `aapt2` linker
     ///
@@ -232,6 +265,68 @@ impl AlignQuery {
         let output = cmd.output().map_err(|v| AlignError::Exec(v))?;
         if !output.status.success() {
             return Err(AlignError::Exit(output.status));
+        }
+
+        // Not interested in the output of the tool.
+        drop(output);
+
+        Ok(())
+    }
+}
+
+impl SignQuery {
+    /// ## Run `apksigner`
+    ///
+    /// Run the `apksigner` APK tool to sign an existing APK.
+    pub fn run(&self) -> Result<(), SignError> {
+        // Set up basic `apksigner` command.
+        let mut cmd = std::process::Command::new(
+            self.build_tools.apksigner()
+        );
+        cmd.args([
+            "sign",
+            "-v",
+        ]);
+
+        // Append keystore.
+        cmd.arg("--ks");
+        cmd.arg(&self.keystore);
+
+        // Append keystore key alias.
+        if let Some(ref v) = self.keystore_key_alias {
+            cmd.arg("--ks-key-alias");
+            cmd.arg(v);
+        }
+
+        // Append keystore credentials.
+        if let Some(ref v) = self.keystore_phrase {
+            cmd.env("CARGO_OSIRIS_ANDROID_KEYSTORE_PHRASE", v);
+            cmd.arg("--ks-pass");
+            cmd.arg("env:CARGO_OSIRIS_ANDROID_KEYSTORE_PHRASE");
+        }
+
+        // Append key credentials.
+        if let Some(ref v) = self.key_phrase {
+            cmd.env("CARGO_OSIRIS_ANDROID_KEY_PHRASE", v);
+            cmd.arg("--key-pass");
+            cmd.arg("env:CARGO_OSIRIS_ANDROID_KEY_PHRASE");
+        }
+
+        // Append path to the output APK.
+        cmd.arg("--out");
+        cmd.arg(&self.output_file);
+
+        // Append path to the input APK, but ensure proper path prefixes.
+        cmd.arg(std::path::Path::new(".").join(&self.input_file));
+
+        // Always forward diagnostics to the parent error stream, so
+        // the user can inspect them.
+        cmd.stderr(std::process::Stdio::inherit());
+
+        // Run and verify it exited successfully.
+        let output = cmd.output().map_err(|v| SignError::Exec(v))?;
+        if !output.status.success() {
+            return Err(SignError::Exit(output.status));
         }
 
         // Not interested in the output of the tool.
