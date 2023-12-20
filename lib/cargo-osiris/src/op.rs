@@ -183,7 +183,7 @@ pub fn copy_file(
 /// `false` if the file was not modified.
 pub fn update_file(
     path: &std::path::Path,
-    content: &str,
+    content: &[u8],
 ) -> Result<bool, BuildError> {
     // If the desired content is an empty file, we have to know whether the
     // file existed before we open it. Otherwise, we might create it when
@@ -201,8 +201,8 @@ pub fn update_file(
         )?;
 
     // Read the entire file content into memory.
-    let mut old = String::new();
-    <std::fs::File as std::io::Read>::read_to_string(&mut f, &mut old)
+    let mut old = Vec::new();
+    <std::fs::File as std::io::Read>::read_to_end(&mut f, &mut old)
         .map_err(
             |v| BuildError::FileUpdate(path.into(), v),
         )?;
@@ -219,7 +219,7 @@ pub fn update_file(
             |v| BuildError::FileUpdate(path.into(), v),
         )?;
 
-        <std::fs::File as std::io::Write>::write_all(&mut f, content.as_bytes())
+        <std::fs::File as std::io::Write>::write_all(&mut f, content)
             .map_err(
                 |v| BuildError::FileUpdate(path.into(), v),
             )?;
