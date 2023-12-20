@@ -11,6 +11,7 @@ mod apk;
 mod dex;
 mod flatres;
 mod java;
+mod keystore;
 mod kotlin;
 mod sdk;
 
@@ -117,168 +118,6 @@ struct Direct<'ctx> {
     pub sdk: sdk::Sdk,
 }
 
-// ## Debug Keystore
-//
-// This is the built-in keystore with a debugging key. It has been created
-// with the standard Java tool `keytool`, with the following arguments:
-//
-// ```sh
-// keytool \
-//     -genkey \
-//     -v \
-//     -alias android \
-//     -keyalg ed25519 \
-//     -keypass android \
-//     -keystore debug.keystore \
-//     -storepass android \
-//     -validity 46720
-// ```
-//
-// Android Studio uses a similar `debug.keystore` file to sign applications
-// during development. We store it in the target directory for everyone to
-// use.
-const DEBUG_KEYSTORE: [u8; 1110] = [
-    b'\x30', b'\x82', b'\x04', b'\x52', b'\x02', b'\x01', b'\x03', b'\x30',
-    b'\x82', b'\x03', b'\xfc', b'\x06', b'\x09', b'\x2a', b'\x86', b'\x48',
-    b'\x86', b'\xf7', b'\x0d', b'\x01', b'\x07', b'\x01', b'\xa0', b'\x82',
-    b'\x03', b'\xed', b'\x04', b'\x82', b'\x03', b'\xe9', b'\x30', b'\x82',
-    b'\x03', b'\xe5', b'\x30', b'\x82', b'\x01', b'\x1c', b'\x06', b'\x09',
-    b'\x2a', b'\x86', b'\x48', b'\x86', b'\xf7', b'\x0d', b'\x01', b'\x07',
-    b'\x01', b'\xa0', b'\x82', b'\x01', b'\x0d', b'\x04', b'\x82', b'\x01',
-    b'\x09', b'\x30', b'\x82', b'\x01', b'\x05', b'\x30', b'\x82', b'\x01',
-    b'\x01', b'\x06', b'\x0b', b'\x2a', b'\x86', b'\x48', b'\x86', b'\xf7',
-    b'\x0d', b'\x01', b'\x0c', b'\x0a', b'\x01', b'\x02', b'\xa0', b'\x81',
-    b'\xad', b'\x30', b'\x81', b'\xaa', b'\x30', b'\x66', b'\x06', b'\x09',
-    b'\x2a', b'\x86', b'\x48', b'\x86', b'\xf7', b'\x0d', b'\x01', b'\x05',
-    b'\x0d', b'\x30', b'\x59', b'\x30', b'\x38', b'\x06', b'\x09', b'\x2a',
-    b'\x86', b'\x48', b'\x86', b'\xf7', b'\x0d', b'\x01', b'\x05', b'\x0c',
-    b'\x30', b'\x2b', b'\x04', b'\x14', b'\xb4', b'\xdf', b'\x30', b'\x45',
-    b'\xb5', b'\x40', b'\x0c', b'\xf6', b'\x48', b'\x3c', b'\x39', b'\xa6',
-    b'\x67', b'\x7e', b'\x13', b'\x35', b'\x2b', b'\x91', b'\x62', b'\x76',
-    b'\x02', b'\x02', b'\x27', b'\x10', b'\x02', b'\x01', b'\x20', b'\x30',
-    b'\x0c', b'\x06', b'\x08', b'\x2a', b'\x86', b'\x48', b'\x86', b'\xf7',
-    b'\x0d', b'\x02', b'\x09', b'\x05', b'\x00', b'\x30', b'\x1d', b'\x06',
-    b'\x09', b'\x60', b'\x86', b'\x48', b'\x01', b'\x65', b'\x03', b'\x04',
-    b'\x01', b'\x2a', b'\x04', b'\x10', b'\x11', b'\x3b', b'\x66', b'\xef',
-    b'\x53', b'\x84', b'\x2e', b'\xa9', b'\x6c', b'\x89', b'\xae', b'\x2a',
-    b'\xed', b'\x91', b'\x4a', b'\xf4', b'\x04', b'\x40', b'\xb1', b'\xab',
-    b'\x06', b'\xbb', b'\xfc', b'\xd5', b'\xc0', b'\x6c', b'\xea', b'\x04',
-    b'\xc6', b'\xe7', b'\x70', b'\x90', b'\xc1', b'\x5c', b'\x8e', b'\xc7',
-    b'\x63', b'\x45', b'\xef', b'\x31', b'\xc1', b'\x73', b'\x0e', b'\x59',
-    b'\xde', b'\xb2', b'\xb9', b'\xe8', b'\x59', b'\xe2', b'\xda', b'\xc3',
-    b'\x68', b'\x3e', b'\xb5', b'\xb5', b'\x7e', b'\x96', b'\x9c', b'\x33',
-    b'\xf1', b'\x58', b'\xe1', b'\x57', b'\x52', b'\x31', b'\x6c', b'\xd2',
-    b'\x1e', b'\x72', b'\xfa', b'\x1d', b'\xca', b'\xb4', b'\x2b', b'\x58',
-    b'\x0e', b'\x3b', b'\xb0', b'\xee', b'\xb3', b'\xce', b'\x31', b'\x42',
-    b'\x30', b'\x1d', b'\x06', b'\x09', b'\x2a', b'\x86', b'\x48', b'\x86',
-    b'\xf7', b'\x0d', b'\x01', b'\x09', b'\x14', b'\x31', b'\x10', b'\x1e',
-    b'\x0e', b'\x00', b'\x61', b'\x00', b'\x6e', b'\x00', b'\x64', b'\x00',
-    b'\x72', b'\x00', b'\x6f', b'\x00', b'\x69', b'\x00', b'\x64', b'\x30',
-    b'\x21', b'\x06', b'\x09', b'\x2a', b'\x86', b'\x48', b'\x86', b'\xf7',
-    b'\x0d', b'\x01', b'\x09', b'\x15', b'\x31', b'\x14', b'\x04', b'\x12',
-    b'\x54', b'\x69', b'\x6d', b'\x65', b'\x20', b'\x31', b'\x37', b'\x30',
-    b'\x33', b'\x30', b'\x37', b'\x35', b'\x32', b'\x30', b'\x35', b'\x36',
-    b'\x38', b'\x38', b'\x30', b'\x82', b'\x02', b'\xc1', b'\x06', b'\x09',
-    b'\x2a', b'\x86', b'\x48', b'\x86', b'\xf7', b'\x0d', b'\x01', b'\x07',
-    b'\x06', b'\xa0', b'\x82', b'\x02', b'\xb2', b'\x30', b'\x82', b'\x02',
-    b'\xae', b'\x02', b'\x01', b'\x00', b'\x30', b'\x82', b'\x02', b'\xa7',
-    b'\x06', b'\x09', b'\x2a', b'\x86', b'\x48', b'\x86', b'\xf7', b'\x0d',
-    b'\x01', b'\x07', b'\x01', b'\x30', b'\x66', b'\x06', b'\x09', b'\x2a',
-    b'\x86', b'\x48', b'\x86', b'\xf7', b'\x0d', b'\x01', b'\x05', b'\x0d',
-    b'\x30', b'\x59', b'\x30', b'\x38', b'\x06', b'\x09', b'\x2a', b'\x86',
-    b'\x48', b'\x86', b'\xf7', b'\x0d', b'\x01', b'\x05', b'\x0c', b'\x30',
-    b'\x2b', b'\x04', b'\x14', b'\x82', b'\x6c', b'\x0b', b'\x31', b'\xf6',
-    b'\x94', b'\x75', b'\x85', b'\x92', b'\xf6', b'\x54', b'\x69', b'\xdb',
-    b'\xa9', b'\xf3', b'\xd6', b'\x93', b'\xd9', b'\x09', b'\x63', b'\x02',
-    b'\x02', b'\x27', b'\x10', b'\x02', b'\x01', b'\x20', b'\x30', b'\x0c',
-    b'\x06', b'\x08', b'\x2a', b'\x86', b'\x48', b'\x86', b'\xf7', b'\x0d',
-    b'\x02', b'\x09', b'\x05', b'\x00', b'\x30', b'\x1d', b'\x06', b'\x09',
-    b'\x60', b'\x86', b'\x48', b'\x01', b'\x65', b'\x03', b'\x04', b'\x01',
-    b'\x2a', b'\x04', b'\x10', b'\x49', b'\xfa', b'\x58', b'\xba', b'\x2c',
-    b'\x5c', b'\xcb', b'\x1c', b'\x19', b'\x42', b'\x03', b'\xf0', b'\x32',
-    b'\xf7', b'\xc2', b'\x31', b'\x80', b'\x82', b'\x02', b'\x30', b'\x26',
-    b'\x3c', b'\x36', b'\xdf', b'\xef', b'\x59', b'\xad', b'\x9d', b'\x85',
-    b'\x57', b'\xbf', b'\x9b', b'\xa9', b'\x5a', b'\xfa', b'\xfe', b'\xb0',
-    b'\x27', b'\x6a', b'\x59', b'\x8d', b'\x2b', b'\xa3', b'\xe7', b'\xe3',
-    b'\x2e', b'\xea', b'\x6e', b'\x37', b'\x01', b'\xaa', b'\x00', b'\x6d',
-    b'\x7b', b'\x15', b'\x4a', b'\x39', b'\xf9', b'\x08', b'\xca', b'\xfd',
-    b'\x51', b'\x8d', b'\x60', b'\x13', b'\x4c', b'\x04', b'\x9d', b'\x8d',
-    b'\x26', b'\x18', b'\xa1', b'\xff', b'\xbe', b'\x21', b'\x95', b'\xda',
-    b'\x6b', b'\x0d', b'\x35', b'\x47', b'\x4c', b'\x1d', b'\xb4', b'\x2c',
-    b'\x0b', b'\x55', b'\x5d', b'\xd5', b'\xbe', b'\x97', b'\xea', b'\x7a',
-    b'\x8f', b'\xac', b'\xc3', b'\x2b', b'\x47', b'\x2b', b'\x00', b'\xe3',
-    b'\x13', b'\xf0', b'\xe4', b'\xb4', b'\x99', b'\x30', b'\x5b', b'\xbe',
-    b'\xdc', b'\x33', b'\x9d', b'\x8a', b'\xb0', b'\xa0', b'\x31', b'\xab',
-    b'\xa7', b'\xd8', b'\x19', b'\xef', b'\x32', b'\xb7', b'\xe1', b'\xac',
-    b'\x12', b'\x93', b'\xe4', b'\x20', b'\xa2', b'\xb6', b'\x09', b'\xf6',
-    b'\xe9', b'\x97', b'\x87', b'\xa8', b'\xbc', b'\xc2', b'\x1a', b'\xb2',
-    b'\xc6', b'\x82', b'\x23', b'\x61', b'\xb9', b'\xd5', b'\xc3', b'\xe2',
-    b'\xd3', b'\x0c', b'\x82', b'\xf0', b'\x4c', b'\x19', b'\x8c', b'\xaf',
-    b'\x9b', b'\xfb', b'\x06', b'\x3e', b'\x6b', b'\x76', b'\x23', b'\x5b',
-    b'\x71', b'\xd6', b'\xc2', b'\x0f', b'\x9f', b'\xbc', b'\x19', b'\x68',
-    b'\x21', b'\x77', b'\xfe', b'\xcb', b'\x57', b'\xe3', b'\x78', b'\x6b',
-    b'\x14', b'\x62', b'\x48', b'\x6e', b'\x88', b'\x78', b'\x99', b'\x1c',
-    b'\xdd', b'\xa6', b'\x71', b'\xe2', b'\x2d', b'\xde', b'\xc6', b'\x73',
-    b'\x1b', b'\x52', b'\x3c', b'\x7e', b'\x83', b'\xea', b'\x28', b'\x0e',
-    b'\xa1', b'\x58', b'\xcc', b'\xcc', b'\xd8', b'\x8e', b'\xc2', b'\xc3',
-    b'\x5e', b'\x64', b'\xfe', b'\x34', b'\x8d', b'\x98', b'\x5b', b'\x29',
-    b'\x91', b'\x94', b'\x2d', b'\x61', b'\xc1', b'\x8e', b'\xf2', b'\x6c',
-    b'\xe4', b'\x1d', b'\x4c', b'\x5a', b'\xc4', b'\xf2', b'\x0a', b'\xf5',
-    b'\xbc', b'\x44', b'\xe1', b'\x0b', b'\x26', b'\x59', b'\x05', b'\x4d',
-    b'\xa9', b'\xee', b'\xa8', b'\xb7', b'\x07', b'\xf5', b'\x02', b'\x4a',
-    b'\xe3', b'\xb2', b'\x35', b'\xb0', b'\xaf', b'\x5b', b'\xe3', b'\xad',
-    b'\x8e', b'\xd0', b'\xce', b'\x3f', b'\xb1', b'\x8e', b'\x30', b'\x3b',
-    b'\x96', b'\xb9', b'\xcd', b'\x09', b'\x22', b'\x10', b'\x5b', b'\xcd',
-    b'\xbc', b'\x20', b'\x11', b'\xb2', b'\xf5', b'\x9b', b'\x5a', b'\x5f',
-    b'\x23', b'\xdc', b'\x73', b'\x5b', b'\xe4', b'\x4d', b'\x48', b'\x52',
-    b'\xb3', b'\x76', b'\x9e', b'\x76', b'\x88', b'\xfc', b'\x14', b'\xd3',
-    b'\x99', b'\x18', b'\xd8', b'\xb2', b'\xc7', b'\xf4', b'\x15', b'\xc8',
-    b'\x61', b'\xad', b'\x27', b'\x10', b'\x7b', b'\x36', b'\x93', b'\xb9',
-    b'\xe2', b'\xc9', b'\x25', b'\x00', b'\xcd', b'\xa1', b'\x9a', b'\x2f',
-    b'\xdd', b'\xba', b'\x95', b'\x26', b'\x88', b'\xf2', b'\x39', b'\xf7',
-    b'\xb3', b'\x75', b'\x18', b'\x92', b'\xc1', b'\xf7', b'\x19', b'\x79',
-    b'\xe2', b'\x00', b'\xed', b'\xdd', b'\x81', b'\x15', b'\xfe', b'\xdf',
-    b'\x7d', b'\x2b', b'\x1d', b'\xe3', b'\x20', b'\x3a', b'\x49', b'\xb8',
-    b'\x25', b'\xd7', b'\x13', b'\x55', b'\x4d', b'\xdb', b'\x94', b'\xaf',
-    b'\x7f', b'\x90', b'\xa4', b'\x3b', b'\xd7', b'\x13', b'\x0e', b'\xe4',
-    b'\xe2', b'\x35', b'\xf6', b'\x59', b'\x8d', b'\x54', b'\x86', b'\x25',
-    b'\x0c', b'\x06', b'\x31', b'\x28', b'\xe2', b'\xc2', b'\x0c', b'\x82',
-    b'\xd7', b'\x75', b'\x25', b'\x6f', b'\x4f', b'\x85', b'\x12', b'\x0d',
-    b'\xc4', b'\x98', b'\xbf', b'\xd0', b'\xc7', b'\x08', b'\xd4', b'\x90',
-    b'\xbb', b'\x37', b'\x18', b'\x48', b'\x01', b'\xeb', b'\x5e', b'\xa3',
-    b'\x67', b'\x0a', b'\x0c', b'\x4f', b'\x06', b'\xa1', b'\x4c', b'\xbb',
-    b'\xb2', b'\xab', b'\xf9', b'\x18', b'\xa1', b'\x38', b'\xee', b'\x43',
-    b'\xbb', b'\x09', b'\xa2', b'\x95', b'\x9e', b'\xed', b'\xb2', b'\x8b',
-    b'\x33', b'\x01', b'\x4d', b'\x54', b'\x7e', b'\xcf', b'\x8b', b'\xaa',
-    b'\x87', b'\x18', b'\xc3', b'\xd8', b'\x51', b'\xc8', b'\x6a', b'\x02',
-    b'\x8a', b'\x5c', b'\x3e', b'\xf2', b'\xa1', b'\xcf', b'\x30', b'\xbc',
-    b'\xee', b'\x34', b'\x45', b'\x22', b'\x64', b'\x6a', b'\x39', b'\xcf',
-    b'\xd6', b'\x19', b'\x8f', b'\x28', b'\x54', b'\xb6', b'\x49', b'\xec',
-    b'\xa3', b'\xcf', b'\x60', b'\x49', b'\xd6', b'\x03', b'\xcb', b'\x4f',
-    b'\xb7', b'\x5b', b'\x35', b'\x5d', b'\x64', b'\x41', b'\x4a', b'\x82',
-    b'\x61', b'\x97', b'\x65', b'\x4b', b'\x05', b'\x08', b'\x1f', b'\x06',
-    b'\xe2', b'\x67', b'\x5e', b'\xbe', b'\x64', b'\x48', b'\x63', b'\x35',
-    b'\xd1', b'\xb8', b'\xd8', b'\xa5', b'\x77', b'\xdf', b'\x10', b'\x21',
-    b'\xb1', b'\x3d', b'\xbe', b'\xc4', b'\xc6', b'\xfb', b'\x5f', b'\x25',
-    b'\x2b', b'\x0e', b'\x5a', b'\x53', b'\x30', b'\x55', b'\x55', b'\x23',
-    b'\xa9', b'\x01', b'\xbd', b'\xe4', b'\xd3', b'\x93', b'\xe5', b'\x56',
-    b'\x74', b'\x16', b'\xe2', b'\x14', b'\x33', b'\x62', b'\xb4', b'\x03',
-    b'\x07', b'\x8e', b'\xb9', b'\x85', b'\x37', b'\x1e', b'\xa7', b'\xb7',
-    b'\x4a', b'\xd8', b'\xb4', b'\xf6', b'\x85', b'\xaf', b'\x0d', b'\x8f',
-    b'\xee', b'\x4b', b'\xef', b'\x4d', b'\xbb', b'\x1c', b'\x8c', b'\x3b',
-    b'\x12', b'\x05', b'\x0a', b'\x3b', b'\x26', b'\xce', b'\x80', b'\x30',
-    b'\x4d', b'\x30', b'\x31', b'\x30', b'\x0d', b'\x06', b'\x09', b'\x60',
-    b'\x86', b'\x48', b'\x01', b'\x65', b'\x03', b'\x04', b'\x02', b'\x01',
-    b'\x05', b'\x00', b'\x04', b'\x20', b'\xd3', b'\xa3', b'\x58', b'\x58',
-    b'\xe0', b'\xf2', b'\xd7', b'\xb4', b'\x1d', b'\x0a', b'\x02', b'\x00',
-    b'\x67', b'\x94', b'\x56', b'\x70', b'\xbb', b'\xf2', b'\x16', b'\xea',
-    b'\xcc', b'\xe6', b'\x3b', b'\x4c', b'\xeb', b'\xaa', b'\x2f', b'\x6b',
-    b'\x31', b'\xa0', b'\x4e', b'\x38', b'\x04', b'\x14', b'\xb7', b'\xee',
-    b'\x15', b'\x0c', b'\x4e', b'\xff', b'\x25', b'\x81', b'\xe6', b'\x15',
-    b'\xf2', b'\xb7', b'\x91', b'\x30', b'\x3d', b'\x8c', b'\xa0', b'\x0a',
-    b'\xdc', b'\x48', b'\x02', b'\x02', b'\x27', b'\x10',
-];
-
 impl<'ctx> Build<'ctx> {
     fn new(
         config: &'ctx config::Config,
@@ -370,7 +209,7 @@ impl<'ctx> Build<'ctx> {
         // Emerge configuration files
         op::update_file(
             self.debug_keystore_file.as_path(),
-            &DEBUG_KEYSTORE,
+            &keystore::DEBUG_DATA,
         )?;
         op::update_file(
             self.manifest_file.as_path(),
