@@ -20,6 +20,11 @@ fn run() -> std::process::ExitCode {
     app.run()
 }
 
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+fn run() -> std::process::ExitCode {
+    1.into()
+}
+
 pub fn osi_demo() -> std::process::ExitCode {
     run()
 }
