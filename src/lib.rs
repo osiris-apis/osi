@@ -48,6 +48,4 @@
 #[cfg(test)]
 extern crate std;
 
-pub mod mem;
-
 pub use osi_derive as dd;
