@@ -3,7 +3,7 @@
 //! This is a utility module for the other `ffi` modules. It provides common
 //! abstractions and type definitions used across many different interfaces.
 
-use crate::mem::align;
+use crate::align;
 
 /// ## Anonymous Pointer Content
 ///

@@ -5,6 +5,7 @@
 
 pub mod align;
 pub mod error;
+pub mod ffi;
 pub mod hash;
 pub mod hmac;
 pub mod str;
