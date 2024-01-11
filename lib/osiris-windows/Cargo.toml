@@ -1,0 +1,28 @@
+[package]
+name = "osiris-windows"
+version = "0.0.1"
+
+description = "Osiris APIs for Windows"
+keywords = [
+        "api",
+        "interfaces",
+        "os",
+        "osiris",
+        "windows",
+]
+
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies.windows]
+version = "0.51"
+features = [
+    "Data_Xml_Dom",
+    "UI_Notifications",
+    "Win32_Foundation",
+]
