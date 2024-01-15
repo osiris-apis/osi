@@ -4,9 +4,12 @@ members = [".", "lib/*"]
 
 [workspace.dependencies]
 gio = { features = ["v2_70"], version = "0.18" }
+osi-apis = { path = "./lib/osi-apis" }
 osi-derive = { path = "./lib/osi-derive" }
 osi-derive-proc = { path = "./lib/osi-derive-proc" }
 osi-lib = { path = "./lib/osi-lib" }
+osiris-linux = { path = "./lib/osiris-linux" }
+osiris-windows = { path = "./lib/osiris-windows" }
 proc-macro2 = { version = "1.0" }
 quote = { version = "1.0" }
 syn = { version = "2.0" }
@@ -45,4 +48,5 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+osi-apis = { workspace = true }
 osi-derive = { workspace = true }

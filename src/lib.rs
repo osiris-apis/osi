@@ -48,4 +48,5 @@
 #[cfg(test)]
 extern crate std;
 
+pub use osi_apis as apis;
 pub use osi_derive as dd;
