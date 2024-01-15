@@ -6,7 +6,7 @@
 //!
 //! The underlying mechanism is based on the WinRT Toast API [^toast].
 //!
-//! [^toast]: https://learn.microsoft.com/en-us/windows/apps/design/shell/tiles-and-notifications/toast-notifications-overview
+//! [^toast]: <https://learn.microsoft.com/en-us/windows/apps/design/shell/tiles-and-notifications/toast-notifications-overview>
 
 // XXX: The current implementation lacks a few advanced features of the
 //      WinRT Toast API. These can be added in the future. It includes things
