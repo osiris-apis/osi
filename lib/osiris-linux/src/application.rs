@@ -7,6 +7,17 @@
 
 use gio;
 
+/// ## Application Setup
+///
+/// The setup structure contains all the parameters required to initialize
+/// the application.
+pub struct Setup<'ctx> {
+    /// Application identifier for the running application, or `None` to
+    /// run without identifier. Note that application IDs follow strict rules
+    /// (usually ASCII-only reverse domain names; see `gio/Application`).
+    pub id: Option<&'ctx str>,
+}
+
 /// ## Application Context
 ///
 /// The context of the local application, providing access to system APIs
@@ -15,42 +26,33 @@ pub struct Context {
     pub(crate) gio: gio::Application,
 }
 
-impl Context {
-    /// ## Create with an Application ID
+impl<'ctx> Setup<'ctx> {
+    /// ## Initialize the Application
     ///
-    /// Create a new application context with the given application ID. Note
-    /// that application IDs follow strict rules (usually ASCII-only reverse
-    /// domain names; see `gio/Application`).
-    pub fn with_id(id: &str) -> Self {
-        Self {
-            gio: gio::Application::new(
-                Some(id),
-                gio::ApplicationFlags::NON_UNIQUE,
-            ),
-        }
-    }
+    /// Perform all application initialization and yield the application
+    /// context ready to be used.
+    pub fn initialize(
+        &self,
+    ) -> Result<Context, Box<dyn std::error::Error>> {
+        let v_gio = gio::Application::new(
+            match self.id {
+                // XXX: The application ID is not used for `NON_UNIQUE`
+                //      applications, yet gio has some weird behavior if
+                //      none is set. We use a dummy value for now, but
+                //      this should be solved properly.
+                None => Some("foo.osiris.unknown"),
+                Some(ref v) => Some(v),
+            },
+            gio::ApplicationFlags::NON_UNIQUE,
+        );
 
-    /// ## Create Application Context
-    ///
-    /// Create a new application context.
-    pub fn new() -> Self {
-        // XXX: The application ID is not used for `NON_UNIQUE` applications,
-        //      yet gio is buggy if no ID is set. Hence, we provide a dummy
-        //      value. See glib-issue #3203 for our blocker.
-        Self::with_id("foo.osiris.unknown")
-    }
-
-    /// ## Perform Application Setup
-    ///
-    /// Perform platform dependent setup operations for the application
-    /// context. This includes operations like connecting to the system bus
-    /// or populating caches.
-    pub fn setup(&self) -> Result<(), Box<dyn std::error::Error>> {
         <_ as gio::prelude::ApplicationExt>::register(
-            &self.gio,
+            &v_gio,
             None::<&gio::Cancellable>,
         ).map_err(|v| Box::new(v))?;
 
-        Ok(())
+        Ok(Context {
+            gio: v_gio,
+        })
     }
 }
