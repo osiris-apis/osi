@@ -67,7 +67,7 @@ pub struct Notification {
 /// it. However, a notification handle can be recreated from an application
 /// context and a notification ID.
 pub struct Handle<'ctx> {
-    app: &'ctx application::Application,
+    app: &'ctx application::Context,
     id: String,
 }
 
@@ -214,7 +214,7 @@ impl Notification {
     /// replaced.
     pub fn raise<'ctx>(
         &self,
-        app: &'ctx application::Application,
+        app: &'ctx application::Context,
         id: Option<String>,
     ) -> Option<Handle<'ctx>> {
         <_ as gio::prelude::ApplicationExt>::send_notification(
@@ -239,7 +239,7 @@ impl<'ctx> Handle<'ctx> {
     /// context does not have to be the same as was used to raise the
     /// notification. However, it must have a matching application ID set.
     pub fn with_id(
-        app: &'ctx application::Application,
+        app: &'ctx application::Context,
         id: String,
     ) -> Self {
         Self {

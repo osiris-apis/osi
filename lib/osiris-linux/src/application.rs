@@ -11,11 +11,11 @@ use gio;
 ///
 /// The context of the local application, providing access to system APIs
 /// regarding the state and lifetime of the application.
-pub struct Application {
+pub struct Context {
     pub(crate) gio: gio::Application,
 }
 
-impl Application {
+impl Context {
     /// ## Create with an Application ID
     ///
     /// Create a new application context with the given application ID. Note
