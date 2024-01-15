@@ -49,5 +49,4 @@ rust-version.workspace = true
 
 [dependencies]
 osi-apis = { workspace = true }
-osi-derive = { workspace = true }
 osi-lib = { workspace = true }
