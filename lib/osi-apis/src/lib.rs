@@ -8,12 +8,15 @@
 #![cfg(
         any(
             target_os = "linux",
+            target_os = "macos",
             target_os = "windows",
         )
     )]
 
 #[cfg(target_os = "linux")]
 pub(crate) use osiris_linux as native;
+#[cfg(target_os = "macos")]
+pub(crate) use osiris_macos as native;
 #[cfg(target_os = "windows")]
 pub(crate) use osiris_windows as native;
 

@@ -22,5 +22,8 @@ rust-version.workspace = true
 [target.'cfg(target_os = "linux")'.dependencies]
 osiris-linux = { workspace = true }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+osiris-macos = { workspace = true }
+
 [target.'cfg(target_os = "windows")'.dependencies]
 osiris-windows = { workspace = true }
