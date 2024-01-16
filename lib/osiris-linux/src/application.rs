@@ -11,6 +11,7 @@ use gio;
 ///
 /// The setup structure contains all the parameters required to initialize
 /// the application.
+#[derive(Default)]
 pub struct Setup<'ctx> {
     /// Application identifier for the running application, or `None` to
     /// run without identifier. Note that application IDs follow strict rules

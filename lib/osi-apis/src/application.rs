@@ -9,6 +9,7 @@
 ///
 /// The setup structure contains all the parameters required to initialize
 /// the application.
+#[derive(Default)]
 pub struct Setup<'ctx> {
     pub(crate) native: crate::native::application::Setup<'ctx>,
 }
@@ -38,6 +39,13 @@ impl From<crate::native::application::Context> for Context {
 }
 
 impl<'ctx> Setup<'ctx> {
+    /// ## Create New Setup Object
+    ///
+    /// Create a new setup object with all the default values set.
+    pub fn new() -> Self {
+        Default::default()
+    }
+
     /// ## Initialize the Application
     ///
     /// Perform all application initialization and yield the application

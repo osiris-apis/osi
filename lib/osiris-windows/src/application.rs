@@ -11,6 +11,7 @@ use windows;
 ///
 /// The setup structure contains all the parameters required to initialize
 /// the application.
+#[derive(Default)]
 pub struct Setup<'ctx> {
     /// Application User Model ID to use, or `None` to inherit it.
     pub aumid: Option<&'ctx str>,
