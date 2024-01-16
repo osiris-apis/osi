@@ -1,0 +1,20 @@
+[package]
+name = "osiris-macos"
+version = "0.0.1"
+
+description = "Osiris APIs for macOS"
+keywords = [
+        "api",
+        "interfaces",
+        "macos",
+        "os",
+        "osiris",
+]
+
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+rust-version.workspace = true
