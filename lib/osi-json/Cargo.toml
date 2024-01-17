@@ -1,0 +1,20 @@
+[package]
+name = "osi-json"
+version = "0.0.1"
+
+description = "Standalone JSON Streaming Implementation"
+keywords = [
+        "decoding",
+        "encoding",
+        "json",
+        "standalone",
+        "streaming",
+]
+
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+rust-version.workspace = true
