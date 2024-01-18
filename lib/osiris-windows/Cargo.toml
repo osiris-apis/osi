@@ -19,7 +19,7 @@ readme.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[dependencies.windows]
+[target.'cfg(target_os = "windows")'.dependencies.windows]
 version = "0.51"
 features = [
     "Data_Xml_Dom",

@@ -19,5 +19,5 @@ readme.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[dependencies]
+[target.'cfg(target_os = "linux")'.dependencies]
 gio = { workspace = true }
