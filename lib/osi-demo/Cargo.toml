@@ -21,6 +21,15 @@ readme.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[package.metadata]
+android.java.source-dirs = ["src/platform/android/java"]
+android.kotlin.source-dirs = ["src/platform/android/java"]
+android.manifest-file = "src/platform/android/AndroidManifest.xml"
+android.resource-dirs = ["src/platform/android/res"]
+
 [target.'cfg(target_os = "linux")'.dependencies]
 adw = { features = ["v1_1"], package = "libadwaita", version = "0.5" }
 gtk = { features = ["v4_6"], package = "gtk4", version = "0.7" }
