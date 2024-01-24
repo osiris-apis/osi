@@ -93,7 +93,9 @@ impl Engine {
     /// data is cleared.
     pub fn reset(&mut self) {
         self.acc.clear();
+        self.acc.shrink_to(4096);
         self.acc_str.clear();
+        self.acc_str.shrink_to(4096);
         self.state = State::None;
     }
 
@@ -126,9 +128,7 @@ impl Engine {
         &mut self,
         err: Error,
     ) -> Error {
-        self.acc.clear();
-        self.acc_str.clear();
-        self.state = State::None;
+        self.reset();
         err
     }
 
@@ -141,9 +141,7 @@ impl Engine {
         token_fn: TokenFn,
     ) -> Result<(), Error> {
         let r = token_fn(self).and_then(|v| handler(v));
-        self.acc.clear();
-        self.acc_str.clear();
-        self.state = State::None;
+        self.reset();
         r
     }
 
