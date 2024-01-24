@@ -27,6 +27,12 @@ pub enum Error {
     StringEscapeUnicode,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum Sign {
+    Plus,
+    Minus,
+}
+
 /// ## JSON Token
 ///
 /// XXX
@@ -42,7 +48,7 @@ pub enum Token<'ctx> {
     Null,
     True,
     False,
-    Number,
+    Number(&'ctx str, &'ctx [u8], Sign, usize, usize, Sign, usize),
     String(&'ctx str, &'ctx str),
 }
 
@@ -51,7 +57,14 @@ enum State {
     None,
     Whitespace,
     Keyword,
-    Number,
+    NumberIntegerNone(Sign),
+    NumberIntegerSome(Sign, usize),
+    NumberIntegerZero(Sign),
+    NumberFractionNone(Sign, usize),
+    NumberFractionSome(Sign, usize, usize),
+    NumberExponentNone(Sign, usize, usize),
+    NumberExponentSign(Sign, usize, usize, Sign),
+    NumberExponentSome(Sign, usize, usize, Sign, usize),
     String,
     StringEscape,
     StringUnicode(u8, u32),
@@ -71,6 +84,7 @@ enum State {
 pub struct Engine {
     acc: alloc::string::String,
     acc_str: alloc::string::String,
+    acc_num: alloc::vec::Vec<u8>,
     state: State,
 }
 
@@ -82,6 +96,7 @@ impl Engine {
         Self {
             acc: alloc::string::String::new(),
             acc_str: alloc::string::String::new(),
+            acc_num: alloc::vec::Vec::new(),
             state: State::None,
         }
     }
@@ -96,6 +111,8 @@ impl Engine {
         self.acc.shrink_to(4096);
         self.acc_str.clear();
         self.acc_str.shrink_to(4096);
+        self.acc_num.clear();
+        self.acc_num.shrink_to(4096);
         self.state = State::None;
     }
 
@@ -207,9 +224,164 @@ impl Engine {
                 },
             },
 
-            // XXX
-            State::Number => match ch {
+            // Parsing numbers is just a matter of parsing the components one
+            // after another, where some components are optional. As usual, we
+            // keep the unmodified number in the accumulator. However, we also
+            // push all digits into a separate accumulator and remember how
+            // many digits each component occupies. This allows much simpler
+            // number conversions later on.
+            State::NumberIntegerNone(sign_int) => match ch {
+                Some(v @ '0'..='9') => {
+                    self.acc.push(v);
+                    self.acc_num.push(
+                        u8::try_from(v.to_digit(10).unwrap()).unwrap(),
+                    );
+                    if v == '0' {
+                        self.state = State::NumberIntegerZero(sign_int);
+                    } else {
+                        self.state = State::NumberIntegerSome(sign_int, 1);
+                    }
+                    None
+                },
                 _ => ch,
+            },
+            State::NumberIntegerSome(sign_int, n_int) => match ch {
+                Some(v @ '0'..='9') => {
+                    self.acc.push(v);
+                    self.acc_num.push(
+                        u8::try_from(v.to_digit(10).unwrap()).unwrap(),
+                    );
+                    self.state = State::NumberIntegerSome(sign_int, n_int + 1);
+                    None
+                },
+                Some('.') => {
+                    self.state = State::NumberFractionNone(sign_int, n_int);
+                    None
+                },
+                Some(v @ 'e' | v @ 'E') => {
+                    self.acc.push(v);
+                    self.state = State::NumberExponentNone(
+                        sign_int, n_int, 0,
+                    );
+                    None
+                },
+                v => {
+                    self.raise(handler, |v| Ok(Token::Number(
+                        &v.acc, v.acc_num.as_slice(), sign_int, n_int, 0, Sign::Plus, 0,
+                    )))?;
+                    v
+                },
+            },
+            State::NumberIntegerZero(sign_int) => match ch {
+                Some('.') => {
+                    self.state = State::NumberFractionNone(sign_int, 1);
+                    None
+                },
+                Some(v @ 'e' | v @ 'E') => {
+                    self.acc.push(v);
+                    self.state = State::NumberExponentNone(
+                        sign_int, 1, 0,
+                    );
+                    None
+                },
+                v => {
+                    self.raise(handler, |v| Ok(Token::Number(
+                        &v.acc, v.acc_num.as_slice(), sign_int, 1, 0, Sign::Plus, 0,
+                    )))?;
+                    v
+                },
+            },
+            State::NumberFractionNone(sign_int, n_int) => match ch {
+                Some(v @ '0'..='9') => {
+                    self.acc.push(v);
+                    self.acc_num.push(
+                        u8::try_from(v.to_digit(10).unwrap()).unwrap(),
+                    );
+                    self.state = State::NumberFractionSome(sign_int, n_int, 1);
+                    None
+                },
+                _ => ch,
+            },
+            State::NumberFractionSome(sign_int, n_int, n_frac) => match ch {
+                Some(v @ 'e' | v @ 'E') => {
+                    self.acc.push(v);
+                    self.state = State::NumberExponentNone(
+                        sign_int, n_int, n_frac,
+                    );
+                    None
+                },
+                Some(v @ '0'..='9') => {
+                    self.acc.push(v);
+                    self.acc_num.push(
+                        u8::try_from(v.to_digit(10).unwrap()).unwrap(),
+                    );
+                    self.state = State::NumberFractionSome(sign_int, n_int, n_frac + 1);
+                    None
+                },
+                v => {
+                    self.raise(handler, |v| Ok(Token::Number(
+                        &v.acc, v.acc_num.as_slice(), sign_int, n_int, n_frac, Sign::Plus, 0,
+                    )))?;
+                    v
+                },
+            },
+            State::NumberExponentNone(sign_int, n_int, n_frac) => match ch {
+                Some(v @ '+') => {
+                    self.acc.push(v);
+                    self.state = State::NumberExponentSign(
+                        sign_int, n_int, n_frac, Sign::Plus,
+                    );
+                    None
+                },
+                Some(v @ '-') => {
+                    self.acc.push(v);
+                    self.state = State::NumberExponentSign(
+                        sign_int, n_int, n_frac, Sign::Minus,
+                    );
+                    None
+                },
+                Some(v @ '0'..='9') => {
+                    self.acc.push(v);
+                    self.acc_num.push(
+                        u8::try_from(v.to_digit(10).unwrap()).unwrap(),
+                    );
+                    self.state = State::NumberExponentSome(
+                        sign_int, n_int, n_frac, Sign::Plus, 1,
+                    );
+                    None
+                },
+                _ => ch,
+            },
+            State::NumberExponentSign(sign_int, n_int, n_frac, sign_exp) => match ch {
+                Some(v @ '0'..='9') => {
+                    self.acc.push(v);
+                    self.acc_num.push(
+                        u8::try_from(v.to_digit(10).unwrap()).unwrap(),
+                    );
+                    self.state = State::NumberExponentSome(
+                        sign_int, n_int, n_frac, sign_exp, 1,
+                    );
+                    None
+                },
+                _ => ch,
+            },
+            State::NumberExponentSome(sign_int, n_int, n_frac, sign_exp, n_exp) => match ch {
+                Some(v @ '0'..='9') => {
+                    self.acc.push(v);
+                    self.acc_num.push(
+                        u8::try_from(v.to_digit(10).unwrap()).unwrap(),
+                    );
+                    self.state = State::NumberExponentSome(
+                        sign_int, n_int, n_frac, sign_exp, n_exp + 1,
+                    );
+                    None
+                },
+                v => {
+                    self.raise(handler, |v| Ok(Token::Number(
+                        &v.acc, v.acc_num.as_slice(), sign_int, n_int, n_frac, sign_exp, n_exp,
+                    )))?;
+                    v
+                },
             },
 
             // When parsing a string, append all characters to the string.
@@ -416,9 +588,20 @@ impl Engine {
                     self.acc.push(v);
                     self.state = State::Keyword;
                 },
-                '-' | '0'..='9' => {
+                '-' => {
                     self.acc.push(v);
-                    self.state = State::Number;
+                    self.state = State::NumberIntegerNone(Sign::Minus);
+                },
+                '0'..='9' => {
+                    self.acc.push(v);
+                    self.acc_num.push(
+                        u8::try_from(v.to_digit(10).unwrap()).unwrap(),
+                    );
+                    if v == '0' {
+                        self.state = State::NumberIntegerZero(Sign::Plus);
+                    } else {
+                        self.state = State::NumberIntegerSome(Sign::Plus, 1);
+                    }
                 },
                 '"' => {
                     self.state = State::String;
