@@ -76,6 +76,7 @@ help:
 	@echo "    help:               Print this usage information"
 	@echo
 	@echo "    rust-build:         Build the Rust packages"
+	@echo "    rust-doc:           Build the Rust documentation"
 	@echo "    rust-test:          Run the Rust test suite"
 
 #
