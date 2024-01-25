@@ -1,18 +1,83 @@
-//! # JSON Token Handling
+//! # JSON Tokenizer
 //!
 //! XXX
 
-/// ## Tokenizer Errors
+/// ## Tokenizer Flags
 ///
-/// XXX
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Error {
-    /// Custom error for use by handler closures. Never created by the engine.
-    Handler,
+/// A set of flags that modify the behavior of the tokenizer engine. See
+/// each flag description for details. Note that flags are constant over
+/// the lifetime of a tokenizer and have to be specified when created.
+pub type Flag = u32;
+
+/// ## Allow Leading Zeroes
+///
+/// When set, the JSON tokenizer allows leading zeroes in JSON Number Values.
+/// These leading zeroes will have no effect and are ignored.
+pub const FLAG_ALLOW_LEADING_ZERO: Flag =       0x00000001;
+
+/// ## Allow Plus Sign
+///
+/// When set, the JSON tokenizer allows leading plus signs in JSON Number
+/// Values. These have no effect and are ignored.
+pub const FLAG_ALLOW_PLUS_SIGN: Flag =          0x00000002;
+
+/// ## Tokenizer Status
+///
+/// After every operation that advances the tokenizer, the latter will report
+/// its current status as one of the possible items of this type.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum Status {
+    /// No token is currently parsed.
+    #[default]
+    Done,
+    /// A token is still being parsed and requires more data.
+    Busy,
+}
+
+/// ## Operational Report
+///
+/// This enum is used to report operational results of the tokenizer to
+/// the caller. It is returned by all operations that advance the tokenizer.
+///
+/// The tokenizer only ever returns values of type
+/// `core::ops::ControlFlow::Continue(Status)`, signaling that it is ready
+/// to consume more data and continue operation. The status information can
+/// be used to deduce the state of the tokenizer.
+///
+/// If a token handler is invoked by the tokenizer and returns values of type
+/// `core::ops::ControlFlow::Break(T)`, it will cause a tokenizer reset, but
+/// is otherwise propagated verbatim to the caller.
+pub type Report<T> = core::ops::ControlFlow<T, Status>;
+
+/// ## Number Signs
+///
+/// This enum is used to represent the sign a JSON Number Value carries.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum Sign {
+    /// Plus sign used for positive numbers.
+    #[default]
+    Plus,
+    /// Minus sign used for negative numbers.
+    Minus,
+}
+
+/// ## Error Tokens
+///
+/// This is the payload used by `Token::Error`. It conveys tokenizer errors to
+/// the token handler, but otherwise allows the tokenizer to proceed and thus
+/// report more possible errors in the same run.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum Error<'ctx> {
     /// Given character is not valid outside JSON values.
     CharacterInvalid(char),
+    /// Given character is not valid in the given combination.
+    CharacterStray(char),
+    /// Given whitespace character is not allowed in JSON.
+    WhitespaceInvalid(char),
     /// Given keyword is not valid in JSON.
-    KeywordUnknown(alloc::string::String),
+    KeywordUnknown(&'ctx str),
+    /// Data ended with an unfinished number.
+    NumberIncomplete,
     /// Data ended with an unclosed string.
     StringIncomplete,
     /// Specified unescaped character is not valid in a string.
@@ -25,38 +90,57 @@ pub enum Error {
     StringSurrogateUnpaired,
     /// String escape sequence produces invalid Unicode Scalar Value.
     StringEscapeUnicode,
-}
-
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum Sign {
-    Plus,
-    Minus,
+    /// Comments are not supported by JSON.
+    Comment(&'ctx str),
 }
 
 /// ## JSON Token
 ///
-/// XXX
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+/// This enum represents all tokens that can be reported by the tokenizer. This
+/// includes standard JSON tokens, but also extended tokens used for better
+/// error diagnotics.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Token<'ctx> {
-    Whitespace(&'ctx str),
+    /// Special token to report errors
+    Error(Error<'ctx>),
+    /// JSON colon token
     Colon,
+    /// JSON comma token
     Comma,
+    /// JSON open-array token
     ArrayOpen,
+    /// JSON close-array token
     ArrayClose,
+    /// JSON open-object token
     ObjectOpen,
+    /// JSON close-object token
     ObjectClose,
+    /// JSON null keyword
     Null,
+    /// JSON true keyword
     True,
+    /// JSON false keyword
     False,
+    /// Block of continuous whitespace
+    Whitespace(&'ctx str),
+    /// JSON number value
     Number(&'ctx str, &'ctx [u8], Sign, usize, usize, Sign, usize),
+    /// JSON string value
     String(&'ctx str, &'ctx str),
 }
 
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+// ## Tokenizer State
+//
+// The internal state of the tokenizer. `State::None` is used when the
+// tokenizer finished a token and has no associated state. Otherwise, the
+// state identifies the current token and possible metadata.
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 enum State {
+    #[default]
     None,
-    Whitespace,
+    Slash,
     Keyword,
+    Whitespace,
     NumberIntegerNone(Sign),
     NumberIntegerSome(Sign, usize),
     NumberIntegerZero(Sign),
@@ -71,6 +155,7 @@ enum State {
     StringSurrogate(u32),
     StringSurrogateEscape(u32),
     StringSurrogateUnicode(u32, u8, u32),
+    CommentLine,
 }
 
 /// ## Tokenizer Engine
@@ -79,34 +164,42 @@ enum State {
 /// and produces a stream of JSON tokens.
 ///
 /// A single engine can be used to tokenize any number of JSON values. Once
-/// a value has been fully tokenized, the engine is automatically reset.
-#[derive(Clone, Debug)]
-pub struct Engine {
+/// a value has been fully tokenized, the engine is automatically reset and
+/// ready to parse the next token.
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+pub struct Tokenizer {
+    flags: Flag,
     acc: alloc::string::String,
     acc_str: alloc::string::String,
     acc_num: alloc::vec::Vec<u8>,
     state: State,
 }
 
-impl Engine {
-    /// ## Create New Tokenizer Engine
+impl Tokenizer {
+    /// ## Create New Tokenizer
     ///
-    /// XXX
-    pub fn new() -> Self {
+    /// Create a new tokenizer engine with the given parameters.
+    ///
+    /// A single tokenizer engine can be used to tokenize an arbitrary amount
+    /// of JSON data.
+    pub fn with(flags: Flag) -> Self {
         Self {
-            acc: alloc::string::String::new(),
-            acc_str: alloc::string::String::new(),
-            acc_num: alloc::vec::Vec::new(),
-            state: State::None,
+            flags: flags,
+            ..Default::default()
         }
     }
 
-    /// ## Reset Engine
+    /// ## Create New Tokenizer
     ///
-    /// Reset the engine to the same state as when it was created. Internal
-    /// buffers might remain allocated for performance reasons. However, any
-    /// data is cleared.
-    pub fn reset(&mut self) {
+    /// Create a new tokenizer engine with the default parameters. See
+    /// `Self::with()` for a detailed description.
+    pub fn new() -> Self {
+        Self::with(0)
+    }
+
+    // Clear current buffers and prepare for the next token. This should be
+    // called after a token was finished.
+    fn prepare(&mut self) {
         self.acc.clear();
         self.acc.shrink_to(4096);
         self.acc_str.clear();
@@ -116,120 +209,148 @@ impl Engine {
         self.state = State::None;
     }
 
-    // Helper to parse JSON keywords to tokens. Returns `None` if the
-    // keyword is not valid.
-    fn keyword(data: &str) -> Option<Token> {
-        match data {
-            "null" => Some(Token::Null),
-            "true" => Some(Token::True),
-            "false" => Some(Token::False),
-            _ => None,
-        }
-    }
-
-    // Helper to convert a JSON escape code to its character value. Any
-    // unknown escape codes are returned verbatim. It is up to the caller
-    // to validate whether they are wanted or not.
-    fn escape(data: char) -> char {
-        match data {
-            'b' => '\u{0008}',
-            'f' => '\u{000c}',
-            'n' => '\u{000a}',
-            'r' => '\u{000d}',
-            't' => '\u{0009}',
-            v => v,
-        }
-    }
-
-    fn fail(
-        &mut self,
-        err: Error,
-    ) -> Error {
-        self.reset();
-        err
-    }
-
-    fn raise<
-        HandlerFn: FnMut(Token) -> Result<(), Error>,
-        TokenFn: FnOnce(&Self) -> Result<Token, Error>,
-    >(
-        &mut self,
-        handler: &mut HandlerFn,
-        token_fn: TokenFn,
-    ) -> Result<(), Error> {
-        let r = token_fn(self).and_then(|v| handler(v));
-        self.reset();
-        r
-    }
-
-    /// ## Push a Character into the Engine
+    /// ## Reset Tokenizer
     ///
-    /// XXX
-    pub fn push<
-        HandlerFn: FnMut(Token) -> Result<(), Error>,
+    /// Reset the engine to the same state as when it was created. Internal
+    /// buffers might remain allocated for performance reasons. However, any
+    /// data is cleared.
+    pub fn reset(&mut self) {
+        self.prepare();
+    }
+
+    /// ## Report Status
+    ///
+    /// Report the status of the tokenizer engine. If a token is currently
+    /// being processed, this will yield `Status::Busy`. Otherwise, it will
+    /// yield `Status::Done`.
+    pub fn status(&self) -> Status {
+        match self.state {
+            State::None => Status::Done,
+            _ => Status::Busy,
+        }
+    }
+
+    fn advance_misc<
+        HandlerValue,
+        HandlerFn: FnMut(Token) -> core::ops::ControlFlow<HandlerValue>,
     >(
         &mut self,
         ch: Option<char>,
         handler: &mut HandlerFn,
-    ) -> Result<(), Error> {
-        // First try to push the next character into the current token
-        // handler. If either no token is currently parsed, or if the
-        // token cannot consume the character, it is returned as unhandled
-        // and the token is finalized.
-        let rem = match self.state {
-            // If no token is currently parsed, return the character as
-            // unhandled. It will then be parsed as start of a new token.
-            State::None => ch,
+    ) -> core::ops::ControlFlow<HandlerValue, Option<char>> {
+        match self.state {
+            // Slashes can start line-comments, multi-line comments, as well
+            // as be part of normal keywords. None of this is supported by
+            // JSON, but we try to be a bit clever to get better diagnostics.
+            State::Slash => match ch {
+                Some(v @ '/') => {
+                    self.acc.push(v);
+                    self.state = State::CommentLine;
+                    core::ops::ControlFlow::Continue(None)
+                },
+                Some(v) => {
+                    self.acc.push(v);
+                    self.state = State::Keyword;
+                    core::ops::ControlFlow::Continue(None)
+                },
+                None => {
+                    handler(Token::Error(Error::CharacterStray('/')))?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(None)
+                },
+            },
 
-            // If we currently parse whitespace, coalesce as much of it
-            // into a single token as possible. Once the first
-            // non-whitespace is encountered, finalize the token and return
-            // the next character as unhandled.
+            // If we parse a keyword we collect as many characters as possible.
+            // Any alphanumeric character is collected. Once a non-compatible
+            // character is encountered, the token is finalized and the
+            // character is returned as unhandled. The keyword is parsed into
+            // one of the possible keywords only when finalized. This allows
+            // error-reporting to consider the entire identifier, instead of
+            // just a single unsupported character. Similarly, we parse a lot
+            // of characters into the token, which do not necessarily form
+            // valid JSON keywords, but which lead to less obscure errors.
+            State::Keyword => match ch {
+                Some(v @ '_' | v @ 'a'..='z'
+                    | v @ 'A'..='Z' | v @ '0'..='9') => {
+                    self.acc.push(v);
+                    core::ops::ControlFlow::Continue(None)
+                },
+                v => {
+                    handler(
+                        match self.acc.as_str() {
+                            "null" => Token::Null,
+                            "true" => Token::True,
+                            "false" => Token::False,
+                            _ => Token::Error(Error::KeywordUnknown(&self.acc)),
+                        }
+                    )?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(v)
+                },
+            },
+
+            // Merge as much whitespace into a single whitespace token as
+            // possible. Once the first non-whitespace token is found, signal
+            // the whitespace token and return the next character as unhandled.
             State::Whitespace => match ch {
                 Some(v @ ' ')
                 | Some(v @ '\n')
                 | Some(v @ '\r')
                 | Some(v @ '\t') => {
                     self.acc.push(v);
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
-                v => {
-                    self.raise(handler, |v| Ok(Token::Whitespace(&v.acc)))?;
-                    v
-                },
-            },
-
-            // If we parse a keyword, we collect as many characters as
-            // possible. Any alphanumeric character is collected (but the
-            // token cannot start with one). Once a non-compatible
-            // character is encountered, the token is finalized and the
-            // character is returned as unhandled.
-            // The keyword is parsed into one of the possible keywords
-            // only when finalized. This allows error-reporting to consider
-            // the entire identifier, instead of just a single unsupported
-            // character.
-            State::Keyword => match ch {
-                Some(v @ '_' | v @ 'a'..='z'
-                    | v @ 'A'..='Z' | v @ '0'..='9') => {
+                Some(v) if v.is_whitespace() => {
+                    handler(Token::Error(Error::WhitespaceInvalid(v)))?;
                     self.acc.push(v);
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
                 v => {
-                    self.raise(
-                        handler,
-                        |v| Self::keyword(&v.acc)
-                            .ok_or(Error::KeywordUnknown(v.acc.clone())),
-                    )?;
-                    v
+                    handler(Token::Whitespace(&self.acc))?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(v)
                 },
             },
 
-            // Parsing numbers is just a matter of parsing the components one
-            // after another, where some components are optional. As usual, we
-            // keep the unmodified number in the accumulator. However, we also
-            // push all digits into a separate accumulator and remember how
-            // many digits each component occupies. This allows much simpler
-            // number conversions later on.
+            // Line comments can start with '#' or '//' and are simply ignored
+            // until the next new-line character. JSON does not support
+            // comments, but we parse them for better diagnostics.
+            State::CommentLine => match ch {
+                Some('\n') => {
+                    handler(Token::Error(Error::Comment(&self.acc)))?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(ch)
+                },
+                Some(v) => {
+                    self.acc.push(v);
+                    core::ops::ControlFlow::Continue(None)
+                },
+                None => {
+                    handler(Token::Error(Error::Comment(&self.acc)))?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(None)
+                },
+            },
+
+            _ => core::unreachable!(),
+        }
+    }
+
+    fn advance_number<
+        HandlerValue,
+        HandlerFn: FnMut(Token) -> core::ops::ControlFlow<HandlerValue>,
+    >(
+        &mut self,
+        ch: Option<char>,
+        handler: &mut HandlerFn,
+    ) -> core::ops::ControlFlow<HandlerValue, Option<char>> {
+        // Parsing numbers is just a matter of parsing the components one
+        // after another, where some components are optional. As usual, we
+        // keep the unmodified number in the accumulator. However, we also
+        // push all digits into a separate accumulator and remember how
+        // many digits each component occupies. This allows much simpler
+        // number conversions later on.
+        match self.state {
             State::NumberIntegerNone(sign_int) => match ch {
                 Some(v @ '0'..='9') => {
                     self.acc.push(v);
@@ -241,10 +362,20 @@ impl Engine {
                     } else {
                         self.state = State::NumberIntegerSome(sign_int, 1);
                     }
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
-                _ => ch,
+                Some(v) => {
+                    handler(Token::Error(Error::CharacterStray(v)))?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(Some(v))
+                },
+                None => {
+                    handler(Token::Error(Error::NumberIncomplete))?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(None)
+                },
             },
+
             State::NumberIntegerSome(sign_int, n_int) => match ch {
                 Some(v @ '0'..='9') => {
                     self.acc.push(v);
@@ -252,45 +383,48 @@ impl Engine {
                         u8::try_from(v.to_digit(10).unwrap()).unwrap(),
                     );
                     self.state = State::NumberIntegerSome(sign_int, n_int + 1);
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
                 Some('.') => {
                     self.state = State::NumberFractionNone(sign_int, n_int);
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
                 Some(v @ 'e' | v @ 'E') => {
                     self.acc.push(v);
                     self.state = State::NumberExponentNone(
                         sign_int, n_int, 0,
                     );
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
                 v => {
-                    self.raise(handler, |v| Ok(Token::Number(
-                        &v.acc, v.acc_num.as_slice(), sign_int, n_int, 0, Sign::Plus, 0,
-                    )))?;
-                    v
+                    handler(Token::Number(
+                        &self.acc, self.acc_num.as_slice(), sign_int, n_int, 0, Sign::Plus, 0,
+                    ))?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(v)
                 },
             },
             State::NumberIntegerZero(sign_int) => match ch {
                 Some('.') => {
                     self.state = State::NumberFractionNone(sign_int, 1);
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
                 Some(v @ 'e' | v @ 'E') => {
                     self.acc.push(v);
                     self.state = State::NumberExponentNone(
                         sign_int, 1, 0,
                     );
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
                 v => {
-                    self.raise(handler, |v| Ok(Token::Number(
-                        &v.acc, v.acc_num.as_slice(), sign_int, 1, 0, Sign::Plus, 0,
-                    )))?;
-                    v
+                    handler(Token::Number(
+                        &self.acc, self.acc_num.as_slice(), sign_int, 1, 0, Sign::Plus, 0,
+                    ))?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(v)
                 },
             },
+
             State::NumberFractionNone(sign_int, n_int) => match ch {
                 Some(v @ '0'..='9') => {
                     self.acc.push(v);
@@ -298,17 +432,27 @@ impl Engine {
                         u8::try_from(v.to_digit(10).unwrap()).unwrap(),
                     );
                     self.state = State::NumberFractionSome(sign_int, n_int, 1);
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
-                _ => ch,
+                Some(v) => {
+                    handler(Token::Error(Error::CharacterStray(v)))?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(Some(v))
+                },
+                None => {
+                    handler(Token::Error(Error::NumberIncomplete))?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(None)
+                },
             },
+
             State::NumberFractionSome(sign_int, n_int, n_frac) => match ch {
                 Some(v @ 'e' | v @ 'E') => {
                     self.acc.push(v);
                     self.state = State::NumberExponentNone(
                         sign_int, n_int, n_frac,
                     );
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
                 Some(v @ '0'..='9') => {
                     self.acc.push(v);
@@ -316,29 +460,31 @@ impl Engine {
                         u8::try_from(v.to_digit(10).unwrap()).unwrap(),
                     );
                     self.state = State::NumberFractionSome(sign_int, n_int, n_frac + 1);
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
                 v => {
-                    self.raise(handler, |v| Ok(Token::Number(
-                        &v.acc, v.acc_num.as_slice(), sign_int, n_int, n_frac, Sign::Plus, 0,
-                    )))?;
-                    v
+                    handler(Token::Number(
+                        &self.acc, self.acc_num.as_slice(), sign_int, n_int, n_frac, Sign::Plus, 0,
+                    ))?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(v)
                 },
             },
+
             State::NumberExponentNone(sign_int, n_int, n_frac) => match ch {
                 Some(v @ '+') => {
                     self.acc.push(v);
                     self.state = State::NumberExponentSign(
                         sign_int, n_int, n_frac, Sign::Plus,
                     );
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
                 Some(v @ '-') => {
                     self.acc.push(v);
                     self.state = State::NumberExponentSign(
                         sign_int, n_int, n_frac, Sign::Minus,
                     );
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
                 Some(v @ '0'..='9') => {
                     self.acc.push(v);
@@ -348,10 +494,20 @@ impl Engine {
                     self.state = State::NumberExponentSome(
                         sign_int, n_int, n_frac, Sign::Plus, 1,
                     );
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
-                _ => ch,
+                Some(v) => {
+                    handler(Token::Error(Error::CharacterStray(v)))?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(Some(v))
+                },
+                None => {
+                    handler(Token::Error(Error::NumberIncomplete))?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(None)
+                },
             },
+
             State::NumberExponentSign(sign_int, n_int, n_frac, sign_exp) => match ch {
                 Some(v @ '0'..='9') => {
                     self.acc.push(v);
@@ -361,10 +517,20 @@ impl Engine {
                     self.state = State::NumberExponentSome(
                         sign_int, n_int, n_frac, sign_exp, 1,
                     );
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
-                _ => ch,
+                Some(v) => {
+                    handler(Token::Error(Error::CharacterStray(v)))?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(Some(v))
+                },
+                None => {
+                    handler(Token::Error(Error::NumberIncomplete))?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(None)
+                },
             },
+
             State::NumberExponentSome(sign_int, n_int, n_frac, sign_exp, n_exp) => match ch {
                 Some(v @ '0'..='9') => {
                     self.acc.push(v);
@@ -374,74 +540,102 @@ impl Engine {
                     self.state = State::NumberExponentSome(
                         sign_int, n_int, n_frac, sign_exp, n_exp + 1,
                     );
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
                 v => {
-                    self.raise(handler, |v| Ok(Token::Number(
-                        &v.acc, v.acc_num.as_slice(), sign_int, n_int, n_frac, sign_exp, n_exp,
-                    )))?;
-                    v
+                    handler(Token::Number(
+                        &self.acc, self.acc_num.as_slice(), sign_int, n_int, n_frac, sign_exp, n_exp,
+                    ))?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(v)
                 },
             },
 
-            // When parsing a string, append all characters to the string.
-            // If a quote is found, finalize the string. If a backslash is
-            // found, parse the following characters as one of the possible
-            // escape sequences.
-            // Note that escape sequences are quite strict, and any
-            // incomplete sequence causes the parser to fail.
-            State::String => match ch {
-                Some('"') => {
-                    self.raise(
-                        handler,
-                        |v| Ok(Token::String(
-                            &v.acc,
-                            &v.acc_str,
-                        )),
-                    )?;
-                    None
+            _ => core::unreachable!(),
+        }
+    }
+
+    fn advance_string<
+        HandlerValue,
+        HandlerFn: FnMut(Token) -> core::ops::ControlFlow<HandlerValue>,
+    >(
+        &mut self,
+        ch: Option<char>,
+        handler: &mut HandlerFn,
+    ) -> core::ops::ControlFlow<HandlerValue, Option<char>> {
+        // Strings must be terminated with a quote. Therefore, we can handle
+        // `None` early for all string states.
+        let ch_value = match ch {
+            None => {
+                handler(Token::Error(Error::StringIncomplete))?;
+                self.prepare();
+                return core::ops::ControlFlow::Continue(None);
+            },
+            Some(v) => v,
+        };
+
+        // Parsing a string is just a matter of pushing characters into the
+        // accumulator and tracking escape-sequences. Unicode-escapes make up
+        // most of the complexity, since we must track surrogate pairs to avoid
+        // strings with non-paired surrogate escapes.
+        match self.state {
+            State::String => match ch_value {
+                '"' => {
+                    handler(Token::String(&self.acc, &self.acc_str))?;
+                    self.prepare();
+                    core::ops::ControlFlow::Continue(None)
                 },
-                Some(v @ '\\') => {
+                v @ '\\' => {
                     self.acc.push(v);
                     self.state = State::StringEscape;
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
-                Some(v @ '\x20'..='\x21'
-                    // '\x22' is '"'
-                    | v @ '\x23'..='\x5b'
-                    // '\x5c' is '\\'
-                    | v @ '\x5d'..='\u{d7ff}'
-                    // '\u{d800}'..='\u{dfff}' are surrogates
-                    | v @ '\u{e000}'..='\u{10ffff}') => {
+                v @ '\x20'..='\x21'
+                // '\x22' is '"'
+                | v @ '\x23'..='\x5b'
+                // '\x5c' is '\\'
+                | v @ '\x5d'..='\u{d7ff}'
+                // '\u{d800}'..='\u{dfff}' are surrogates
+                | v @ '\u{e000}'..='\u{10ffff}' => {
                     self.acc.push(v);
                     self.acc_str.push(v);
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
-                Some(v @ '\x00'..='\x1f') => {
-                    return Err(self.fail(Error::StringCharacterInvalid(v)));
-                },
-                None => {
-                    return Err(self.fail(Error::StringIncomplete));
+                v @ '\x00'..='\x1f' => {
+                    handler(Token::Error(Error::StringCharacterInvalid(v)))?;
+                    self.acc.push(v);
+                    self.acc_str.push(v);
+                    core::ops::ControlFlow::Continue(None)
                 },
             },
-            State::StringEscape => match ch {
-                Some(v @ '"' | v @ '\\' | v @ '/' | v @ 'b'
-                    | v @ 'f' | v @ 'n' | v @ 'r' | v @ 't') => {
+
+            State::StringEscape => match ch_value {
+                v @ '"' | v @ '\\' | v @ '/' | v @ 'b'
+                | v @ 'f' | v @ 'n' | v @ 'r' | v @ 't' => {
                     self.acc.push(v);
-                    self.acc_str.push(Self::escape(v));
+                    self.acc_str.push(
+                        match v {
+                            'b' => '\u{0008}',
+                            'f' => '\u{000c}',
+                            'n' => '\u{000a}',
+                            'r' => '\u{000d}',
+                            't' => '\u{0009}',
+                            v => v,
+                        },
+                    );
                     self.state = State::String;
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
-                Some(v @ 'u') => {
+                v @ 'u' => {
                     self.acc.push(v);
                     self.state = State::StringUnicode(0, 0);
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
-                Some(v) => {
-                    return Err(self.fail(Error::StringEscapeInvalid(v)));
-                },
-                None => {
-                    return Err(self.fail(Error::StringIncomplete));
+                v => {
+                    handler(Token::Error(Error::StringEscapeInvalid(v)))?;
+                    self.acc.push(v);
+                    self.acc_str.push(v);
+                    core::ops::ControlFlow::Continue(None)
                 },
             },
 
@@ -456,8 +650,8 @@ impl Engine {
             // If the Unicode Code Point is not a valid Unicode Scalar
             // Value, nor a valid surrogate pair, it is rejected as
             // invalid.
-            State::StringUnicode(num, value) => match ch {
-                Some(v @ '0'..='9' | v @ 'a'..='f' | v @ 'A'..='F') => {
+            State::StringUnicode(num, value) => match ch_value {
+                v @ '0'..='9' | v @ 'a'..='f' | v @ 'A'..='F' => {
                     let value = (value << 4) | v.to_digit(16).unwrap();
                     self.acc.push(v);
                     if num < 3 {
@@ -471,52 +665,52 @@ impl Engine {
                     } else if value >= 0xdc00 && value <= 0xdfff {
                         // Got an unpaired trail-surrogate. This is not
                         // allowed, so reject it straight away.
-                        return Err(self.fail(Error::StringSurrogateUnpaired));
+                        handler(Token::Error(Error::StringSurrogateUnpaired))?;
                     } else if let Some(v) = char::from_u32(value) {
                         // Got a valid Unicode Scalar Value.
                         self.acc_str.push(v);
                         self.state = State::String;
                     } else {
                         // Code-point is not a Unicode Scalar Value.
-                        return Err(self.fail(Error::StringEscapeUnicode));
+                        handler(Token::Error(Error::StringEscapeUnicode))?;
                     }
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
-                Some(_) => {
-                    return Err(self.fail(Error::StringEscapeIncomplete));
-                },
-                None => {
-                    return Err(self.fail(Error::StringIncomplete));
+                v => {
+                    handler(Token::Error(Error::StringEscapeIncomplete))?;
+                    self.acc.push(v);
+                    core::ops::ControlFlow::Continue(None)
                 },
             },
-            State::StringSurrogate(lead) => match ch {
-                Some(v @ '\\') => {
+
+            State::StringSurrogate(lead) => match ch_value {
+                v @ '\\' => {
                     self.acc.push(v);
                     self.state = State::StringSurrogateEscape(lead);
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
-                Some(_) => {
-                    return Err(self.fail(Error::StringSurrogateUnpaired));
-                },
-                None => {
-                    return Err(self.fail(Error::StringIncomplete));
+                v => {
+                    handler(Token::Error(Error::StringSurrogateUnpaired))?;
+                    self.acc.push(v);
+                    core::ops::ControlFlow::Continue(None)
                 },
             },
-            State::StringSurrogateEscape(lead) => match ch {
-                Some(v @ 'u') => {
+
+            State::StringSurrogateEscape(lead) => match ch_value {
+                v @ 'u' => {
                     self.acc.push(v);
                     self.state = State::StringSurrogateUnicode(lead, 0, 0);
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
-                Some(_) => {
-                    return Err(self.fail(Error::StringSurrogateUnpaired));
-                },
-                None => {
-                    return Err(self.fail(Error::StringIncomplete));
+                v => {
+                    handler(Token::Error(Error::StringSurrogateUnpaired))?;
+                    self.acc.push(v);
+                    core::ops::ControlFlow::Continue(None)
                 },
             },
-            State::StringSurrogateUnicode(lead, num, trail) => match ch {
-                Some(v @ '0'..='9' | v @ 'a'..='f' | v @ 'A'..='F') => {
+
+            State::StringSurrogateUnicode(lead, num, trail) => match ch_value {
+                v @ '0'..='9' | v @ 'a'..='f' | v @ 'A'..='F' => {
                     let trail = (trail << 4) | v.to_digit(16).unwrap();
                     self.acc.push(v);
                     if num < 3 {
@@ -526,7 +720,7 @@ impl Engine {
                     } else if trail >= 0xd800 && trail <= 0xdbff {
                         // This is another lead-surrogate, but we expected
                         // a trail-surrogate. Reject it.
-                        return Err(self.fail(Error::StringSurrogateUnpaired));
+                        handler(Token::Error(Error::StringSurrogateUnpaired))?;
                     } else if trail >= 0xdc00 && trail <= 0xdfff {
                         // This is a trail-surrogate following a
                         // lead-surrogate. This finalizes the surrogate
@@ -542,51 +736,133 @@ impl Engine {
                     } else if let Some(_) = char::from_u32(trail) {
                         // We expected a trail-surrogate, but got a
                         // Unicode Scalar Value. Reject this.
-                        return Err(self.fail(Error::StringSurrogateUnpaired));
+                        handler(Token::Error(Error::StringSurrogateUnpaired))?;
                     } else {
                         // Code-point is not a Unicode Scalar Value.
-                        return Err(self.fail(Error::StringEscapeUnicode));
+                        handler(Token::Error(Error::StringEscapeUnicode))?;
                     }
-                    None
+                    core::ops::ControlFlow::Continue(None)
                 },
-                Some(_) => {
-                    return Err(self.fail(Error::StringEscapeIncomplete));
+                v => {
+                    handler(Token::Error(Error::StringEscapeIncomplete))?;
+                    self.acc.push(v);
+                    core::ops::ControlFlow::Continue(None)
                 },
-                None => {
-                    return Err(self.fail(Error::StringIncomplete));
-                },
+            },
+
+            _ => core::unreachable!(),
+        }
+    }
+
+    /// ## Push a Character into the Tokenizer
+    ///
+    /// Push a single character into the tokenizer and process it. This
+    /// will advance the tokenizer state machine and report successfully
+    /// parsed tokens to the specified handler closure.
+    ///
+    /// The tokenizer engine will always continue parsing and is always
+    /// ready for more input. Errors are reported as special tokens and
+    /// the tokenizer will try its best to recover and proceed. This
+    /// allows reporting multiple errors in a single run. It is up to
+    /// the caller to decide whether to ultimately reject the input or
+    /// use the best-effort result of the tokenizer.
+    ///
+    /// Whenever a token is successfully parsed, the specified handler
+    /// is invoked with the token as parameter. If the handler returns
+    /// `core::ops::ControlFlow::Break(_)`, the tokenizer will reset its
+    /// internal state and propagate the value the caller immediately.
+    /// If the handler returns `core::ops::ControlFlow::Continue(())`,
+    /// the tokenizer will continue its operation as normal.
+    ///
+    /// Some JSON Tokens are open-ended, meaning that the tokenizer needs
+    /// to know about the end of the input. Hence, pushing `None` into
+    /// the tokenizer will be interpreted as End-of-Input and finalize
+    /// or cancel the final token.
+    pub fn push<
+        HandlerValue,
+        HandlerFn: FnMut(Token) -> core::ops::ControlFlow<HandlerValue>,
+    >(
+        &mut self,
+        ch: Option<char>,
+        handler: &mut HandlerFn,
+    ) -> Report<HandlerValue> {
+        // First try to push the next character into the current token
+        // handler. If either no token is currently parsed, or if the
+        // token cannot consume the character, it is returned as unhandled
+        // and the token is finalized.
+        let rem = match self.state {
+            State::None => core::ops::ControlFlow::Continue(ch),
+
+            State::Slash
+            | State::Keyword
+            | State::Whitespace
+            | State::CommentLine => {
+                self.advance_misc(ch, handler)
+            },
+
+            State::NumberIntegerNone(_)
+            | State::NumberIntegerSome(_, _)
+            | State::NumberIntegerZero(_)
+            | State::NumberFractionNone(_, _)
+            | State::NumberFractionSome(_, _, _)
+            | State::NumberExponentNone(_, _, _)
+            | State::NumberExponentSign(_, _, _, _)
+            | State::NumberExponentSome(_, _, _, _, _) => {
+                self.advance_number(ch, handler)
+            },
+
+            State::String
+            | State::StringEscape
+            | State::StringUnicode(_, _)
+            | State::StringSurrogate(_)
+            | State::StringSurrogateEscape(_)
+            | State::StringSurrogateUnicode(_, _, _) => {
+                self.advance_string(ch, handler)
             },
         };
 
-        // If the character was not handled, start parsing a new token
-        // with it as first character.
-        if let Some(v) = rem {
-            match v {
+        match rem {
+            // A handler yielded a break value. Reset the engine and propagate
+            // the break to the caller. A break cannot be recovered from, so
+            // the engine is always reset and prepared for a new run.
+            core::ops::ControlFlow::Break(v) => {
+                self.reset();
+                return Report::Break(v);
+            },
+
+            // The character was successfully parsed, or signaled end-of-input.
+            // No need to start a new token, but we can simply return to the
+            // caller.
+            core::ops::ControlFlow::Continue(None) => {},
+
+            // Either no previous token was handled, or this character
+            // finalized it. Either way, the character starts a new token.
+            core::ops::ControlFlow::Continue(Some(v)) => match v {
+                ':' => {
+                    handler(Token::Colon)?;
+                },
+                ',' => {
+                    handler(Token::Comma)?;
+                },
+                '[' => {
+                    handler(Token::ArrayOpen)?;
+                },
+                ']' => {
+                    handler(Token::ArrayClose)?;
+                },
+                '{' => {
+                    handler(Token::ObjectOpen)?;
+                },
+                '}' => {
+                    handler(Token::ObjectClose)?;
+                },
+                'a'..='z' | 'A'..='Z' => {
+                    self.acc.push(v);
+                    self.state = State::Keyword;
+                },
                 ' ' | '\n' | '\r' | '\t' => {
                     self.acc.push(v);
                     self.state = State::Whitespace;
-                },
-                ':' => {
-                    self.raise(handler, |_| Ok(Token::Colon))?;
-                },
-                ',' => {
-                    self.raise(handler, |_| Ok(Token::Comma))?;
-                },
-                '[' => {
-                    self.raise(handler, |_| Ok(Token::ArrayOpen))?;
-                },
-                ']' => {
-                    self.raise(handler, |_| Ok(Token::ArrayClose))?;
-                },
-                '{' => {
-                    self.raise(handler, |_| Ok(Token::ObjectOpen))?;
-                },
-                '}' => {
-                    self.raise(handler, |_| Ok(Token::ObjectClose))?;
-                },
-                '_' | 'a'..='z' | 'A'..='Z' => {
-                    self.acc.push(v);
-                    self.state = State::Keyword;
                 },
                 '-' => {
                     self.acc.push(v);
@@ -606,30 +882,127 @@ impl Engine {
                 '"' => {
                     self.state = State::String;
                 },
-                v => return Err(self.fail(Error::CharacterInvalid(v))),
-            };
+                '#' => {
+                    self.state = State::CommentLine;
+                },
+                '\'' => {
+                    // Single quotes are not allowed, so raise an error but
+                    // then treat it as part of a keyword. We could try to
+                    // parse it as single-quote string, but it is unclear
+                    // whether it would yield better diagnostics.
+                    handler(Token::Error(Error::CharacterInvalid(v)))?;
+                    self.acc.push(v);
+                    self.state = State::Keyword;
+                },
+                '(' | ')' => {
+                    // Parentheses are not allowed, so raise an error and
+                    // treat them as part of a keyword. We could try to
+                    // match them and ignore anything in between to get
+                    // better diagnostics. But for now we just do the
+                    // simple thing and treat it as keyword.
+                    handler(Token::Error(Error::CharacterInvalid(v)))?;
+                    self.acc.push(v);
+                    self.state = State::Keyword;
+                },
+                '+' => {
+                    // A leading plus-sign is not allowed for JSON Number
+                    // Values, yet it is very reasonable to support it. Raise
+                    // an error, unless explicitly allowed, and then continue
+                    // parsing the number.
+                    if (self.flags & FLAG_ALLOW_PLUS_SIGN) == 0 {
+                        handler(Token::Error(Error::CharacterInvalid(v)))?;
+                    }
+                    self.acc.push(v);
+                    self.state = State::NumberIntegerNone(Sign::Plus);
+                },
+                '/' => {
+                    // Slashes are not allowed, but are often used to start
+                    // comments or combine expressions in other languages.
+                    // Hence, try to be clever and do the same, so we get
+                    // improved diagnostics.
+                    self.acc.push(v);
+                    self.state = State::Slash;
+                },
+                '=' => {
+                    // Raise errors about equal signs, but then treat them as
+                    // colons, as they usually serve similar purposes.
+                    handler(Token::Error(Error::CharacterInvalid(v)))?;
+                    handler(Token::Colon)?;
+                },
+                '`' => {
+                    // Backticks are not allowed, but treat them as part of a
+                    // keyword for diagnotics. We could try to match them and
+                    // ignore anything in between, but it is unclear whether it
+                    // would benefit diagnostics.
+                    handler(Token::Error(Error::CharacterInvalid(v)))?;
+                    self.acc.push(v);
+                    self.state = State::Keyword;
+                },
+                '!' | '$' | '%' | '&' | '*' | '.' | '<' | '>'
+                | '?' | '@' | '\\' | '^' | '_' | '|' | '~' => {
+                    // Raise errors about these punctuation characters, but
+                    // continue as if they are part of keywords, given that
+                    // they are often used in special keywords elsewhere.
+                    handler(Token::Error(Error::CharacterInvalid(v)))?;
+                    self.acc.push(v);
+                    self.state = State::Keyword;
+                },
+                v if v.is_ascii_punctuation() => {
+                    // Raise errors about stray unsupported punctuation
+                    // characters, but otherwise ignore them and continue.
+                    handler(Token::Error(Error::CharacterInvalid(v)))?;
+                },
+                v if v.is_control() => {
+                    // Raise errors about stray control characters, but
+                    // otherwise ignore them and continue.
+                    handler(Token::Error(Error::CharacterInvalid(v)))?;
+                },
+                v if v.is_whitespace() => {
+                    // Raise errors about unsupported whitespace characters,
+                    // but then include them in the whitespace token verbatim.
+                    handler(Token::Error(Error::WhitespaceInvalid(v)))?;
+                    self.acc.push(v);
+                    self.state = State::Whitespace;
+                },
+                v if v.is_alphanumeric() => {
+                    // Unsupported alphanumeric characters are simply treated
+                    // as keywords. They will eventually lead to invalid
+                    // keyword tokens, so no need to raise errors here.
+                    self.acc.push(v);
+                    self.state = State::Keyword;
+                },
+                v => {
+                    // Any other character we simply treat as invalid and
+                    // ignore it. There is nothing reasonable to do about it,
+                    // as all other things have been handled before.
+                    handler(Token::Error(Error::CharacterInvalid(v)))?;
+                },
+            },
         }
 
-        Ok(())
+        Report::Continue(self.status())
     }
 
-    /// ## Push a String into the Engine
+    /// ## Push a String into the Tokenizer
     ///
-    /// XXX
+    /// Push an entire string into the tokenizer and process it. This is
+    /// equivalent to iterating over the characters and pushing them into
+    /// the tokenizer individually. See `Self::push()` for details.
     pub fn push_str<
-        HandlerFn: FnMut(Token) -> Result<(), Error>,
+        HandlerValue,
+        HandlerFn: FnMut(Token) -> core::ops::ControlFlow<HandlerValue>,
     >(
         &mut self,
         data: &str,
         handler: &mut HandlerFn,
-    ) -> Result<(), Error> {
+    ) -> Report<HandlerValue> {
         for ch in data.chars() {
             self.push(Some(ch), handler)?;
         }
-        Ok(())
+        Report::Continue(self.status())
     }
 
-    /// ## Parse a String with the Engine
+    /// ## Parse a String with the Tokenizer
     ///
     /// Push the entire string into the tokenizer engine, followed by an
     /// End-Of-Input marker. See `Self::push()` for details.
@@ -637,18 +1010,23 @@ impl Engine {
     /// Note that this does not clear the engine before pushing the string
     /// into it. Hence, make sure to call this on a clean engine, unless
     /// it is meant to be pushed on top of the previous input.
+    ///
+    /// This will finalize the input and thus always reset the tokenizer
+    /// before returning. Moreover, the tokenizer will always report a
+    /// status of `Status::Done` when finished.
     pub fn parse_str<
-        HandlerFn: FnMut(Token) -> Result<(), Error>,
+        HandlerValue,
+        HandlerFn: FnMut(Token) -> core::ops::ControlFlow<HandlerValue>,
     >(
         &mut self,
         data: &str,
         handler: &mut HandlerFn,
-    ) -> Result<(), Error> {
+    ) -> Report<HandlerValue> {
         for ch in data.chars() {
             self.push(Some(ch), handler)?;
         }
         self.push(None, handler)?;
-        Ok(())
+        Report::Continue(Status::Done)
     }
 }
 
@@ -664,16 +1042,16 @@ mod tests {
     ) {
         let mut iter = to.iter();
 
-        Engine::new().parse_str(
+        Tokenizer::new().parse_str(
             from,
-            &mut |v| {
+            &mut |v| -> core::ops::ControlFlow<()> {
                 assert_eq!(
                     v,
                     *iter.next().unwrap(),
                 );
-                Ok(())
+                core::ops::ControlFlow::Continue(())
             },
-        ).unwrap();
+        );
 
         assert_eq!(iter.next(), None);
     }
