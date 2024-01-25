@@ -120,8 +120,7 @@ rust-build: rust-builddir
 				build \
 				--all-targets \
 				--target-dir "/srv/build/rust" \
-				--verbose \
-				--workspace
+				--verbose
 
 .PHONY: rust-doc
 rust-doc: rust-builddir
@@ -156,5 +155,4 @@ rust-test: rust-builddir
 				test \
 				--all-targets \
 				--target-dir "/srv/build/rust" \
-				--verbose \
-				--workspace
+				--verbose
