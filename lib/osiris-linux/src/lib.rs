@@ -12,7 +12,5 @@
 //! public API does not expose any of the GTK/glib types, and thus the project
 //! can switch to a custom implementation of the specifications in the future.
 
-#![cfg(any(all(doc, not(doctest)), target_os = "linux"))]
-
 pub mod application;
 pub mod notification;

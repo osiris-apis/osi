@@ -4,7 +4,5 @@
 //! uses Windows 8.1 as baseline, but can make use of newer Windows features
 //! if available.
 
-#![cfg(any(all(doc, not(doctest)), target_os = "windows"))]
-
 pub mod application;
 pub mod notification;

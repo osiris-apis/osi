@@ -19,7 +19,7 @@ readme.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[target.'cfg(target_os = "macos")'.dependencies.icrate]
+[dependencies.icrate]
 version = "0.1"
 features = [
         "AppKit",
@@ -29,5 +29,5 @@ features = [
         "Foundation_NSThread",
 ]
 
-[target.'cfg(target_os = "macos")'.dependencies.objc2]
+[dependencies.objc2]
 version = "0.5"
