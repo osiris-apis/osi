@@ -7,6 +7,7 @@ gio = { features = ["v2_70"], version = "0.18" }
 osi-apis = { path = "./lib/osi-apis" }
 osi-derive = { path = "./lib/osi-derive" }
 osi-derive-proc = { path = "./lib/osi-derive-proc" }
+osi-json = { path = "./lib/osi-json" }
 osi-lib = { path = "./lib/osi-lib" }
 osiris-linux = { path = "./lib/osiris-linux" }
 osiris-macos = { path = "./lib/osiris-macos" }

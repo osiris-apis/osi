@@ -21,3 +21,4 @@ rust-version.workspace = true
 
 [dependencies]
 osi-derive = { workspace = true }
+osi-json = { workspace = true }

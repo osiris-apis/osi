@@ -11,3 +11,4 @@ pub mod hmac;
 pub mod str;
 
 pub use osi_derive as dd;
+pub use osi_json as json;
