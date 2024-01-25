@@ -1,6 +1,11 @@
 [workspace]
-default-members = [".", "lib/*"]
 members = [".", "lib/*"]
+
+default-members = [
+        ".",
+        "lib/cargo-osiris",
+        "lib/osi-demo",
+]
 
 [workspace.dependencies]
 gio = { features = ["v2_70"], version = "0.18" }
