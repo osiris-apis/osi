@@ -4,7 +4,7 @@ members = [".", "lib/*"]
 default-members = [
         ".",
         "lib/cargo-osiris",
-        "lib/osi-demo",
+        "lib/osi-*",
 ]
 
 [workspace.dependencies]
