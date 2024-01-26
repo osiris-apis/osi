@@ -102,7 +102,10 @@ FORCE:
 # Target: rust-*
 #
 
+# Rust channel to use for all operations.
 RUST_CHANNEL		?= stable
+
+# List of Rust targets this workspace has crates for.
 RUST_TARGETS		?= \
 	x86_64-apple-darwin \
 	x86_64-linux-android \
@@ -136,7 +139,7 @@ rust-build: rust-builddir
 				--target-dir "/srv/build/rust" \
 				--verbose
 
-rust-doc-%: rust-builddir FORCE
+F_RUST_DOC		= \
 	$(DOCKER_PRIV_PODMAN_RUN_1000) \
 		--env "CARGO_HOME=/srv/build/cargo" \
 		--init \
@@ -149,13 +152,28 @@ rust-doc-%: rust-builddir FORCE
 				doc \
 				--lib \
 				--no-deps \
-				--target "$*" \
 				--target-dir "/srv/build/rust" \
-				--verbose
-	rm -f "$(BUILDDIR)/rust/doc/.lock"
+				--verbose \
+				$1
+
+RUST_DOC_PKGS		=
+
+rust-doc-%: rust-builddir FORCE
+	test -z "$(RUST_DOC_PKGS)" || \
+		$(call \
+			F_RUST_DOC, \
+			--target "$*" \
+			$(foreach pkg,$(RUST_DOC_PKGS),-p $(pkg)) \
+		)
+
+rust-doc-x86_64-apple-darwin: RUST_DOC_PKGS = osiris-macos
+rust-doc-x86_64-pc-windows-msvc: RUST_DOC_PKGS = osiris-windows
+rust-doc-x86_64-unknown-linux-gnu: RUST_DOC_PKGS = osiris-linux
 
 .PHONY: rust-doc
 rust-doc: $(foreach target,$(RUST_TARGETS),rust-doc-$(target))
+	$(call F_RUST_DOC,)
+	rm -f "$(BUILDDIR)/rust/doc/.lock"
 
 .PHONY: rust-test
 rust-test: rust-builddir
