@@ -48,5 +48,8 @@
 #[cfg(test)]
 extern crate std;
 
+#[doc(inline)]
 pub use osi_apis as apis;
+
+#[doc(inline)]
 pub use osi_lib as lib;
