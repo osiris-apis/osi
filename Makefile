@@ -103,6 +103,11 @@ FORCE:
 #
 
 RUST_CHANNEL		?= stable
+RUST_DOC_TARGETS	?= \
+	x86_64-apple-darwin \
+	x86_64-linux-android \
+	x86_64-pc-windows-msvc \
+	x86_64-unknown-linux-gnu
 
 .PHONY: rust-builddir
 rust-builddir: $(BUILDDIR)/cargo/ $(BUILDDIR)/rust/
@@ -123,8 +128,7 @@ rust-build: rust-builddir
 				--target-dir "/srv/build/rust" \
 				--verbose
 
-.PHONY: rust-doc
-rust-doc: rust-builddir
+rust-doc-%: rust-builddir FORCE
 	$(DOCKER_PRIV_PODMAN_RUN_1000) \
 		--env "CARGO_HOME=/srv/build/cargo" \
 		--init \
@@ -137,10 +141,13 @@ rust-doc: rust-builddir
 				doc \
 				--lib \
 				--no-deps \
+				--target "$*" \
 				--target-dir "/srv/build/rust" \
-				--verbose \
-				--workspace
+				--verbose
 	rm -f "$(BUILDDIR)/rust/doc/.lock"
+
+.PHONY: rust-doc
+rust-doc: $(foreach target,$(RUST_DOC_TARGETS),rust-doc-$(target))
 
 .PHONY: rust-test
 rust-test: rust-builddir
