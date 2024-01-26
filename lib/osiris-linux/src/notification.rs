@@ -7,7 +7,7 @@
 //! The underlying mechanism is based on the Freedesktop Notification
 //! Specification[^spec].
 //!
-//! [^spec]: https://specifications.freedesktop.org/notification-spec/
+//! [^spec]: <https://specifications.freedesktop.org/notification-spec/>
 
 // XXX: The current implementation lacks a few advanced features of the
 //      Notification Specification. These can be added in the future. It
