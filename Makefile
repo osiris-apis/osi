@@ -103,14 +103,22 @@ FORCE:
 #
 
 RUST_CHANNEL		?= stable
-RUST_DOC_TARGETS	?= \
+RUST_TARGETS		?= \
 	x86_64-apple-darwin \
 	x86_64-linux-android \
 	x86_64-pc-windows-msvc \
 	x86_64-unknown-linux-gnu
 
+rust-builddir-%: | $(BUILDDIR)/rust/%/
+	@ln -fns "../doc" "$(BUILDDIR)/rust/$*/doc"
+
 .PHONY: rust-builddir
-rust-builddir: $(BUILDDIR)/cargo/ $(BUILDDIR)/rust/
+rust-builddir: \
+    $(foreach target,$(RUST_TARGETS),rust-builddir-$(target)) \
+    | \
+    $(BUILDDIR)/cargo/ \
+    $(BUILDDIR)/rust/ \
+    $(BUILDDIR)/rust/doc/ \
 
 .PHONY: rust-build
 rust-build: rust-builddir
@@ -147,7 +155,7 @@ rust-doc-%: rust-builddir FORCE
 	rm -f "$(BUILDDIR)/rust/doc/.lock"
 
 .PHONY: rust-doc
-rust-doc: $(foreach target,$(RUST_DOC_TARGETS),rust-doc-$(target))
+rust-doc: $(foreach target,$(RUST_TARGETS),rust-doc-$(target))
 
 .PHONY: rust-test
 rust-test: rust-builddir
