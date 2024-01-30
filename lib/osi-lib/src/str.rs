@@ -81,13 +81,15 @@ pub fn cmp_natural(
 ///
 /// Additionally, if the string starts with a numeric character, it is
 /// prefixed with an underscore.
-pub fn symbolize(input: &str) -> String {
+pub fn symbolize(input: &str) -> alloc::string::String {
     let needs_prefix = input.chars()
         .next()
         .map(char::is_numeric)
         .unwrap_or(true);
 
-    let mut v = String::with_capacity(input.len() + (needs_prefix as usize));
+    let mut v = alloc::string::String::with_capacity(
+        input.len() + (needs_prefix as usize),
+    );
 
     if needs_prefix {
         v.push('_');

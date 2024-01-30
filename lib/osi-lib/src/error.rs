@@ -2,6 +2,8 @@
 //!
 //! This module provides utilities around error handling.
 
+use alloc::boxed::Box;
+
 /// ## Uncaught Errors
 ///
 /// This object represents errors that were not caught, but have to be
@@ -11,7 +13,11 @@ pub enum Uncaught {
     Any(Box<dyn core::any::Any>),
     Debug(Box<dyn core::fmt::Debug>),
     Display(Box<dyn core::fmt::Display>),
+
+    #[cfg(feature = "std")]
     Error(Box<dyn std::error::Error>),
+    #[cfg(not(feature = "std"))]
+    Error(Box<dyn core::fmt::Display>),
 }
 
 impl core::fmt::Debug for Uncaught {
@@ -23,7 +29,11 @@ impl core::fmt::Debug for Uncaught {
             Uncaught::Any(_) => write!(fmt, "Uncaught::Any()"),
             Uncaught::Debug(v) => write!(fmt, "Uncaught::Debug({:?})", v),
             Uncaught::Display(v) => write!(fmt, "Uncaught::Display({})", v),
+
+            #[cfg(feature = "std")]
             Uncaught::Error(v) => write!(fmt, "Uncaught::Error({:?})", v),
+            #[cfg(not(feature = "std"))]
+            Uncaught::Error(v) => write!(fmt, "Uncaught::Error({})", v),
         }
     }
 }
@@ -42,6 +52,7 @@ impl core::fmt::Display for Uncaught {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for Uncaught {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
@@ -111,21 +122,50 @@ impl Uncaught {
         Self::fold_display(Box::new(v))
     }
 
-    /// ## Fold Error into Uncaught
+    /// ## Fold Standard Error into Uncaught
     ///
     /// Take any error and fold it into an uncaught error, exposing the
     /// full `Error` trait.
+    #[cfg(feature = "std")]
     pub fn fold_error(v: Box<dyn std::error::Error>) -> Self {
         Self::Error(v)
     }
 
-    /// ## Box Error into Uncaught
+    /// ## Fold Fallback Error into Uncaught
+    ///
+    /// Take any fallback error and fold it into an uncaught error, exposing
+    /// the full `Error` trait.
+    ///
+    /// This function is exposed if no `std` is used, and thus serves as
+    /// fallback when `std::error::Error` is not available.
+    #[cfg(not(feature = "std"))]
+    pub fn fold_error(v: Box<dyn core::fmt::Display>) -> Self {
+        Self::Error(v)
+    }
+
+    /// ## Box Standard Error into Uncaught
     ///
     /// Take any error and box it into an uncaught error, exposing the
     /// full `Error` trait.
+    #[cfg(feature = "std")]
     pub fn box_error<T>(v: T) -> Self
     where
         T: std::error::Error + 'static,
+    {
+        Self::fold_error(Box::new(v))
+    }
+
+    /// ## Box Fallback Error into Uncaught
+    ///
+    /// Take any fallback error and box it into an uncaught error, exposing the
+    /// full `Error` trait.
+    ///
+    /// This function is exposed if no `std` is used, and thus serves as
+    /// fallback when `std::error::Error` is not available.
+    #[cfg(not(feature = "std"))]
+    pub fn box_error<T>(v: T) -> Self
+    where
+        T: core::fmt::Display + 'static,
     {
         Self::fold_error(Box::new(v))
     }
@@ -133,6 +173,7 @@ impl Uncaught {
 
 #[cfg(test)]
 mod tests {
+    use std::format;
     use super::*;
 
     // Test basic operations of `Uncaught`, including its boxing and
@@ -151,8 +192,17 @@ mod tests {
         assert_eq!(format!("{:?}", e), "Uncaught::Display(0)");
         assert_eq!(format!("{}", e), "Uncaught(Display): 0");
 
-        let e = Uncaught::box_error(std::io::Error::other("foobar"));
-        assert_eq!(format!("{:?}", e), "Uncaught::Error(Custom { kind: Other, error: \"foobar\" })");
-        assert_eq!(format!("{}", e), "Uncaught(Error): foobar");
+        #[cfg(feature = "std")]
+        {
+            let e = Uncaught::box_error(std::io::Error::other("foobar"));
+            assert_eq!(format!("{:?}", e), "Uncaught::Error(Custom { kind: Other, error: \"foobar\" })");
+            assert_eq!(format!("{}", e), "Uncaught(Error): foobar");
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            let e = Uncaught::box_error("foobar");
+            assert_eq!(format!("{:?}", e), "Uncaught::Error(foobar)");
+            assert_eq!(format!("{}", e), "Uncaught(Error): foobar");
+        }
     }
 }

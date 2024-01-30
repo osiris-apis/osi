@@ -110,7 +110,7 @@ impl<const SIZE: usize> Hash<SIZE> {
     ///
     /// Due to limitations of the const-evaluation of Rust, this returns a
     /// `String` rather than `[char; SIZE * 2]`.
-    pub fn to_hex(&self) -> String {
+    pub fn to_hex(&self) -> alloc::string::String {
         fn digit_to_char(digit: u8) -> char {
             match digit {
                 0x0 => '0', 0x1 => '1', 0x2 => '2', 0x3 => '3',
@@ -121,7 +121,7 @@ impl<const SIZE: usize> Hash<SIZE> {
             }
         }
 
-        let mut s = String::with_capacity(
+        let mut s = alloc::string::String::with_capacity(
             SIZE.checked_mul(2).unwrap(),
         );
 

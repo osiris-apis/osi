@@ -3,6 +3,14 @@
 //! This crate provides shared utility functions used across many
 //! Osiris crates.
 
+#![no_std]
+
+extern crate alloc;
+extern crate core;
+
+#[cfg(any(test, feature = "std"))]
+extern crate std;
+
 pub mod align;
 pub mod error;
 pub mod ffi;
