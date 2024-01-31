@@ -3,6 +3,18 @@
 //! This module provides utilities for string operations, which are not found
 //! in the standard library.
 
+/// Convert a string into an option based on whether it is empty.
+///
+/// This takes a string `v` and tests whether it is empty. If it is, it will
+/// yield `None`, otherwise it will yield `Some(v)`.
+pub fn some(v: &str) -> Option<&str> {
+    if v.is_empty() {
+        None
+    } else {
+        Some(v)
+    }
+}
+
 /// ## Compare Strings with Natural Sort Order
 ///
 /// This takes two strings and compares them with natural sort order, trying
@@ -109,6 +121,15 @@ pub fn symbolize(input: &str) -> alloc::string::String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Verify behavior of `some()`, ensuring that it turns empty strings into
+    // `None` and everything else into `Some(v)`.
+    #[test]
+    fn some_basic() {
+        assert_eq!(some(""), None);
+        assert_eq!(some(" "), Some(" "));
+        assert_eq!(some("foobar"), Some("foobar"));
+    }
 
     // Verify Natural Sort Order
     //
