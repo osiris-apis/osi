@@ -762,5 +762,15 @@ mod tests {
             r[0],
             Error::CommandTakesNoParameters(Id::Root, _),
         ));
+
+        let r = parse(
+            &["foo", "invalid"],
+            &mut values,
+        ).unwrap_err();
+        assert_eq!(r.len(), 1);
+        assert!(core::matches!(
+            r[0],
+            Error::CommandTakesNoParameters(Id::Foo, _),
+        ));
     }
 }
