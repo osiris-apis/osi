@@ -1,0 +1,27 @@
+[package]
+name = "osi-wip"
+version = "0.0.1"
+
+description = "Osiris Work in Progress Library"
+keywords = [
+        "api",
+        "library",
+        "osiris",
+        "utilities",
+        "wip",
+]
+
+categories.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+readme.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+osi-derive = { workspace = true }
+osi-lib = { workspace = true }
+
+[features]
+std = []

@@ -5,7 +5,7 @@
 //! to access data of native and foreign ABIs independent of the ABI of the
 //! calling platform.
 
-use crate::{ffi, align};
+use crate::{ffi, lib::align};
 
 /// ## ABI Description
 ///
