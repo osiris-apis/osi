@@ -1,8 +1,8 @@
-//! # Osiris Demo Application Library
+//! # Osiris Apis Analyzer Library
 //!
-//! This library provides the implementation of the Osiris Demo Application. It
-//! renders a simple UI to test and debug Osiris APIs. It uses the platform
-//! native APIs to render the UI and interact with the system.
+//! This library provides the implementation of the Osiris Apis Analyzer
+//! Application. It renders a simple UI to analyze Osiris APIs. It uses the
+//! platform native APIs to render the UI and interact with the system.
 
 mod platform;
 
@@ -25,6 +25,6 @@ fn run() -> std::process::ExitCode {
     1.into()
 }
 
-pub fn osi_demo() -> std::process::ExitCode {
+pub fn osiris_analyzer() -> std::process::ExitCode {
     run()
 }

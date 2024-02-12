@@ -1,13 +1,13 @@
 [package]
-name = "osi-demo"
+name = "osiris-analyzer"
 version = "0.0.1"
 
 categories = [
         "development-tools",
 ]
-description = "Osiris Demo Application"
+description = "Osiris Apis Analyzer"
 keywords = [
-        "demo",
+        "analyzer",
         "direct",
         "os",
         "osiris",
