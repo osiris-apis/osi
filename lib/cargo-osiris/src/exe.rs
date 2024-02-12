@@ -149,36 +149,12 @@ pub fn cargo_osiris() -> std::process::ExitCode {
 
             // Run `cargo metadata` and parse the output.
             match query.run() {
-                Err(cargo::Error::Exec(v)) => {
-                    eprintln!("Cannot query cargo metadata: Execution of cargo could not commence ({})", v);
-                    Err(1)
-                },
-                Err(cargo::Error::Cargo(v)) => {
-                    eprintln!("Cannot query cargo metadata: Cargo failed executing ({})", v);
-                    Err(1)
-                },
-                Err(cargo::Error::Unicode(error)) => {
-                    eprintln!("Cannot query cargo metadata: Cargo returned invalid unicode data ({})", error);
-                    Err(1)
-                },
-                Err(cargo::Error::Json) => {
-                    eprintln!("Cannot query cargo metadata: Cargo returned invalid JSON data");
-                    Err(1)
-                },
-                Err(cargo::Error::UnknownPackage(v)) => {
-                    eprintln!("Cannot query cargo metadata: Requested package name '{}' is unknown", v);
-                    Err(1)
-                },
-                Err(cargo::Error::AmbiguousPackage(v)) => {
-                    eprintln!("Cannot query cargo metadata: Requested package name '{}' is ambiguous", v);
-                    Err(1)
-                },
-                Err(cargo::Error::Data) => {
-                    eprintln!("Cannot query cargo metadata: Cargo metadata lacks required fields");
-                    Err(1)
-                },
                 Ok(v) => {
                     Ok(v)
+                },
+                Err(e) => {
+                    eprintln!("Cannot query cargo metadata: {}", e);
+                    Err(1)
                 },
             }
         }
@@ -246,35 +222,9 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                     eprintln!("Cannot build platform integration: {} failed executing: {}", tool, v);
                     Err(1)
                 },
-                Err(op::BuildError::Cargo(sub)) => match sub {
-                    cargo::Error::Exec(v) => {
-                        eprintln!("Cannot build Android platform integration: Execution of Cargo could not commence: {}", v);
-                        Err(1)
-                    },
-                    cargo::Error::Cargo(v) => {
-                        eprintln!("Cannot build Android platform integration: Cargo failed executing: {}", v);
-                        Err(1)
-                    },
-                    cargo::Error::Unicode(v) => {
-                        eprintln!("Cannot build Android platform integration: Invalid Unicode in Cargo output: {}", v);
-                        Err(1)
-                    },
-                    cargo::Error::Json => {
-                        eprintln!("Cannot build Android platform integration: Invalid JSON in Cargo output");
-                        Err(1)
-                    },
-                    cargo::Error::UnknownPackage(v) => {
-                        eprintln!("Cannot build Android platform integration: Unknown package name: {}", v);
-                        Err(1)
-                    },
-                    cargo::Error::AmbiguousPackage(v) => {
-                        eprintln!("Cannot build Android platform integration: Ambiguous package name: {}", v);
-                        Err(1)
-                    },
-                    cargo::Error::Data => {
-                        eprintln!("Cannot build Android platform integration: Unsupported data format in Cargo output");
-                        Err(1)
-                    },
+                Err(op::BuildError::Cargo(e)) => {
+                    eprintln!("Cannot build Android platform integration: {}", e);
+                    Err(1)
                 },
                 Err(op::BuildError::AndroidPlatform(sub)) => match sub {
                     platform::android::BuildError::UnsupportedPath(path) => {

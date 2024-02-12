@@ -7,10 +7,7 @@
 use crate::misc;
 use std::collections::{BTreeMap, BTreeSet};
 
-/// ## Metadata Extraction Errors
-///
-/// This error-enum describes the possible errors from the metadata extraction
-/// helper. See each error-code for details on when it is raised.
+/// Error definitions for all possible errors of the Cargo metadata extraction.
 #[derive(Debug)]
 pub enum Error {
     /// Execution of `cargo` could not commence.
@@ -27,6 +24,20 @@ pub enum Error {
     AmbiguousPackage(String),
     /// Data decoding error.
     Data,
+}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+        match self {
+            Error::Exec(e) => fmt.write_fmt(core::format_args!("Execution of `cargo` could not commence (io-error: {})", e)),
+            Error::Cargo(e) => fmt.write_fmt(core::format_args!("`cargo` failed unexpectedly (exit-code: {})", e)),
+            Error::Unicode(e) => fmt.write_fmt(core::format_args!("`cargo` returned invalid Unicode data (utf8-error: {})", e)),
+            Error::Json => fmt.write_fmt(core::format_args!("`cargo` returned invalid JSON data")),
+            Error::UnknownPackage(v) => fmt.write_fmt(core::format_args!("Cannot resolve requested package name: {}", v)),
+            Error::AmbiguousPackage(v) => fmt.write_fmt(core::format_args!("Ambiguous package name: {}", v)),
+            Error::Data => fmt.write_fmt(core::format_args!("Cannot decode Cargo metadata")),
+        }
+    }
 }
 
 /// ## Android Metadata
