@@ -43,9 +43,14 @@ pub struct ConfigPlatformAndroid {
     pub version_name: String,
 }
 
+/// ## MacOS Configuration
+pub struct ConfigPlatformMacos {
+}
+
 /// ## Platform Union
 pub enum ConfigPlatformConfiguration {
     Android(ConfigPlatformAndroid),
+    Macos(ConfigPlatformMacos),
 }
 
 /// ## Platform Configuration

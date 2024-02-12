@@ -276,6 +276,15 @@ pub fn build(
                 path_build.as_path(),
             )
         },
+        config::ConfigPlatformConfiguration::Macos(ref v) => {
+            platform::macos::build(
+                config,
+                metadata,
+                platform,
+                v,
+                path_build.as_path(),
+            )
+        },
     }
 }
 

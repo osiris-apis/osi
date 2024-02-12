@@ -5,3 +5,4 @@
 //! dependent toolchains.
 
 pub mod android;
+pub mod macos;
