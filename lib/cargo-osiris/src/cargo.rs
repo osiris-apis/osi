@@ -7,23 +7,54 @@
 use crate::misc;
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Error definitions for Osiris Metadata parsing.
+#[derive(Debug)]
+pub enum MdOsiError {
+    /// Invalid type for the specified field
+    TypeInvalid(&'static str, &'static str),
+    /// Supported range of the selected type was exceeded
+    TypeExceeded(&'static str),
+    /// Mandatory key is missing
+    KeyMissing(&'static str),
+    /// Key cannot be specified with conflicting alternatives
+    KeyExclusive(&'static str),
+    /// Specified version is higher/lower than supported by this implementation.
+    VersionUnsupported(u32),
+}
+
 /// Error definitions for all possible errors of the Cargo metadata extraction.
 #[derive(Debug)]
 pub enum Error {
-    /// Execution of `cargo` could not commence.
+    /// Execution of `cargo` could not commence
     Exec(std::io::Error),
-    /// `cargo` exited without success.
+    /// `cargo` exited without success
     Cargo(std::process::ExitStatus),
-    /// Unicode decoding error.
+    /// Unicode decoding error
     Unicode(std::str::Utf8Error),
-    /// JSON decoding error.
+    /// JSON decoding error
     Json,
+    /// No package specified, nor does the Cargo workspace have a root
+    NoPackage,
     /// Unknown package reference
     UnknownPackage(String),
     /// Ambiguous package reference
     AmbiguousPackage(String),
-    /// Data decoding error.
+    /// Data decoding error
     Data,
+    /// Osiris Metadata parsing errors
+    MdOsi(MdOsiError),
+}
+
+impl core::fmt::Display for MdOsiError {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+        match self {
+            MdOsiError::TypeInvalid(v, t) => fmt.write_fmt(core::format_args!("Specified entry requires a value of a different type: `{}` requires type `{}`", v, t)),
+            MdOsiError::TypeExceeded(v) => fmt.write_fmt(core::format_args!("Specified entry exceeded the maximum supported range for its type: {}", v)),
+            MdOsiError::KeyMissing(v) => fmt.write_fmt(core::format_args!("Required entry was not specified: {}", v)),
+            MdOsiError::KeyExclusive(v) => fmt.write_fmt(core::format_args!("Exclusive entry was specified with conflicts: {}", v)),
+            MdOsiError::VersionUnsupported(v) => fmt.write_fmt(core::format_args!("Specified version is not supported: {}", v)),
+        }
+    }
 }
 
 impl core::fmt::Display for Error {
@@ -33,38 +64,119 @@ impl core::fmt::Display for Error {
             Error::Cargo(e) => fmt.write_fmt(core::format_args!("`cargo` failed unexpectedly (exit-code: {})", e)),
             Error::Unicode(e) => fmt.write_fmt(core::format_args!("`cargo` returned invalid Unicode data (utf8-error: {})", e)),
             Error::Json => fmt.write_fmt(core::format_args!("`cargo` returned invalid JSON data")),
+            Error::NoPackage => fmt.write_fmt(core::format_args!("No package specified, nor does the Cargo workspace have a root package")),
             Error::UnknownPackage(v) => fmt.write_fmt(core::format_args!("Cannot resolve requested package name: {}", v)),
             Error::AmbiguousPackage(v) => fmt.write_fmt(core::format_args!("Ambiguous package name: {}", v)),
             Error::Data => fmt.write_fmt(core::format_args!("Cannot decode Cargo metadata")),
+            Error::MdOsi(e) => fmt.write_fmt(core::format_args!("Cannot parse Osiris metadata: {}", e)),
         }
     }
 }
 
-/// ## Android Metadata
-///
-/// This struct represents the Android-related metadata embedded in a Cargo
-/// manifest of a single package.
+impl core::convert::From<MdOsiError> for Error {
+    fn from(v: MdOsiError) -> Self {
+        Error::MdOsi(v)
+    }
+}
+
+/// Metadata required to bundle an application of library for the Android
+/// platform.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct MetadataAndroid {
-    /// Java source directories to be included in an Android build.
+    /// Java source directories to be included in an Android build
     pub java_dirs: Vec<std::path::PathBuf>,
-    /// Kotlin source directories to be included in an Android build.
+    /// Kotlin source directories to be included in an Android build
     pub kotlin_dirs: Vec<std::path::PathBuf>,
-    /// Android manifest to be included in an Android build.
+    /// Android manifest to be included in an Android build
     pub manifest_file: Option<std::path::PathBuf>,
-    /// Android resource directories to be included in an Android build.
+    /// Android resource directories to be included in an Android build
     pub resource_dirs: Vec<std::path::PathBuf>,
 }
 
-/// ## Reduced Cargo Metadata
-///
-/// This struct represents the reduced cargo metadata with only the bits that
-/// are required by us.
+/// Metadata about the application independent of the target platform.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct MdOsiApplication {
+    /// Identifier of the application. Used to register and identify the
+    /// application. Must not change over the life of the application. Only
+    /// alphanumeric and `-`, `_` allowed. Non-ASCII allowed but might break
+    /// external tools.
+    pub id: Option<String>,
+    /// Human-readable name of the application.
+    pub name: Option<String>,
+}
+
+/// Metadata about the application and library for the Android platform.
+/// These are one-to-one mappings of their respective counterparts in the
+/// Android SDK.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct MdOsiPlatformAndroid {
+    pub application_id: Option<String>,
+    pub namespace: Option<String>,
+
+    pub compile_sdk: Option<u32>,
+    pub min_sdk: Option<u32>,
+    pub target_sdk: Option<u32>,
+
+    pub abis: Option<Vec<String>>,
+
+    pub version_code: Option<u32>,
+    pub version_name: Option<String>,
+}
+
+/// Metadata about the application and framework for the macOS platform.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct MdOsiPlatformMacos {
+}
+
+/// Metadata specific to a platform, indexed by the name of the platform.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum MdOsiPlatformConfiguration {
+    /// Android platform table
+    Android(MdOsiPlatformAndroid),
+    /// Macos platform table
+    Macos(MdOsiPlatformMacos),
+}
+
+/// Metadata about a platform integration supported by the application.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct MdOsiPlatform {
+    /// Custom ID of the platform integration.
+    pub id: String,
+    /// Path to the platform integration root relative from the configuration.
+    pub path: Option<String>,
+
+    /// Platform specific configuration.
+    pub configuration: Option<MdOsiPlatformConfiguration>,
+}
+
+/// Version `1` of the Osiris metadata format.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct MdOsiV1 {
+    /// Application table specifying properties of the application
+    /// itself.
+    application: Option<MdOsiApplication>,
+    /// Platform table specifying all properties of the platform
+    /// integration for all supported platforms.
+    platforms: Vec<MdOsiPlatform>,
+}
+
+/// Osiris metadata that was embedded as `package.metadata.osiris` in a Cargo
+/// manifest.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum MdOsi {
+    /// Version `1` of the metadata format.
+    V1(MdOsiV1),
+}
+
+/// Reduced metadata as returned by an invocation of `cargo-metadata`. Only the
+/// pieces needed by this implementation are retained.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Metadata {
-    /// Sets of Android-related build metadata.
+    /// Sets of Android-related build metadata
     pub android_sets: Vec<MetadataAndroid>,
-    /// Target directory of the package build.
+    /// Osiris package metadata
+    pub osiris: Option<MdOsi>,
+    /// Target directory of the package build
     pub target_directory: String,
 }
 
@@ -75,27 +187,22 @@ struct MetadataBlob {
     pub json: serde_json::Value,
 }
 
-/// ## Metadata query parameters
-///
-/// This open-coded structure provides the parameters for a query to
-/// `cargo-metadata`. It is to be filled in by the caller.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+/// Open-coded structure with all parameters for a query to `cargo-metadata`.
+/// It is to be filled in by the caller.
+#[derive(Clone, Debug)]
 pub struct MetadataQuery {
+    /// Name of the target package in the workspace. If `None`, the root
+    /// package of the workspace is used, if any.
+    pub package: Option<String>,
+    /// The target platform to compile for. If `None`, a generic request for
+    /// all possible targets is performed.
+    pub target: Option<String>,
     /// Path to the workspace directory (or package directory) where
     /// `Cargo.toml` resides (preferably an absolute path).
     pub workspace: std::path::PathBuf,
-    /// Name of the main package in the workspace (if `None`, the workspace
-    /// root is used).
-    pub main_package: Option<String>,
-    /// The target platform to compile for (if `None`, a generic request for
-    /// all possible targets is performed).
-    pub target: Option<String>,
 }
 
-/// ## Reduced Cargo Build Output
-///
-/// This struct represents the reduced cargo build output with only the bits
-/// that are required by us.
+/// Output of a `cargo build` run with only relevant pieces retained.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Build {
     /// List of absolute paths to artifacts produced by the build. This is a
@@ -110,10 +217,8 @@ struct BuildBlob {
     pub json: Vec<serde_json::Value>,
 }
 
-/// ## Build query parameters
-///
-/// This open-coded structure provides the parameters for a query to
-/// `cargo-build`. It is to be filled in by the caller.
+/// Parameters to a `cargo build` operation. To be filled in by the query
+/// requester.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct BuildQuery {
     /// Whether to enable default features.
@@ -131,8 +236,6 @@ pub struct BuildQuery {
     pub workspace: std::path::PathBuf,
 }
 
-// ## Return Cargo binary to use
-//
 // Return the Cargo command to use for invocations of Cargo. This will
 // look at the `CARGO` environment variable first, and if unset use the
 // default `cargo` command.
@@ -175,13 +278,13 @@ impl MetadataBlob {
         };
 
         for pkg in packages.iter() {
-            let name = match pkg.get("name") {
-                Some(serde_json::Value::String(v)) => v,
-                _ => continue
-            };
             let id = match pkg.get("id") {
                 Some(serde_json::Value::String(v)) => v,
-                _ => continue
+                _ => continue,
+            };
+            let name = match pkg.get("name") {
+                Some(serde_json::Value::String(v)) => Some(v.as_str()),
+                _ => None,
             };
 
             // Local packages have `source` unset or set to `null`.
@@ -194,7 +297,7 @@ impl MetadataBlob {
 
                 // Otherwise, if the key matches the package name, keep the
                 // package ID as candidate.
-                if key == name {
+                if Some(key) == name {
                     candidates.insert(id);
                 }
             }
@@ -215,7 +318,10 @@ impl MetadataBlob {
     // it also contains build and dev dependencies, as well as dependencies
     // of workspace packages other than the requested package. Hence, this
     // function collects exactly the required package IDs.
-    fn involved_ids(&self, start: Option<&str>) -> BTreeSet<String> {
+    fn involved_ids(
+        &self,
+        start: &str,
+    ) -> BTreeSet<String> {
         let mut roots = BTreeSet::<&str>::new();
         let mut ids = BTreeSet::<String>::new();
         let mut todo = BTreeSet::<&str>::new();
@@ -234,31 +340,9 @@ impl MetadataBlob {
             _ => return ids,
         };
 
-        // Find the root nodes. If the caller specifies them, we use them.
-        // Otherwise, we use the resolved root package. If that is not
-        // suitable, we use the default workspace.
-        //
-        // If the resolved root nodes are an empty set, there is nothing
-        // to do and we yield an empty set to the caller.
-        //
-        // XXX: This should be extended to allow the caller to specify more
-        //      than one root package, and to select whether to compile the
-        //      entire workspace.
-        if let Some(root_str) = start {
-            roots.insert(root_str);
-        } else if let Some(serde_json::Value::String(root_str)) = resolve.get("root") {
-            roots.insert(root_str);
-        } else if let Some(serde_json::Value::Array(dirs)) = self.json.get("workspace_default_members") {
-            for dir in dirs.iter() {
-                if let serde_json::Value::String(dir_str) = dir {
-                    roots.insert(dir_str);
-                }
-            }
-        }
-
-        if roots.is_empty() {
-            return ids;
-        }
+        // Use the specified start node as root for the resolution. The code
+        // supports multiple roots, yet we currently only pass in a single one.
+        roots.insert(start);
 
         // Iterate all nodes and collect their actual code-dependencies, but
         // ignore any build or dev dependencies. Push each node into the
@@ -321,6 +405,233 @@ impl MetadataBlob {
         ids
     }
 
+    fn get_str(
+        map: &serde_json::value::Map<String, serde_json::Value>,
+        key: &'static str,
+        path: &'static str,
+    ) -> Result<Option<String>, Error> {
+        match map.get(key) {
+            None => Ok(None),
+            Some(serde_json::Value::String(v)) => {
+                Ok(Some(v.clone()))
+            },
+            Some(_) => {
+                Err(MdOsiError::TypeInvalid(path, "string"))
+            },
+        }.map_err(|e| e.into())
+    }
+
+    fn get_u32(
+        map: &serde_json::value::Map<String, serde_json::Value>,
+        key: &'static str,
+        path: &'static str,
+    ) -> Result<Option<u32>, Error> {
+        match map.get(key) {
+            None => Ok(None),
+            Some(serde_json::Value::Number(v)) => {
+                if let Some(v) = v.as_u64() {
+                    if let Ok(v) = u32::try_from(v) {
+                        Ok(Some(v))
+                    } else {
+                        Err(MdOsiError::TypeExceeded(path))
+                    }
+                } else {
+                    Err(MdOsiError::TypeExceeded(path))
+                }
+            },
+            Some(_) => {
+                Err(MdOsiError::TypeInvalid(path, "number"))
+            },
+        }.map_err(|e| e.into())
+    }
+
+    // Helper for `parse_mdosi()` that extracts the Android platform configuration.
+    fn parse_mdosi_android(
+        &self,
+        android: &serde_json::value::Map<String, serde_json::Value>,
+    ) -> Result<MdOsiPlatformAndroid, Error> {
+        let v_application_id = Self::get_str(android, "application-id", "platforms.[].android.application-id")?;
+        let v_namespace = Self::get_str(android, "namespace", "platforms.[].android.namespace")?;
+        let v_compile_sdk = Self::get_u32(android, "compile-sdk", "platforms.[].android.compile-sdk")?;
+        let v_min_sdk = Self::get_u32(android, "min-sdk", "platforms.[].android.min-sdk")?;
+        let v_target_sdk = Self::get_u32(android, "target-sdk", "platforms.[].android.target-sdk")?;
+        let v_version_code = Self::get_u32(android, "version-code", "platforms.[].android.version-code")?;
+        let v_version_name = Self::get_str(android, "version-name", "platforms.[].android.version-name")?;
+
+        let v_abis = match android.get("abis") {
+            None => None,
+            Some(serde_json::Value::Array(abis)) => {
+                let mut acc = Vec::new();
+                for abi in abis.iter() {
+                    match abi {
+                        serde_json::Value::String(v) => {
+                            acc.push(v.clone());
+                        },
+                        _ => {
+                            return Err(MdOsiError::TypeInvalid("platforms.[].android.abis.[]", "string").into())
+                        }
+                    }
+                }
+                Some(acc)
+            },
+            Some(_) => {
+                return Err(MdOsiError::TypeInvalid("platforms.[].android.abis", "array").into());
+            },
+        };
+
+        Ok(MdOsiPlatformAndroid {
+            application_id: v_application_id,
+            namespace: v_namespace,
+
+            compile_sdk: v_compile_sdk,
+            min_sdk: v_min_sdk,
+            target_sdk: v_target_sdk,
+
+            abis: v_abis,
+
+            version_code: v_version_code,
+            version_name: v_version_name,
+        })
+
+    }
+
+    // Helper for `parse_mdosi()` that extracts the macOS platform configuration.
+    fn parse_mdosi_macos(
+        &self,
+        _macos: &serde_json::value::Map<String, serde_json::Value>,
+    ) -> Result<MdOsiPlatformMacos, Error> {
+        Ok(MdOsiPlatformMacos {
+        })
+    }
+
+    // Helper for `parse()` that extracts the Osiris metadata from the package
+    // metadata.
+    fn parse_mdosi(
+        &self,
+        pkgmd: &serde_json::value::Map<String, serde_json::Value>,
+    ) -> Result<Option<MdOsi>, Error> {
+        // Get the top-level entry for Osiris metadata.
+        let json_osiris = match pkgmd.get("osiris") {
+            None => return Ok(None),
+            Some(serde_json::Value::Object(v)) => Ok(v),
+            Some(_) => Err(MdOsiError::TypeInvalid("osiris", "object")),
+        }?;
+
+        // Figure out the metadata version.
+        let _version = match Self::get_u32(json_osiris, "version", "version")? {
+            None => Err(MdOsiError::KeyMissing("version")),
+            Some(1) => Ok(1),
+            Some(v) => Err(MdOsiError::VersionUnsupported(v)),
+        }?;
+
+        // Create the top-level object and parse everything
+        // into it. Only version 1 is defined so far.
+        let mut mdosi = MdOsiV1 {
+            application: None,
+            platforms: Vec::new(),
+        };
+
+        // Extract the `application` data.
+        match json_osiris.get("application") {
+            None => {},
+            Some(serde_json::Value::Object(application)) => {
+                let mut mdosi_app = MdOsiApplication {
+                    id: None,
+                    name: None,
+                };
+
+                match application.get("id") {
+                    None => {},
+                    Some(serde_json::Value::String(id_str)) => {
+                        mdosi_app.id = Some(id_str.clone());
+                    },
+                    Some(_) => {
+                        return Err(MdOsiError::TypeInvalid("application.id", "string").into());
+                    },
+                }
+                match application.get("name") {
+                    None => {},
+                    Some(serde_json::Value::String(name_str)) => {
+                        mdosi_app.name = Some(name_str.clone());
+                    },
+                    Some(_) => {
+                        return Err(MdOsiError::TypeInvalid("application.name", "string").into());
+                    },
+                }
+
+                mdosi.application = Some(mdosi_app);
+            },
+            Some(_) => {
+                return Err(MdOsiError::TypeInvalid("application", "object").into());
+            }
+        }
+
+        // Extract the `platforms` data.
+        match json_osiris.get("platforms") {
+            None => {},
+            Some(serde_json::Value::Array(platforms)) => {
+                for platform in platforms.iter() {
+                    let id = match platform.get("id") {
+                        None => {
+                            return Err(MdOsiError::KeyMissing("platforms.[].id").into());
+                        },
+                        Some(serde_json::Value::String(id_str)) => {
+                            id_str.clone()
+                        },
+                        Some(_) => {
+                            return Err(MdOsiError::TypeInvalid("platforms.[].id", "string").into());
+                        },
+                    };
+
+                    let mut mdosi_pf = MdOsiPlatform {
+                        id: id,
+                        path: None,
+                        configuration: None,
+                    };
+
+                    match platform.get("path") {
+                        None => {},
+                        Some(serde_json::Value::String(path_str)) => {
+                            mdosi_pf.path = Some(path_str.clone());
+                        },
+                        Some(_) => {
+                            return Err(MdOsiError::TypeInvalid("platforms.[].path", "string").into());
+                        },
+                    }
+
+                    mdosi_pf.configuration = match (
+                        platform.get("android"),
+                        platform.get("macos"),
+                    ) {
+                        (None, None) => Ok(None),
+                        (Some(_), Some(_)) => {
+                            Err(MdOsiError::KeyExclusive("platforms.[].{android,macos}").into())
+                        },
+                        (Some(serde_json::Value::Object(android)), None) => {
+                            self.parse_mdosi_android(android).map(|v| Some(MdOsiPlatformConfiguration::Android(v)))
+                        },
+                        (Some(_), None) => {
+                            Err(MdOsiError::TypeInvalid("platforms.<platform>.android", "object").into())
+                        },
+                        (None, Some(serde_json::Value::Object(macos))) => {
+                            self.parse_mdosi_macos(macos).map(|v| Some(MdOsiPlatformConfiguration::Macos(v)))
+                        },
+                        (None, Some(_)) => {
+                            Err(MdOsiError::TypeInvalid("platforms.<platform>.macos", "object").into())
+                        },
+                    }?;
+
+                    mdosi.platforms.push(mdosi_pf);
+                }
+            },
+            Some(_) => {
+                return Err(MdOsiError::TypeInvalid("platforms", "array").into());
+            },
+        }
+
+        Ok(Some(MdOsi::V1(mdosi)))
+    }
+
     // Parse all desired fields in the manifest blob and expose them as a
     // new Metadata object.
     fn parse(&self, query: &MetadataQuery) -> Result<Metadata, Error> {
@@ -329,14 +640,29 @@ impl MetadataBlob {
             .as_str().ok_or(Error::Data)?
             .to_string();
 
+        // If no package name was specified, find the root package in the metadata. If none
+        // is present, raise an error to the caller.
+        let root_raw = match &query.package {
+            None => match self.json.get("resolve") {
+                Some(serde_json::Value::Object(v)) => match v.get("root") {
+                    Some(serde_json::Value::String(v)) => Ok(v),
+                    _ => Err(Error::NoPackage),
+                },
+                _ => Err(Error::NoPackage),
+            },
+            Some(v) => Ok(v),
+        }?;
+        let root = self.resolve_local_package(root_raw)?;
+
         // Walk the dependency graph and collect all packages that are part of
         // this compilation. We have to do this, since only the dependency
         // graph is affected by target-filtering and feature-selection, and we
         // want to avoid any build or dev dependencies.
-        let ids = self.involved_ids(query.main_package.as_deref());
+        let ids = self.involved_ids(&root);
 
         // Now walk the package list and extract all data we desire.
         let mut android_sets = Vec::new();
+        let mut pkgmd_osi = None;
         if let Some(serde_json::Value::Array(packages)) = self.json.get("packages") {
             for pkg in packages.iter() {
                 let mut java_dirs = Vec::new();
@@ -352,6 +678,7 @@ impl MetadataBlob {
                 if !ids.contains(id) {
                     continue;
                 }
+                let is_root = *id == root;
 
                 // Get the absolute path to the package root. We need this
                 // normalize other paths in the package metadata.
@@ -400,6 +727,10 @@ impl MetadataBlob {
                             }
                         }
                     }
+
+                    if is_root {
+                        pkgmd_osi = self.parse_mdosi(metadata)?;
+                    }
                 }
 
                 // Store the metadata if any value is set.
@@ -424,6 +755,7 @@ impl MetadataBlob {
         Ok(
             Metadata {
                 android_sets: android_sets,
+                osiris: pkgmd_osi,
                 target_directory: data_target_directory,
             }
         )
@@ -431,9 +763,8 @@ impl MetadataBlob {
 }
 
 impl MetadataQuery {
-    /// ## Query metadata from Cargo
-    ///
-    /// Invoke `cargo metadata` and parse all the cargo metadata into the
+    /// Query Cargo for all metadata for the specified workspace. This will
+    /// invoke `cargo metadata` and parse all the cargo metadata into the
     /// `Metadata` object. Only the bits required by the crate are fetched,
     /// everything else is ignored.
     pub fn run(&self) -> Result<Metadata, Error> {
@@ -600,10 +931,8 @@ impl BuildBlob {
 }
 
 impl BuildQuery {
-    /// ## Query build results from Cargo
-    ///
-    /// Invoke `cargo build` and parse all the cargo output into a
-    /// `Build` object.
+    /// Request a full build operation from Cargo. This will invoke
+    /// `cargo build` and parse all the cargo output into a `Build` object.
     pub fn run(&self) -> Result<Build, Error> {
         // Build the cargo-build invocation.
         let mut cmd = std::process::Command::new(cargo_command());
@@ -799,7 +1128,7 @@ mod tests {
                         ]
                     }
                 }"#,
-            ).unwrap().involved_ids(None).into_iter().collect::<Vec<String>>(),
+            ).unwrap().involved_ids("root (...)").into_iter().collect::<Vec<String>>(),
             vec![
                 "dep0 (...)",
                 "dep1 (...)",
@@ -814,7 +1143,7 @@ mod tests {
     fn metadata_from_json() {
         let query = MetadataQuery {
             workspace: ".".into(),
-            main_package: None,
+            package: Some("foobar".into()),
             target: None,
         };
 
@@ -838,11 +1167,19 @@ mod tests {
         assert_eq!(
             MetadataBlob::from_str(
                 r#"{
+                    "packages": [
+                        {
+                            "id": "foobar (...)",
+                            "name": "foobar",
+                            "source": null
+                        }
+                    ],
                     "target_directory": "."
                 }"#,
             ).unwrap().parse(&query).unwrap(),
             Metadata {
                 android_sets: Vec::new(),
+                osiris: None,
                 target_directory: ".".into(),
             },
         );
@@ -854,7 +1191,7 @@ mod tests {
     fn metadata_java_kotlin() {
         let query = MetadataQuery {
             workspace: ".".into(),
-            main_package: None,
+            package: None,
             target: None,
         };
 
@@ -947,6 +1284,7 @@ mod tests {
                         ],
                     },
                 ],
+                osiris: None,
                 target_directory: ".".into(),
             },
         );
