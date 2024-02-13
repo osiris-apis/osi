@@ -62,6 +62,8 @@ pub enum Value<'args> {
 pub struct Flag<'args, 'ctx> {
     name: &'ctx str,
     value: core::cell::RefCell<Value<'args>>,
+
+    help_short: Option<&'ctx str>,
 }
 
 /// Definition of a command-line sub-command. This carries all information
@@ -74,6 +76,8 @@ pub struct Command<'args, 'ctx, Id> {
     commands: &'ctx [Command<'args, 'ctx, Id>],
     flags: &'ctx [Flag<'args, 'ctx>],
     parameters: core::cell::RefCell<Option<Parameters<'args>>>,
+
+    help_short: Option<&'ctx str>,
 }
 
 /// Command-line parser setup, which encapsulates operational flags as well as
@@ -86,10 +90,13 @@ impl<'args, 'ctx> Flag<'args, 'ctx> {
     fn with(
         name: &'ctx str,
         value: Value<'args>,
+        help_short: Option<&'ctx str>,
     ) -> Self {
         Self {
             name: name,
             value: core::cell::RefCell::new(value),
+
+            help_short: help_short,
         }
     }
 
@@ -98,8 +105,9 @@ impl<'args, 'ctx> Flag<'args, 'ctx> {
     pub fn with_name(
         name: &'ctx str,
         value: Value<'args>,
+        help_short: Option<&'ctx str>,
     ) -> Self {
-        Self::with(name, value)
+        Self::with(name, value, help_short)
     }
 }
 
@@ -110,6 +118,7 @@ impl<'args, 'ctx, Id> Command<'args, 'ctx, Id> {
         commands: &'ctx mut [Command<'args, 'ctx, Id>],
         flags: &'ctx mut [Flag<'args, 'ctx>],
         parameters: Option<Parameters<'args>>,
+        help_short: Option<&'ctx str>,
     ) -> Self {
         commands.sort_unstable_by_key(|v| v.name);
         flags.sort_unstable_by_key(|v| v.name);
@@ -120,19 +129,8 @@ impl<'args, 'ctx, Id> Command<'args, 'ctx, Id> {
             commands: commands,
             flags: flags,
             parameters: core::cell::RefCell::new(parameters),
+            help_short: help_short,
         }
-    }
-
-    /// Create an anonymous command definition with the specified sub-commands,
-    /// flags, and parameter parser. All other properties of the command will
-    /// assume their defaults.
-    pub fn new(
-        id: Id,
-        commands: &'ctx mut [Command<'args, 'ctx, Id>],
-        flags: &'ctx mut [Flag<'args, 'ctx>],
-        parameters: Option<Parameters<'args>>,
-    ) -> Self {
-        Self::with(id, "--invalid--", commands, flags, parameters)
     }
 
     /// Create a command-line command definition with the specified name,
@@ -144,8 +142,9 @@ impl<'args, 'ctx, Id> Command<'args, 'ctx, Id> {
         commands: &'ctx mut [Command<'args, 'ctx, Id>],
         flags: &'ctx mut [Flag<'args, 'ctx>],
         parameters: Option<Parameters<'args>>,
+        help_short: Option<&'ctx str>,
     ) -> Self {
-        Self::with(id, name, commands, flags, parameters)
+        Self::with(id, name, commands, flags, parameters, help_short)
     }
 
     fn find_command(
@@ -172,6 +171,82 @@ impl<'args, 'ctx, Id> Command<'args, 'ctx, Id> {
             Ok(v) => Some(&self.flags[v]),
             _ => None,
         }
+    }
+
+    /// Write usage information to the specified format stream. This will
+    /// include short explanations for the individual items.
+    ///
+    /// Only information for the current level will be printed.
+    pub fn help(
+        &self,
+        dst: &mut dyn core::fmt::Write,
+    ) -> Result<(), core::fmt::Error> {
+        // Start with one-line description.
+        if let Some(v) = self.help_short {
+            dst.write_fmt(core::format_args!("{}\n\n", v))?;
+        }
+
+        // Follow with usage information.
+        let usage = match (
+            self.flags.len() > 0,
+            self.commands.len() > 0,
+        ) {
+            (false, false) => "",
+            (false, true) => " {COMMAND}",
+            (true, false) => " [OPTIONS]",
+            (true, true) => " [OPTIONS] {COMMAND}",
+        };
+        dst.write_fmt(core::format_args!(
+            "Usage: {}{}\n",
+            self.name,
+            usage,
+        ))?;
+
+        // List all options for this level.
+        let mut flags = self.flags.iter()
+            .filter(|v| v.help_short.is_some())
+            .peekable();
+        if flags.peek().is_some() {
+            dst.write_str("\nOptions:\n")?;
+
+            let maxlen = flags.clone()
+                .map(|v| v.name.len())
+                .max()
+                .unwrap();
+
+            for flag in flags {
+                dst.write_fmt(core::format_args!(
+                    "    --{0:1$}  {2}\n",
+                    flag.name,
+                    maxlen,
+                    flag.help_short.unwrap(),
+                ))?;
+            }
+        }
+
+        // List all commands for this level.
+        let mut cmds = self.commands.iter()
+            .filter(|v| v.help_short.is_some())
+            .peekable();
+        if cmds.peek().is_some() {
+            dst.write_str("\nCommands:\n")?;
+
+            let maxlen = cmds.clone()
+                .map(|v| v.name.len())
+                .max()
+                .unwrap();
+
+            for cmd in cmds {
+                dst.write_fmt(core::format_args!(
+                    "    {0:1$}  {2}\n",
+                    cmd.name,
+                    maxlen,
+                    cmd.help_short.unwrap(),
+                ))?;
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -697,22 +772,22 @@ mod tests {
         values: &'args mut Values,
     ) -> Result<Id, alloc::boxed::Box<[Error<'args, Id>]>> {
         let mut flags_foo = [
-            Flag::with_name("foofoo", Value::Parse(&mut values.foofoo)),
-            Flag::with_name("foobar", Value::Parse(&mut values.foobar)),
+            Flag::with_name("foofoo", Value::Parse(&mut values.foofoo), None),
+            Flag::with_name("foobar", Value::Parse(&mut values.foobar), None),
         ];
         let mut flags_bar = [
-            Flag::with_name("barfoo", Value::Parse(&mut values.barfoo)),
-            Flag::with_name("barbar", Value::Parse(&mut values.barbar)),
+            Flag::with_name("barfoo", Value::Parse(&mut values.barfoo), None),
+            Flag::with_name("barbar", Value::Parse(&mut values.barbar), None),
         ];
         let mut cmds = [
-            Command::with_name(Id::Foo, "foo", &mut [], &mut flags_foo, None),
-            Command::with_name(Id::Bar, "bar", &mut [], &mut flags_bar, None),
+            Command::with_name(Id::Foo, "foo", &mut [], &mut flags_foo, None, None),
+            Command::with_name(Id::Bar, "bar", &mut [], &mut flags_bar, None, None),
         ];
         let mut flags = [
-            Flag::with_name("foo", Value::Parse(&mut values.foo)),
-            Flag::with_name("bar", Value::Parse(&mut values.bar)),
+            Flag::with_name("foo", Value::Parse(&mut values.foo), None),
+            Flag::with_name("bar", Value::Parse(&mut values.bar), None),
         ];
-        let cmd = Command::new(Id::Root, &mut cmds, &mut flags, None);
+        let cmd = Command::with_name(Id::Root, "cmd", &mut cmds, &mut flags, None, None);
         Parser::new().parse_str(arguments, &cmd)
     }
 
