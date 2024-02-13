@@ -3,6 +3,30 @@
 //! This module provides compatibility types that allow easy integration for
 //! situations where the Standard Library is available.
 
+/// Compatibility type to bridge between `std::io::Write` and
+/// `core::fmt::Write`.
+///
+/// This type can be used to wrap any type that implements `std::io::Write` to
+/// get a wrapping type that implements `core::fmt::Write`. The standard
+/// library does not provide this blanket implementation due to backwards
+/// compatibility reasons.
+#[repr(transparent)]
+pub struct Write<T>(pub T);
+
+#[cfg(feature = "std")]
+impl<T> core::fmt::Write for Write<T>
+where
+    T: std::io::Write
+{
+    fn write_fmt(&mut self, args: core::fmt::Arguments) -> core::fmt::Result {
+        self.0.write_fmt(args).map_err(|_| core::fmt::Error)
+    }
+
+    fn write_str(&mut self, v: &str) -> core::fmt::Result {
+        self.0.write_all(v.as_bytes()).map_err(|_| core::fmt::Error)
+    }
+}
+
 /// Compatibility type for `std::ffi::OsStr`. This type represents the same
 /// value as returned by `std::ffi::OsStr::as_encoded_bytes()` for a given
 /// `OsStr` value.
