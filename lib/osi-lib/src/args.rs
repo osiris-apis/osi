@@ -645,40 +645,54 @@ where
     /// command-line flag was set, otherwise `false` is returned. Furthermore,
     /// if set, it will write respective usage information to the specified
     /// destination.
+    pub fn help_for<'args, 'ctx>(
+        command: &'ctx Command<'args, 'ctx, Id>,
+        dst: &mut dyn core::fmt::Write,
+        id: &Id,
+    ) -> Result<bool, core::fmt::Error> {
+        let mut trace = alloc::vec::Vec::new();
+        let mut todo = alloc::vec::Vec::new();
+
+        todo.push(Some(command));
+
+        // Traverse the tree of sub-commands, keeping a trace so the
+        // help-handler can utilize the chain.
+        while let Some(o_current) = todo.pop() {
+            if let Some(current) = o_current {
+                if *id == current.id {
+                    current.help(dst, &trace)?;
+                    return Ok(true);
+                }
+
+                if current.commands.list.len() > 0 {
+                    trace.push(current);
+                    todo.push(None);
+                    for cmd in current.commands.list.iter() {
+                        todo.push(Some(cmd));
+                    }
+                }
+            } else {
+                trace.pop();
+            }
+        }
+
+        Ok(false)
+    }
+
+    /// Try handling any `--help` arguments. This will return `true` if this
+    /// command-line flag was set, otherwise `false` is returned. Furthermore,
+    /// if set, it will write respective usage information to the specified
+    /// destination.
     pub fn help<'args, 'ctx>(
         &self,
         command: &'ctx Command<'args, 'ctx, Id>,
         dst: &mut dyn core::fmt::Write,
     ) -> Result<bool, core::fmt::Error> {
         if let Some(ref id) = *self.cell.borrow() {
-            let mut trace = alloc::vec::Vec::new();
-            let mut todo = alloc::vec::Vec::new();
-
-            todo.push(Some(command));
-
-            // Traverse the tree of sub-commands, keeping a trace so the
-            // help-handler can utilize the chain.
-            while let Some(o_current) = todo.pop() {
-                if let Some(current) = o_current {
-                    if *id == current.id {
-                        current.help(dst, &trace)?;
-                        return Ok(true);
-                    }
-
-                    if current.commands.list.len() > 0 {
-                        trace.push(current);
-                        todo.push(None);
-                        for cmd in current.commands.list.iter() {
-                            todo.push(Some(cmd));
-                        }
-                    }
-                } else {
-                    trace.pop();
-                }
-            }
+            Self::help_for(command, dst, id)
+        } else {
+            Ok(false)
         }
-
-        Ok(false)
     }
 }
 
