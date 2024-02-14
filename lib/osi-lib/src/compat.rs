@@ -101,6 +101,13 @@ impl OsStr {
     pub fn to_str(&self) -> Result<&str, core::str::Utf8Error> {
         core::str::from_utf8(self.as_encoded_bytes())
     }
+
+    /// Return a Rust string for the value of this compatibility type. This
+    /// will replace invalid Unicode sequences with the Unicode replacement
+    /// character. See `alloc::string::String::from_utf8_lossy()` for details.
+    pub fn to_string_lossy(&self) -> alloc::borrow::Cow<str> {
+        alloc::string::String::from_utf8_lossy(self.as_encoded_bytes())
+    }
 }
 
 impl<'a> From<&'a str> for &'a OsStr {
