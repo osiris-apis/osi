@@ -376,7 +376,6 @@ impl ConfigPlatform {
     /// Return a reference to the embedded android configuration, or `None`,
     /// depending on whether the platform configuration is for Android.
     pub fn android(&self) -> Option<&ConfigPlatformAndroid> {
-        #[allow(irrefutable_let_patterns)]
         if let ConfigPlatformConfiguration::Android(ref v) = self.configuration {
             Some(v)
         } else {
