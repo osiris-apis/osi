@@ -8,7 +8,7 @@ use crate::compat;
 /// Error definitions for all possible errors of the argument parser.
 #[derive(Debug)]
 #[non_exhaustive]
-pub enum Error<'args, Id> {
+pub enum Error<'args> {
     /// Specified flag contains invalid Unicode.
     FlagInvalidUnicode(&'args compat::OsStr),
     /// Specified flag is not known.
@@ -32,9 +32,9 @@ pub enum Error<'args, Id> {
     /// Short flags are unknown.
     ShortsUnknown(&'args compat::OsStr),
     /// Parameter parser for command failed.
-    CommandParameter(Id, &'args compat::OsStr, sink::Error),
+    CommandParameter(alloc::string::String, &'args compat::OsStr, sink::Error),
     /// Specified command takes no parameters.
-    CommandTakesNoParameters(Id, &'args compat::OsStr),
+    CommandTakesNoParameters(alloc::string::String, &'args compat::OsStr),
 }
 
 // Type alias for value parsers.
@@ -338,7 +338,7 @@ impl Parser {
         history: &alloc::vec::Vec<&'ctx Command<'args, 'ctx, Id>>,
         flag_str: &'args str,
         value_opt: Option<&'args compat::OsStr>,
-    ) -> Result<(), Error<'args, Id>>
+    ) -> Result<(), Error<'args>>
     where
         Id: Clone,
         Source: Iterator<Item = &'args compat::OsStr>,
@@ -405,7 +405,7 @@ impl Parser {
         &mut self,
         _history: &alloc::vec::Vec<&'ctx Command<'args, 'ctx, Id>>,
         short_str: &'args compat::OsStr,
-    ) -> Result<(), Error<'args, Id>> {
+    ) -> Result<(), Error<'args>> {
         // Our configuration does not allow specifying short options, so none
         // of these can ever match. Hence, treat them all as invalid for now
         // and signal an error. Then ignore the argument and continue.
@@ -417,7 +417,7 @@ impl Parser {
         command: &'ctx Command<'args, 'ctx, Id>,
         arg_os: &'args compat::OsStr,
         arg_str_opt: Option<&'args str>,
-    ) -> Result<Option<&'ctx Command<'args, 'ctx, Id>>, Error<'args, Id>>
+    ) -> Result<Option<&'ctx Command<'args, 'ctx, Id>>, Error<'args>>
     where
         Id: Clone,
     {
@@ -430,11 +430,11 @@ impl Parser {
             Ok(Some(sub))
         } else if let Some(ref v) = command.parameters {
             v.push(command.id.clone(), arg_os).map_err(
-                |e| Error::CommandParameter(command.id.clone(), arg_os, e),
+                |e| Error::CommandParameter(command.name.into(), arg_os, e),
             )?;
             Ok(None)
         } else {
-            Err(Error::CommandTakesNoParameters(command.id.clone(), arg_os))
+            Err(Error::CommandTakesNoParameters(command.name.into(), arg_os))
         }
     }
 
@@ -442,7 +442,7 @@ impl Parser {
         &mut self,
         mut arguments: Source,
         command: &'ctx Command<'args, 'ctx, Id>,
-    ) -> Result<Id, alloc::boxed::Box<[Error<'args, Id>]>>
+    ) -> Result<Id, alloc::boxed::Box<[Error<'args>]>>
     where
         Id: Clone,
         Source: Iterator<Item = &'args compat::OsStr>,
@@ -512,14 +512,12 @@ impl Parser {
                             while let Some(v) = arguments.next() {
                                 if let Err(e) = p.push(current.id.clone(), v) {
                                     errors.push(Error::CommandParameter(
-                                        current.id.clone(), v, e,
+                                        current.name.into(), v, e,
                                     ));
                                 }
                             }
                         } else if let Some(v) = arguments.next() {
-                            errors.push(Error::CommandTakesNoParameters(
-                                current.id.clone(), v,
-                            ));
+                            errors.push(Error::CommandTakesNoParameters(current.name.into(), v));
                         }
                     },
 
@@ -580,7 +578,7 @@ impl Parser {
         &mut self,
         arguments: Source,
         command: &'ctx Command<'args, 'ctx, Id>,
-    ) -> Result<Id, alloc::boxed::Box<[Error<'args, Id>]>>
+    ) -> Result<Id, alloc::boxed::Box<[Error<'args>]>>
     where
         Id: Clone,
         Source: Iterator<Item = &'args compat::OsStr>,
@@ -596,7 +594,7 @@ impl Parser {
         &mut self,
         arguments: Source,
         command: &'ctx Command<'args, 'ctx, Id>,
-    ) -> Result<Id, alloc::boxed::Box<[Error<'args, Id>]>>
+    ) -> Result<Id, alloc::boxed::Box<[Error<'args>]>>
     where
         Id: Clone,
         Source: IntoIterator<Item = &'args SourceItem>,
@@ -617,7 +615,7 @@ impl Parser {
         &mut self,
         arguments: Source,
         command: &'ctx Command<'args, 'ctx, Id>,
-    ) -> Result<Id, alloc::boxed::Box<[Error<'args, Id>]>>
+    ) -> Result<Id, alloc::boxed::Box<[Error<'args>]>>
     where
         Id: Clone,
         Source: IntoIterator<Item = &'args SourceItem>,
@@ -937,7 +935,7 @@ mod tests {
     fn parse<'args>(
         arguments: &'args [&'args str],
         values: &'args mut Values,
-    ) -> Result<Id, alloc::boxed::Box<[Error<'args, Id>]>> {
+    ) -> Result<Id, alloc::boxed::Box<[Error<'args>]>> {
         let flags_foo = FlagList::with([
             Flag::with_name("foofoo", Value::Parse(&mut values.foofoo), None),
             Flag::with_name("foobar", Value::Parse(&mut values.foobar), None),
@@ -1002,7 +1000,7 @@ mod tests {
         assert_eq!(r.len(), 1);
         assert!(core::matches!(
             r[0],
-            Error::CommandTakesNoParameters(Id::Root, _),
+            Error::CommandTakesNoParameters(ref v, _) if v == "cmd",
         ));
 
         let r = parse(
@@ -1012,7 +1010,7 @@ mod tests {
         assert_eq!(r.len(), 1);
         assert!(core::matches!(
             r[0],
-            Error::CommandTakesNoParameters(Id::Foo, _),
+            Error::CommandTakesNoParameters(ref v, _) if v == "foo",
         ));
     }
 }
