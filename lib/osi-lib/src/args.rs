@@ -1,11 +1,12 @@
 //! # Program Arguments
 //!
-//! XXX
+//! This module implements a basic command-line parser for runtime arguments
+//! passed to a program.
 
 use crate::compat;
 
 /// Error definitions for all possible errors of the argument parser.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum Error<'args, Id> {
     /// Specified flag contains invalid Unicode.
@@ -23,48 +24,62 @@ pub enum Error<'args, Id> {
     /// Specified flag needs a value.
     FlagNeedsValue(&'args str),
     /// Value parser for set-flag failed.
-    FlagSetValue(&'args str, &'args str),
+    FlagSetValue(&'args str, sink::Error),
     /// Value parser for toggle-flag failed.
-    FlagToggleValue(&'args str, bool, &'args str),
+    FlagToggleValue(&'args str, bool, sink::Error),
     /// Value parser for parse-flag failed.
-    FlagParseValue(&'args str, &'args compat::OsStr, &'args str),
+    FlagParseValue(&'args str, &'args compat::OsStr, sink::Error),
     /// Short flags are unknown.
     ShortsUnknown(&'args compat::OsStr),
     /// Parameter parser for command failed.
-    CommandParameter(Id, &'args compat::OsStr, &'args str),
+    CommandParameter(Id, &'args compat::OsStr, sink::Error),
     /// Specified command takes no parameters.
     CommandTakesNoParameters(Id, &'args compat::OsStr),
 }
 
-type Sink<'args, Source> = &'args mut dyn sink::Sink<
-    Source,
-    Success = (),
-    Error = &'args str,
->;
+// Type alias for value parsers.
+type Sink<'args, Id, Source> = &'args dyn sink::Sink<Id, Source>;
 
 /// Location and parsing information for command-line parameters. This
 /// defines how commands take values, and how they are processed when present.
-pub type Parameters<'args> = Sink<'args, &'args compat::OsStr>;
+pub type Parameters<'args, Id> = Sink<'args, Id, &'args compat::OsStr>;
 
 /// Location and parsing information for command-line flags. This defines
 /// whether a flag takes a value, and how a flag is processed when present.
 #[derive(Debug)]
 #[non_exhaustive]
-pub enum Value<'args> {
-    Set(Sink<'args, ()>),
-    Toggle(Sink<'args, bool>),
-    Parse(Sink<'args, &'args compat::OsStr>),
+pub enum Value<'args, Id> {
+    Set(Sink<'args, Id, ()>),
+    Toggle(Sink<'args, Id, bool>),
+    Parse(Sink<'args, Id, &'args compat::OsStr>),
+}
+
+/// An audited list of command-line configuration.
+///
+/// This type encodes auditing guarantees in the type-system. It takes user
+/// configuration, audits it, and then provides a wrapper type to ensure the
+/// auditing is encoded in the type-system.
+#[derive(Debug)]
+#[repr(transparent)]
+pub struct AuditedList<T: ?Sized> {
+    list: T,
 }
 
 /// Definition of a command-line flag. This carries all information required
 /// to parse a specific flag on the command-line and store parsed information.
 #[derive(Debug)]
-pub struct Flag<'args, 'ctx> {
+pub struct Flag<'args, 'ctx, Id> {
     name: &'ctx str,
-    value: core::cell::RefCell<Value<'args>>,
+    value: Value<'args, Id>,
 
     help_short: Option<&'ctx str>,
 }
+
+/// An audited list of command-line flags.
+pub type FlagList<'args, 'ctx, const N: usize, Id> = AuditedList<[Flag<'args, 'ctx, Id>; N]>;
+
+/// A reference to an audited list of command-line flags.
+pub type FlagListRef<'args, 'ctx, Id> = &'ctx AuditedList<[Flag<'args, 'ctx, Id>]>;
 
 /// Definition of a command-line sub-command. This carries all information
 /// required to parse a specific sub-command on the command-line, as well as
@@ -73,12 +88,18 @@ pub struct Flag<'args, 'ctx> {
 pub struct Command<'args, 'ctx, Id> {
     id: Id,
     name: &'ctx str,
-    commands: &'ctx [Command<'args, 'ctx, Id>],
-    flags: &'ctx [Flag<'args, 'ctx>],
-    parameters: core::cell::RefCell<Option<Parameters<'args>>>,
+    commands: CommandListRef<'args, 'ctx, Id>,
+    flags: FlagListRef<'args, 'ctx, Id>,
+    parameters: Option<Parameters<'args, Id>>,
 
     help_short: Option<&'ctx str>,
 }
+
+/// An audited list of command-line sub-commands.
+pub type CommandList<'args, 'ctx, const N: usize, Id> = AuditedList<[Command<'args, 'ctx, Id>; N]>;
+
+/// A reference to an audited list of command-line sub-commands.
+pub type CommandListRef<'args, 'ctx, Id> = &'ctx AuditedList<[Command<'args, 'ctx, Id>]>;
 
 /// Command-line parser setup, which encapsulates operational flags as well as
 /// possible caches for repeated parser operations.
@@ -86,15 +107,32 @@ pub struct Command<'args, 'ctx, Id> {
 pub struct Parser {
 }
 
-impl<'args, 'ctx> Flag<'args, 'ctx> {
+/// Flag collector for standard `--help` flags. It implements `sink::Sink` and
+/// always stores the last calling context as value.
+#[derive(Debug)]
+pub struct Help<Id> {
+    cell: core::cell::RefCell<Option<Id>>,
+}
+
+// Allow creation of empty lists for all audited lists. This requires all
+// implementors to allow empty lists without auditing.
+impl<'a, T> Default for &'a AuditedList<[T]> {
+    fn default() -> Self {
+        &AuditedList::<[T; 0]> {
+            list: [],
+        }
+    }
+}
+
+impl<'args, 'ctx, Id> Flag<'args, 'ctx, Id> {
     fn with(
         name: &'ctx str,
-        value: Value<'args>,
+        value: Value<'args, Id>,
         help_short: Option<&'ctx str>,
     ) -> Self {
         Self {
             name: name,
-            value: core::cell::RefCell::new(value),
+            value: value,
 
             help_short: help_short,
         }
@@ -104,10 +142,22 @@ impl<'args, 'ctx> Flag<'args, 'ctx> {
     /// location. All other properties of the flag will assume their defaults.
     pub fn with_name(
         name: &'ctx str,
-        value: Value<'args>,
+        value: Value<'args, Id>,
         help_short: Option<&'ctx str>,
     ) -> Self {
         Self::with(name, value, help_short)
+    }
+}
+
+impl<'args, 'ctx, const N: usize, Id> FlagList<'args, 'ctx, N, Id> {
+    /// Create an audited list of command-line flags from user configuration.
+    /// This will sort the flag array by their names and thus allow faster
+    /// searches.
+    pub fn with(mut list: [Flag<'args, 'ctx, Id>; N]) -> Self {
+        list.sort_unstable_by_key(|v| v.name);
+        Self {
+            list: list,
+        }
     }
 }
 
@@ -115,20 +165,17 @@ impl<'args, 'ctx, Id> Command<'args, 'ctx, Id> {
     fn with(
         id: Id,
         name: &'ctx str,
-        commands: &'ctx mut [Command<'args, 'ctx, Id>],
-        flags: &'ctx mut [Flag<'args, 'ctx>],
-        parameters: Option<Parameters<'args>>,
+        commands: CommandListRef<'args, 'ctx, Id>,
+        flags: FlagListRef<'args, 'ctx, Id>,
+        parameters: Option<Parameters<'args, Id>>,
         help_short: Option<&'ctx str>,
     ) -> Self {
-        commands.sort_unstable_by_key(|v| v.name);
-        flags.sort_unstable_by_key(|v| v.name);
-
         Self {
             id: id,
             name: name,
             commands: commands,
             flags: flags,
-            parameters: core::cell::RefCell::new(parameters),
+            parameters: parameters,
             help_short: help_short,
         }
     }
@@ -139,9 +186,9 @@ impl<'args, 'ctx, Id> Command<'args, 'ctx, Id> {
     pub fn with_name(
         id: Id,
         name: &'ctx str,
-        commands: &'ctx mut [Command<'args, 'ctx, Id>],
-        flags: &'ctx mut [Flag<'args, 'ctx>],
-        parameters: Option<Parameters<'args>>,
+        commands: CommandListRef<'args, 'ctx, Id>,
+        flags: FlagListRef<'args, 'ctx, Id>,
+        parameters: Option<Parameters<'args, Id>>,
         help_short: Option<&'ctx str>,
     ) -> Self {
         Self::with(id, name, commands, flags, parameters, help_short)
@@ -151,11 +198,11 @@ impl<'args, 'ctx, Id> Command<'args, 'ctx, Id> {
         &self,
         name: &str,
     ) -> Option<&'ctx Command<'args, 'ctx, Id>> {
-        match self.commands.binary_search_by_key(
+        match self.commands.list.binary_search_by_key(
             &name,
             |v| v.name,
         ) {
-            Ok(v) => Some(&self.commands[v]),
+            Ok(v) => Some(&self.commands.list[v]),
             _ => None,
         }
     }
@@ -163,12 +210,12 @@ impl<'args, 'ctx, Id> Command<'args, 'ctx, Id> {
     fn find_flag(
         &self,
         name: &str,
-    ) -> Option<&'ctx Flag<'args, 'ctx>> {
-        match self.flags.binary_search_by_key(
+    ) -> Option<&'ctx Flag<'args, 'ctx, Id>> {
+        match self.flags.list.binary_search_by_key(
             &name,
             |v| v.name,
         ) {
-            Ok(v) => Some(&self.flags[v]),
+            Ok(v) => Some(&self.flags.list[v]),
             _ => None,
         }
     }
@@ -180,6 +227,7 @@ impl<'args, 'ctx, Id> Command<'args, 'ctx, Id> {
     pub fn help(
         &self,
         dst: &mut dyn core::fmt::Write,
+        trace: &alloc::vec::Vec<&'ctx Command<'args, 'ctx, Id>>,
     ) -> Result<(), core::fmt::Error> {
         // Start with one-line description.
         if let Some(v) = self.help_short {
@@ -187,23 +235,23 @@ impl<'args, 'ctx, Id> Command<'args, 'ctx, Id> {
         }
 
         // Follow with usage information.
+        dst.write_str("Usage:")?;
+        for cmd in trace {
+            dst.write_fmt(core::format_args!(" {}", cmd.name))?;
+        }
         let usage = match (
-            self.flags.len() > 0,
-            self.commands.len() > 0,
+            self.flags.list.len() > 0,
+            self.commands.list.len() > 0,
         ) {
             (false, false) => "",
-            (false, true) => " {COMMAND}",
+            (false, true) => " <COMMAND>",
             (true, false) => " [OPTIONS]",
-            (true, true) => " [OPTIONS] {COMMAND}",
+            (true, true) => " [OPTIONS] <COMMAND>",
         };
-        dst.write_fmt(core::format_args!(
-            "Usage: {}{}\n",
-            self.name,
-            usage,
-        ))?;
+        dst.write_fmt(core::format_args!(" {}{}\n", self.name, usage))?;
 
         // List all options for this level.
-        let mut flags = self.flags.iter()
+        let mut flags = self.flags.list.iter()
             .filter(|v| v.help_short.is_some())
             .peekable();
         if flags.peek().is_some() {
@@ -225,7 +273,7 @@ impl<'args, 'ctx, Id> Command<'args, 'ctx, Id> {
         }
 
         // List all commands for this level.
-        let mut cmds = self.commands.iter()
+        let mut cmds = self.commands.list.iter()
             .filter(|v| v.help_short.is_some())
             .peekable();
         if cmds.peek().is_some() {
@@ -250,6 +298,18 @@ impl<'args, 'ctx, Id> Command<'args, 'ctx, Id> {
     }
 }
 
+impl<'args, 'ctx, const N: usize, Id> CommandList<'args, 'ctx, N, Id> {
+    /// Create an audited list of command-line sub-commands from user
+    /// configuration. This will sort the sub-command array by their names and
+    /// thus allow faster searches.
+    pub fn with(mut list: [Command<'args, 'ctx, Id>; N]) -> Self {
+        list.sort_unstable_by_key(|v| v.name);
+        Self {
+            list: list,
+        }
+    }
+}
+
 impl Parser {
     /// Create a new command-line parser with the default settings. This parser
     /// can be used to parse multiple command-lines, if desired.
@@ -261,7 +321,7 @@ impl Parser {
     fn lookup_flag<'args, 'ctx, Id>(
         history: &alloc::vec::Vec<&'ctx Command<'args, 'ctx, Id>>,
         flag: &str,
-    ) -> Option<&'ctx Flag<'args, 'ctx>> {
+    ) -> Option<&'ctx Flag<'args, 'ctx, Id>> {
         for cmd in history.iter().rev() {
             if let Some(v) = cmd.find_flag(flag) {
                 return Some(v);
@@ -274,11 +334,13 @@ impl Parser {
     fn parse_flag<'args, 'ctx, Id, Source>(
         &mut self,
         arguments: &mut Source,
+        current: &'ctx Command<'args, 'ctx, Id>,
         history: &alloc::vec::Vec<&'ctx Command<'args, 'ctx, Id>>,
         flag_str: &'args str,
         value_opt: Option<&'args compat::OsStr>,
     ) -> Result<(), Error<'args, Id>>
     where
+        Id: Clone,
         Source: Iterator<Item = &'args compat::OsStr>,
     {
         let (flag, flag_toggled) = match Self::lookup_flag(history, flag_str) {
@@ -291,9 +353,8 @@ impl Parser {
                 }
             },
         };
-        let mut value = flag.value.borrow_mut();
 
-        match (&mut *value, flag_toggled, value_opt) {
+        match (&flag.value, flag_toggled, value_opt) {
             (Value::Set(_), Some(v), _)
             | (Value::Parse(_), Some(v), _) => {
                 // Flag only exists without `no-*` prefix, but this flag cannot
@@ -312,13 +373,13 @@ impl Parser {
             },
             (Value::Set(s), None, None) => {
                 // Correct use of settable-flag.
-                s.push(()).map_err(
+                s.push(current.id.clone(), ()).map_err(
                     |e| Error::FlagSetValue(flag_str, e),
                 )
             },
             (Value::Toggle(s), t, None) => {
                 // Correct use of toggle-flag.
-                s.push(t.is_none()).map_err(
+                s.push(current.id.clone(), t.is_none()).map_err(
                     |e| Error::FlagToggleValue(t.unwrap_or(flag_str), t.is_none(), e),
                 )
             },
@@ -326,14 +387,14 @@ impl Parser {
                 // Flag requires a value, so fetch it.
                 match arguments.next() {
                     None => Err(Error::FlagNeedsValue(flag_str)),
-                    Some(v) => s.push(v).map_err(
+                    Some(v) => s.push(current.id.clone(), v).map_err(
                         |e| Error::FlagParseValue(flag_str, v, e),
                     )
                 }
             },
             (Value::Parse(s), None, Some(v)) => {
                 // Flag requires a value that was passed inline.
-                s.push(v).map_err(
+                s.push(current.id.clone(), v).map_err(
                     |e| Error::FlagParseValue(flag_str, v, e),
                 )
             },
@@ -367,8 +428,8 @@ impl Parser {
 
         if let Some(sub) = sub_opt {
             Ok(Some(sub))
-        } else if let Some(ref mut v) = *command.parameters.borrow_mut() {
-            v.push(arg_os).map_err(
+        } else if let Some(ref v) = command.parameters {
+            v.push(command.id.clone(), arg_os).map_err(
                 |e| Error::CommandParameter(command.id.clone(), arg_os, e),
             )?;
             Ok(None)
@@ -447,9 +508,9 @@ impl Parser {
                     ("", false, None) => {
                         // We got an empty flag. This ends all parsing and
                         // forwards the remaining arguments as parameters.
-                        if let Some(ref mut p) = *current.parameters.borrow_mut() {
+                        if let Some(ref p) = current.parameters {
                             while let Some(v) = arguments.next() {
-                                if let Err(e) = p.push(v) {
+                                if let Err(e) = p.push(current.id.clone(), v) {
                                     errors.push(Error::CommandParameter(
                                         current.id.clone(), v, e,
                                     ));
@@ -465,7 +526,7 @@ impl Parser {
                     (_, false, _) => {
                         // We got a complete flag with or without value. Look
                         // up the flag and pass the value along, if required.
-                        if let Err(e) = self.parse_flag(&mut arguments, &history, flag, value) {
+                        if let Err(e) = self.parse_flag(&mut arguments, &current, &history, flag, value) {
                             errors.push(e);
                         }
                     },
@@ -569,28 +630,101 @@ impl Parser {
     }
 }
 
+impl<Id> Help<Id>
+where
+    Id: PartialEq,
+{
+    /// Create a new context for handling of common `--help` arguments.
+    pub fn new() -> Self {
+        Self {
+            cell: core::cell::RefCell::new(None),
+        }
+    }
+
+    /// Try handling any `--help` arguments. This will return `true` if this
+    /// command-line flag was set, otherwise `false` is returned. Furthermore,
+    /// if set, it will write respective usage information to the specified
+    /// destination.
+    pub fn help<'args, 'ctx>(
+        &self,
+        command: &'ctx Command<'args, 'ctx, Id>,
+        dst: &mut dyn core::fmt::Write,
+    ) -> Result<bool, core::fmt::Error> {
+        if let Some(ref id) = *self.cell.borrow() {
+            let mut trace = alloc::vec::Vec::new();
+            let mut todo = alloc::vec::Vec::new();
+
+            todo.push(Some(command));
+
+            // Traverse the tree of sub-commands, keeping a trace so the
+            // help-handler can utilize the chain.
+            while let Some(o_current) = todo.pop() {
+                if let Some(current) = o_current {
+                    if *id == current.id {
+                        current.help(dst, &trace)?;
+                        return Ok(true);
+                    }
+
+                    if current.commands.list.len() > 0 {
+                        trace.push(current);
+                        todo.push(None);
+                        for cmd in current.commands.list.iter() {
+                            todo.push(Some(cmd));
+                        }
+                    }
+                } else {
+                    trace.pop();
+                }
+            }
+        }
+
+        Ok(false)
+    }
+}
+
+impl<Id> sink::Sink<Id, ()> for Help<Id>
+where
+    Id: core::fmt::Debug,
+{
+    fn push(
+        &self,
+        ctx: Id,
+        _data: (),
+    ) -> Result<(), sink::Error> {
+        self.cell.replace(Some(ctx));
+        Ok(())
+    }
+}
+
 pub mod sink {
     //! # Interfaces for Generic Data Sinks
     //!
     //! Data sinks allow generalizing the way how data is collected or stored.
-    //! The `Sink` trait defines how any type can accept specific input data
+    //! The `SinkMut` trait defines how any type can accept specific input data
     //! and store it, possibly raising errors if the data could not be parsed.
+    //! The `Sink` trait defines a variant for sinks with interior mutability.
 
     use crate::compat;
 
-    /// Generic data sinks define how data is collected and stored, providing a
-    /// uniform interface to the caller. Sinks are specific to the type of the
-    /// source data, and can be implemented for a wide range of different
-    /// sources.
-    pub trait Sink<Source>
+    /// Enumeration of errors that can be raised by data sinks. The enumeration
+    /// is not exhaustive and uncaught errors must be handled by callers.
+    #[derive(Debug)]
+    #[non_exhaustive]
+    pub enum Error {
+        /// Value was not valid for this data parser
+        ValueInvalid,
+        /// Data was not encoded as valid Unicode
+        UnicodeInvalid,
+    }
+
+    /// Generic data sink with inherited mutability. It defines how data is
+    /// collected and stored, providing a uniform interface to the caller.
+    /// Sinks are specific to the type of the source data, and can be
+    /// implemented for a wide range of different sources.
+    pub trait SinkMut<Context, Source>
     where
         Self: core::fmt::Debug,
     {
-        /// Data type used when data was successfully stored.
-        type Success;
-        /// Data type used when data could not be stored.
-        type Error;
-
         /// Push data into the sink, reporting whether it was stored
         /// successfully. Usually, this requires the implementor to parse the
         /// input data (if necessary) and then store it.
@@ -599,93 +733,103 @@ pub mod sink {
         /// old data, or whether it is amended.
         fn push(
             &mut self,
+            ctx: Context,
             data: Source,
-        ) -> Result<Self::Success, Self::Error>;
+        ) -> Result<(), Error>;
     }
 
-    impl<'args> Sink<&'args compat::OsStr> for &'args compat::OsStr {
-        type Success = ();
-        type Error = &'args str;
+    /// Generic data sink with interior mutability. It defines how data is
+    /// collected and stored, providing a uniform interface to the caller.
+    /// Sinks are specific to the type of the source data, and can be
+    /// implemented for a wide range of different sources.
+    pub trait Sink<Context, Source>
+    where
+        Self: core::fmt::Debug,
+    {
+        /// Push data into the sink, reporting whether it was stored
+        /// successfully. Usually, this requires the implementor to parse the
+        /// input data (if necessary) and then store it.
+        ///
+        /// It is up to the implementor to decide whether new data overrides
+        /// old data, or whether it is amended.
+        fn push(
+            &self,
+            ctx: Context,
+            data: Source,
+        ) -> Result<(), Error>;
+    }
 
+    impl<'args, Context> SinkMut<Context, &'args compat::OsStr> for &'args compat::OsStr {
         fn push(
             &mut self,
+            _ctx: Context,
             data: &'args compat::OsStr,
-        ) -> Result<Self::Success, Self::Error> {
+        ) -> Result<(), Error> {
             *self = data;
             Ok(())
         }
     }
 
     #[cfg(feature = "std")]
-    impl<'args> Sink<&'args compat::OsStr> for &'args std::ffi::OsStr {
-        type Success = ();
-        type Error = &'args str;
-
+    impl<'args, Context> SinkMut<Context, &'args compat::OsStr> for &'args std::ffi::OsStr {
         fn push(
             &mut self,
+            _ctx: Context,
             data: &'args compat::OsStr,
-        ) -> Result<Self::Success, Self::Error> {
+        ) -> Result<(), Error> {
             *self = data.as_osstr();
             Ok(())
         }
     }
 
     #[cfg(feature = "std")]
-    impl<'args> Sink<&'args compat::OsStr> for std::ffi::OsString {
-        type Success = ();
-        type Error = &'args str;
-
+    impl<'args, Context> SinkMut<Context, &'args compat::OsStr> for std::ffi::OsString {
         fn push(
             &mut self,
+            _ctx: Context,
             data: &'args compat::OsStr,
-        ) -> Result<Self::Success, Self::Error> {
+        ) -> Result<(), Error> {
             *self = data.as_osstr().into();
             Ok(())
         }
     }
 
-    impl<'args> Sink<&'args compat::OsStr> for &'args str {
-        type Success = ();
-        type Error = &'args str;
-
+    impl<'args, Context> SinkMut<Context, &'args compat::OsStr> for &'args str {
         fn push(
             &mut self,
+            _ctx: Context,
             data: &'args compat::OsStr,
-        ) -> Result<Self::Success, Self::Error> {
+        ) -> Result<(), Error> {
             if let Ok(data_str) = data.to_str() {
                 *self = data_str;
                 Ok(())
             } else {
-                Err("Does not accept non-Unicode values")
+                Err(Error::UnicodeInvalid)
             }
         }
     }
 
-    impl<'args> Sink<&'args compat::OsStr> for alloc::string::String {
-        type Success = ();
-        type Error = &'args str;
-
+    impl<'args, Context> SinkMut<Context, &'args compat::OsStr> for alloc::string::String {
         fn push(
             &mut self,
+            _ctx: Context,
             data: &'args compat::OsStr,
-        ) -> Result<Self::Success, Self::Error> {
+        ) -> Result<(), Error> {
             if let Ok(data_str) = data.to_str() {
                 *self = data_str.into();
                 Ok(())
             } else {
-                Err("Does not accept non-Unicode values")
+                Err(Error::UnicodeInvalid)
             }
         }
     }
 
-    impl<'args> Sink<&'args compat::OsStr> for bool {
-        type Success = ();
-        type Error = &'args str;
-
+    impl<'args, Context> SinkMut<Context, &'args compat::OsStr> for bool {
         fn push(
             &mut self,
+            _ctx: Context,
             data: &'args compat::OsStr,
-        ) -> Result<Self::Success, Self::Error> {
+        ) -> Result<(), Error> {
             if let Ok(data_str) = data.to_str() {
                 match data_str {
                     "TRUE" | "True" | "true"
@@ -701,46 +845,55 @@ pub mod sink {
                         Ok(())
                     },
                     _ => {
-                        Err("Does not accept non-boolean values")
+                        Err(Error::ValueInvalid)
                     },
                 }
             } else {
-                Err("Does not accept non-Unicode values")
+                Err(Error::UnicodeInvalid)
             }
         }
     }
 
-    impl<Source, Target> Sink<Source> for Option<Target>
+    impl<Context, Source, Target> SinkMut<Context, Source> for Option<Target>
     where
-        Target: Sink<Source> + Default,
+        Target: SinkMut<Context, Source> + Default,
     {
-        type Success = Target::Success;
-        type Error = Target::Error;
-
         fn push(
             &mut self,
+            ctx: Context,
             data: Source,
-        ) -> Result<Self::Success, Self::Error> {
+        ) -> Result<(), Error> {
             self.get_or_insert_with(Default::default)
-                .push(data)
+                .push(ctx, data)
         }
     }
 
-    impl<Source, Target> Sink<Source> for alloc::vec::Vec<Target>
+    impl<Context, Source, Target> SinkMut<Context, Source> for alloc::vec::Vec<Target>
     where
-        Target: Sink<Source> + Default,
+        Target: SinkMut<Context, Source> + Default,
     {
-        type Success = Target::Success;
-        type Error = Target::Error;
-
         fn push(
             &mut self,
+            ctx: Context,
             data: Source,
-        ) -> Result<Self::Success, Self::Error> {
+        ) -> Result<(), Error> {
             let mut v: Target = Default::default();
-            let r = v.push(data)?;
+            let r = v.push(ctx, data)?;
             self.push(v);
             Ok(r)
+        }
+    }
+
+    impl<Context, Source, Target> Sink<Context, Source> for core::cell::RefCell<Target>
+    where
+        Target: SinkMut<Context, Source>,
+    {
+        fn push(
+            &self,
+            ctx: Context,
+            data: Source,
+        ) -> Result<(), Error> {
+            self.borrow_mut().push(ctx, data)
         }
     }
 }
@@ -759,35 +912,35 @@ mod tests {
 
     #[derive(Debug, Default, Eq, PartialEq)]
     struct Values {
-        foo: Option<String>,
-        bar: Option<String>,
-        foofoo: Option<String>,
-        foobar: Option<String>,
-        barfoo: Option<String>,
-        barbar: Option<String>,
+        foo: core::cell::RefCell<Option<String>>,
+        bar: core::cell::RefCell<Option<String>>,
+        foofoo: core::cell::RefCell<Option<String>>,
+        foobar: core::cell::RefCell<Option<String>>,
+        barfoo: core::cell::RefCell<Option<String>>,
+        barbar: core::cell::RefCell<Option<String>>,
     }
 
     fn parse<'args>(
         arguments: &'args [&'args str],
         values: &'args mut Values,
     ) -> Result<Id, alloc::boxed::Box<[Error<'args, Id>]>> {
-        let mut flags_foo = [
+        let flags_foo = FlagList::with([
             Flag::with_name("foofoo", Value::Parse(&mut values.foofoo), None),
             Flag::with_name("foobar", Value::Parse(&mut values.foobar), None),
-        ];
-        let mut flags_bar = [
+        ]);
+        let flags_bar = FlagList::with([
             Flag::with_name("barfoo", Value::Parse(&mut values.barfoo), None),
             Flag::with_name("barbar", Value::Parse(&mut values.barbar), None),
-        ];
-        let mut cmds = [
-            Command::with_name(Id::Foo, "foo", &mut [], &mut flags_foo, None, None),
-            Command::with_name(Id::Bar, "bar", &mut [], &mut flags_bar, None, None),
-        ];
-        let mut flags = [
+        ]);
+        let cmds = CommandList::with([
+            Command::with_name(Id::Foo, "foo", Default::default(), &flags_foo, None, None),
+            Command::with_name(Id::Bar, "bar", Default::default(), &flags_bar, None, None),
+        ]);
+        let flags = FlagList::with([
             Flag::with_name("foo", Value::Parse(&mut values.foo), None),
             Flag::with_name("bar", Value::Parse(&mut values.bar), None),
-        ];
-        let cmd = Command::with_name(Id::Root, "cmd", &mut cmds, &mut flags, None, None);
+        ]);
+        let cmd = Command::with_name(Id::Root, "cmd", &cmds, &flags, None, None);
         Parser::new().parse_str(arguments, &cmd)
     }
 
@@ -803,7 +956,7 @@ mod tests {
         assert_eq!(
             values,
             Values {
-                foo: Some("value-foo".into()),
+                foo: core::cell::RefCell::new(Some("value-foo".into())),
                 ..Default::default()
             },
         );
@@ -816,9 +969,9 @@ mod tests {
         assert_eq!(
             values,
             Values {
-                foo: Some("value-foo".into()),
-                bar: Some("value-bar".into()),
-                barbar: Some("value-barbar".into()),
+                foo: core::cell::RefCell::new(Some("value-foo".into())),
+                bar: core::cell::RefCell::new(Some("value-bar".into())),
+                barbar: core::cell::RefCell::new(Some("value-barbar".into())),
                 ..Default::default()
             },
         );
