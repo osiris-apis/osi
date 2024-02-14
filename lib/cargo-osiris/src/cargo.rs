@@ -154,10 +154,10 @@ pub struct MdOsiPlatform {
 pub struct MdOsiV1 {
     /// Application table specifying properties of the application
     /// itself.
-    application: Option<MdOsiApplication>,
+    pub application: Option<MdOsiApplication>,
     /// Platform table specifying all properties of the platform
     /// integration for all supported platforms.
-    platforms: Vec<MdOsiPlatform>,
+    pub platforms: Vec<MdOsiPlatform>,
 }
 
 /// Osiris metadata that was embedded as `package.metadata.osiris` in a Cargo
