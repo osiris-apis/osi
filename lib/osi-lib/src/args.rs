@@ -114,6 +114,26 @@ pub struct Help<Id> {
     cell: core::cell::RefCell<Option<Id>>,
 }
 
+impl<'args> core::fmt::Display for Error<'args> {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+        match self {
+            Self::FlagInvalidUnicode(flag) => fmt.write_fmt(core::format_args!("Flag name contains invalid Unicode: {}", flag.to_string_lossy())),
+            Self::FlagUnknown(flag) => fmt.write_fmt(core::format_args!("Invalid flag name: --{}", flag)),
+            Self::FlagToggleUnknown(flag) => fmt.write_fmt(core::format_args!("Invalid toggle-flag name: --[no-]{}", flag)),
+            Self::FlagCannotBeToggled(flag) => fmt.write_fmt(core::format_args!("Flag cannot be toggled: --no-{}", flag)),
+            Self::FlagTakesNoValue(flag, value) => fmt.write_fmt(core::format_args!("Flag takes no value: --{}={}", flag, value.to_string_lossy())),
+            Self::FlagToggleTakesNoValue(flag, value) => fmt.write_fmt(core::format_args!("Toggle-flag takes no value: --no-{}={}", flag, value.to_string_lossy())),
+            Self::FlagNeedsValue(flag) => fmt.write_fmt(core::format_args!("Flag requires a value: --{}", flag)),
+            Self::FlagSetValue(flag, e) => fmt.write_fmt(core::format_args!("Cannot parse value for flag `--{}`: {}", flag, e)),
+            Self::FlagToggleValue(flag, v, e) => fmt.write_fmt(core::format_args!("Cannot parse value for toggle-flag `--[no-]{}={}`: {}", flag, v, e)),
+            Self::FlagParseValue(flag, v, e) => fmt.write_fmt(core::format_args!("Cannot parse value for flag `--[no-]{}={}`: {}", flag, v.to_string_lossy(), e)),
+            Self::ShortsUnknown(flags) => fmt.write_fmt(core::format_args!("Invalid short flags: {}", flags.to_string_lossy())),
+            Self::CommandParameter(cmd, v, e) => fmt.write_fmt(core::format_args!("Cannot parse parameter for command `{} {}`: {}", cmd, v.to_string_lossy(), e)),
+            Self::CommandTakesNoParameters(cmd, v) => fmt.write_fmt(core::format_args!("Invalid parameters for command: {} {}", cmd, v.to_string_lossy())),
+        }
+    }
+}
+
 // Allow creation of empty lists for all audited lists. This requires all
 // implementors to allow empty lists without auditing.
 impl<'a, T> Default for &'a AuditedList<[T]> {
@@ -769,6 +789,15 @@ pub mod sink {
             ctx: Context,
             data: Source,
         ) -> Result<(), Error>;
+    }
+
+    impl core::fmt::Display for Error {
+        fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+            match self {
+                Self::ValueInvalid => fmt.write_str("Value is not valid"),
+                Self::UnicodeInvalid => fmt.write_str("Value is not valid Unicode"),
+            }
+        }
     }
 
     impl<'args, Context> SinkMut<Context, &'args compat::OsStr> for &'args compat::OsStr {
