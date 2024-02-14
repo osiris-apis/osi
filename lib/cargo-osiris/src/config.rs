@@ -87,6 +87,15 @@ pub struct Config {
     pub platforms: BTreeMap<String, ConfigPlatform>,
 }
 
+impl core::fmt::Display for Error {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+        match self {
+            Self::MissingKey(key) => fmt.write_fmt(core::format_args!("Missing mandatory configuration for: {}", key)),
+            Self::DuplicatePlatform(id) => fmt.write_fmt(core::format_args!("Duplicate platform configuration for ID: {}", id)),
+        }
+    }
+}
+
 impl Config {
     // Verify a platform configuration and add it to the set.
     fn add_platform(&mut self, platform: &toml::RawPlatform) -> Result<(), Error> {
@@ -106,7 +115,7 @@ impl Config {
         // Collect the platform-specific configuration.
         let v_configuration = match platform.configuration.as_ref() {
             None => {
-                Err(Error::MissingKey(".platform.<type>"))
+                Err(Error::MissingKey(".platforms.[].<type>"))
             },
             Some(toml::RawPlatformConfiguration::Android(data_android)) => {
                 // Java uses reverse-domain paths for all source files. We
@@ -115,7 +124,7 @@ impl Config {
                 // up in the final APK, so we want to avoid it. The user
                 // can still specify those if they desire.
                 let v_namespace = data_android.namespace.as_ref()
-                    .ok_or(Error::MissingKey(".platform.android.namespace"))?;
+                    .ok_or(Error::MissingKey(".platforms.[].android.namespace"))?;
 
                 // The application ID identifies the application in the
                 // different app stores and must be unique. Any changes to
@@ -145,7 +154,7 @@ impl Config {
                         data_android.compile_sdk,
                     ) {
                         (None, None, None) => {
-                            return Err(Error::MissingKey(".platform.android.min-sdk"));
+                            return Err(Error::MissingKey(".platforms.[].android.min-sdk"));
                         },
                         (Some(min), None, None) => {
                             (min, min, min)
