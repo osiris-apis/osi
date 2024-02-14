@@ -45,40 +45,6 @@ pub enum Error {
     MdOsi(MdOsiError),
 }
 
-impl core::fmt::Display for MdOsiError {
-    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
-        match self {
-            MdOsiError::TypeInvalid(v, t) => fmt.write_fmt(core::format_args!("Specified entry requires a value of a different type: `{}` requires type `{}`", v, t)),
-            MdOsiError::TypeExceeded(v) => fmt.write_fmt(core::format_args!("Specified entry exceeded the maximum supported range for its type: {}", v)),
-            MdOsiError::KeyMissing(v) => fmt.write_fmt(core::format_args!("Required entry was not specified: {}", v)),
-            MdOsiError::KeyExclusive(v) => fmt.write_fmt(core::format_args!("Exclusive entry was specified with conflicts: {}", v)),
-            MdOsiError::VersionUnsupported(v) => fmt.write_fmt(core::format_args!("Specified version is not supported: {}", v)),
-        }
-    }
-}
-
-impl core::fmt::Display for Error {
-    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
-        match self {
-            Error::Exec(e) => fmt.write_fmt(core::format_args!("Execution of `cargo` could not commence (io-error: {})", e)),
-            Error::Cargo(e) => fmt.write_fmt(core::format_args!("`cargo` failed unexpectedly (exit-code: {})", e)),
-            Error::Unicode(e) => fmt.write_fmt(core::format_args!("`cargo` returned invalid Unicode data (utf8-error: {})", e)),
-            Error::Json => fmt.write_fmt(core::format_args!("`cargo` returned invalid JSON data")),
-            Error::NoPackage => fmt.write_fmt(core::format_args!("No package specified, nor does the Cargo workspace have a root package")),
-            Error::UnknownPackage(v) => fmt.write_fmt(core::format_args!("Cannot resolve requested package name: {}", v)),
-            Error::AmbiguousPackage(v) => fmt.write_fmt(core::format_args!("Ambiguous package name: {}", v)),
-            Error::Data => fmt.write_fmt(core::format_args!("Cannot decode Cargo metadata")),
-            Error::MdOsi(e) => fmt.write_fmt(core::format_args!("Cannot parse Osiris metadata: {}", e)),
-        }
-    }
-}
-
-impl core::convert::From<MdOsiError> for Error {
-    fn from(v: MdOsiError) -> Self {
-        Error::MdOsi(v)
-    }
-}
-
 /// Metadata required to bundle an application of library for the Android
 /// platform.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -244,6 +210,40 @@ pub struct BuildQuery {
 // unconditionally, and thus ensure that the correct toolchain is used.
 fn cargo_command() -> std::ffi::OsString {
     std::env::var_os("CARGO").unwrap_or("cargo".into())
+}
+
+impl core::fmt::Display for MdOsiError {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+        match self {
+            MdOsiError::TypeInvalid(v, t) => fmt.write_fmt(core::format_args!("Specified entry requires a value of a different type: `{}` requires type `{}`", v, t)),
+            MdOsiError::TypeExceeded(v) => fmt.write_fmt(core::format_args!("Specified entry exceeded the maximum supported range for its type: {}", v)),
+            MdOsiError::KeyMissing(v) => fmt.write_fmt(core::format_args!("Required entry was not specified: {}", v)),
+            MdOsiError::KeyExclusive(v) => fmt.write_fmt(core::format_args!("Exclusive entry was specified with conflicts: {}", v)),
+            MdOsiError::VersionUnsupported(v) => fmt.write_fmt(core::format_args!("Specified version is not supported: {}", v)),
+        }
+    }
+}
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+        match self {
+            Error::Exec(e) => fmt.write_fmt(core::format_args!("Execution of `cargo` could not commence (io-error: {})", e)),
+            Error::Cargo(e) => fmt.write_fmt(core::format_args!("`cargo` failed unexpectedly (exit-code: {})", e)),
+            Error::Unicode(e) => fmt.write_fmt(core::format_args!("`cargo` returned invalid Unicode data (utf8-error: {})", e)),
+            Error::Json => fmt.write_fmt(core::format_args!("`cargo` returned invalid JSON data")),
+            Error::NoPackage => fmt.write_fmt(core::format_args!("No package specified, nor does the Cargo workspace have a root package")),
+            Error::UnknownPackage(v) => fmt.write_fmt(core::format_args!("Cannot resolve requested package name: {}", v)),
+            Error::AmbiguousPackage(v) => fmt.write_fmt(core::format_args!("Ambiguous package name: {}", v)),
+            Error::Data => fmt.write_fmt(core::format_args!("Cannot decode Cargo metadata")),
+            Error::MdOsi(e) => fmt.write_fmt(core::format_args!("Cannot parse Osiris metadata: {}", e)),
+        }
+    }
+}
+
+impl core::convert::From<MdOsiError> for Error {
+    fn from(v: MdOsiError) -> Self {
+        Error::MdOsi(v)
+    }
 }
 
 impl MetadataBlob {
