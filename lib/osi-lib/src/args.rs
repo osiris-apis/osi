@@ -800,6 +800,17 @@ pub mod sink {
         }
     }
 
+    impl<'args, Context> SinkMut<Context, bool> for bool {
+        fn push(
+            &mut self,
+            _ctx: Context,
+            data: bool,
+        ) -> Result<(), Error> {
+            *self = data;
+            Ok(())
+        }
+    }
+
     impl<'args, Context> SinkMut<Context, &'args compat::OsStr> for &'args compat::OsStr {
         fn push(
             &mut self,
