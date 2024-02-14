@@ -7,8 +7,7 @@
 //! operations exposed by the library. This module does not implement any of
 //! the operations, but merely uses the APIs from the library.
 
-use clap;
-use crate::{cargo, config, op, platform, toml};
+use crate::{cargo, config, lib, op, platform};
 
 /// ## Cargo Osiris
 ///
@@ -16,139 +15,38 @@ use crate::{cargo, config, op, platform, toml};
 /// interact with the Osiris Build System. It can be invoked as a standalone
 /// tool or via `cargo osiris ...`.
 pub fn cargo_osiris() -> std::process::ExitCode {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum Cmd {
+        Root,
+        Build,
+        Emerge,
+    }
+
     struct Cli {
-        cmd: clap::Command,
     }
 
     impl Cli {
         fn new() -> Self {
-            let mut cmd;
-
-            cmd = clap::Command::new("cargo-osiris")
-                .propagate_version(true)
-                .subcommand_required(true)
-                .about("Osiris Build System")
-                .long_about("Build system for Rust Applications")
-                .version(clap::crate_version!());
-
-            cmd = cmd.arg(
-                clap::Arg::new("config")
-                    .long("config")
-                    .value_name("PATH")
-                    .help("Path to the Osiris configuration relative to the working directory")
-                    .default_value("./osiris.toml")
-                    .value_parser(clap::builder::ValueParser::os_string())
-            );
-
-            cmd = cmd.subcommand(
-                clap::Command::new("build")
-                    .about("Build artifacts for the specified platform")
-                    .arg(
-                        clap::Arg::new("platform")
-                            .long("platform")
-                            .value_name("NAME")
-                            .help("ID of the target platform to operate on")
-                            .required(true)
-                            .value_parser(clap::builder::ValueParser::string())
-                    )
-            );
-
-            cmd = cmd.subcommand(
-                clap::Command::new("emerge")
-                    .about("Create a persisting platform integration")
-                    .arg(
-                        clap::Arg::new("platform")
-                            .long("platform")
-                            .value_name("NAME")
-                            .help("ID of the target platform to operate on")
-                            .required(true)
-                            .value_parser(clap::builder::ValueParser::string())
-                    )
-                    .arg(
-                        clap::Arg::new("update")
-                            .long("update")
-                            .value_name("BOOL")
-                            .help("Whether to allow updating an existing platform integration")
-                            .default_value("false")
-                            .value_parser(clap::builder::ValueParser::bool())
-                    )
-            );
-
             Self {
-                cmd: cmd,
             }
-        }
-
-        // Handle the `--config <...>` argument.
-        fn config(
-            &self,
-            m: &clap::ArgMatches,
-        ) -> Result<(toml::Raw, config::Config), u8> {
-            // Unwrap the config-path from the argument.
-            let config_arg = m.get_raw("config");
-            let mut config_iter = config_arg.expect("Cannot acquire config path");
-            assert_eq!(config_iter.len(), 1);
-            let config_path = config_iter.next().unwrap();
-
-            // Parse the raw representation from the path.
-            let raw = match toml::Raw::parse_path(&config_path) {
-                Ok(v) => Ok(v),
-                Err(toml::Error::File(v)) => {
-                    eprintln!("Cannot parse configuration: Failed reading {:?} ({})", config_path, v);
-                    Err(1)
-                },
-                Err(toml::Error::Toml(v, None)) => {
-                    eprintln!("Cannot parse configuration: Invalid TOML syntax ({})", v);
-                    Err(1)
-                },
-                Err(toml::Error::Toml(v, Some(span))) => {
-                    eprintln!("Cannot parse configuration: Invalid TOML syntax at offset {}:{} ({})", span.start, span.end, v);
-                    Err(1)
-                },
-                Err(toml::Error::Data(v, None)) => {
-                    eprintln!("Cannot parse configuration: Invalid TOML content ({})", v);
-                    Err(1)
-                },
-                Err(toml::Error::Data(v, Some(span))) => {
-                    eprintln!("Cannot parse configuration: Invalid TOML content at offset {}:{} ({})", span.start, span.end, v);
-                    Err(1)
-                },
-                Err(toml::Error::Version(v)) => {
-                    eprintln!("Cannot parse configuration: Unsupported version '{}'", v);
-                    Err(1)
-                },
-            }?;
-
-            // Validate configuration and convert to internal representation.
-            let config = match config::Config::from_toml(&raw, &config_path) {
-                Ok(v) => Ok(v),
-                Err(config::Error::MissingKey(v)) => {
-                    eprintln!("Invalid configuration: Missing configuration for '{}'", v);
-                    Err(1)
-                },
-                Err(config::Error::DuplicatePlatform(v)) => {
-                    eprintln!("Invalid configuration: Duplicate platform with ID '{}'", v);
-                    Err(1)
-                },
-            }?;
-
-            Ok((raw, config))
         }
 
         // Query Cargo for package metadata.
         fn metadata(
             &self,
-            config: &config::Config,
-        ) -> Result<cargo::Metadata, u8> {
+            v_manifest: &Option<String>,
+        ) -> Result<(cargo::Metadata, config::Config), u8> {
+            let manifest_path: std::path::PathBuf = v_manifest.as_deref().unwrap_or(".").into();
+
             // Build query parameters.
             let query = cargo::MetadataQuery {
-                workspace: config.path_application.clone(),
-                package: config.package.clone(),
+                workspace: manifest_path.clone(),
+                package: None,
                 target: None,
             };
 
             // Run `cargo metadata` and parse the output.
-            match query.run() {
+            let metadata = match query.run() {
                 Ok(v) => {
                     Ok(v)
                 },
@@ -156,20 +54,37 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                     eprintln!("Cannot query cargo metadata: {}", e);
                     Err(1)
                 },
-            }
+            }?;
+
+            // Build internal configuration based on the metadata.
+            let config = match config::Config::from_cargo(&metadata, &manifest_path) {
+                Ok(v) => Ok(v),
+                Err(e) => {
+                    eprintln!("Cannot build configuration: {}", e);
+                    Err(1)
+                },
+            }?;
+
+            Ok((metadata, config))
         }
 
         // Handle the `--platform <...>` argument.
         fn platform<'config>(
             &self,
-            m: &clap::ArgMatches,
             config: &'config config::Config,
+            v_platform: &Option<String>,
         ) -> Result<&'config config::ConfigPlatform, u8> {
-            let id: &String = m.get_one("platform").expect("Cannot acquire platform ID");
+            let id = match v_platform {
+                None => {
+                    eprintln!("No platform integration specified");
+                    Err(1)
+                },
+                Some(ref v) => Ok(v),
+            }?;
 
             match config.platforms.get(id) {
                 None => {
-                    eprintln!("No platform with ID {}", id);
+                    eprintln!("No platform integration with ID {}", id);
                     Err(1)
                 },
                 Some(v) => Ok(v),
@@ -178,12 +93,11 @@ pub fn cargo_osiris() -> std::process::ExitCode {
 
         fn op_build(
             &self,
-            m: &clap::ArgMatches,
-            m_op: &clap::ArgMatches,
+            v_manifest: &Option<String>,
+            v_platform: &Option<String>,
         ) -> Result<(), u8> {
-            let (_, config) = self.config(m)?;
-            let metadata = self.metadata(&config)?;
-            let platform = self.platform(m_op, &config)?;
+            let (metadata, config) = self.metadata(v_manifest)?;
+            let platform = self.platform(&config, v_platform)?;
 
             match op::build(
                 &config,
@@ -340,18 +254,18 @@ pub fn cargo_osiris() -> std::process::ExitCode {
 
         fn op_emerge(
             &self,
-            m: &clap::ArgMatches,
-            m_op: &clap::ArgMatches,
+            v_manifest: &Option<String>,
+            v_platform: &Option<String>,
+            v_update: &bool,
         ) -> Result<(), u8> {
-            let (_, config) = self.config(m)?;
-            let platform = self.platform(m_op, &config)?;
-            let update = *m_op.get_one("update").expect("Update-flag lacks a value");
+            let (_metadata, config) = self.metadata(v_manifest)?;
+            let platform = self.platform(&config, v_platform)?;
 
             match op::emerge(
                 &config,
                 platform,
                 None,
-                update,
+                *v_update,
             ) {
                 Err(op::EmergeError::Already) => {
                     eprintln!("Cannot emerge platform integration: Platform code already present");
@@ -379,35 +293,93 @@ pub fn cargo_osiris() -> std::process::ExitCode {
             }
         }
 
-        fn run(mut self) -> Result<(), u8> {
-            let (m, r);
+        fn run(&self) -> Result<(), u8> {
+            use crate::lib::args::{Flag, Value};
 
-            r = self.cmd.try_get_matches_from_mut(
-                std::env::args_os(),
+            let args = std::env::args_os().skip(1).collect::<Vec<std::ffi::OsString>>();
+
+            let v_help = lib::args::Help::new();
+            let v_manifest: core::cell::RefCell<Option<String>> = Default::default();
+            let v_platform: core::cell::RefCell<Option<String>> = Default::default();
+            let v_update: core::cell::RefCell<bool> = Default::default();
+
+            let flags_build = lib::args::FlagList::with([
+                Flag::with_name("help", Value::Set(&v_help), Some("Show usage information")),
+                Flag::with_name("platform", Value::Parse(&v_platform), Some("ID of the target platform")),
+            ]);
+            let flags_emerge = lib::args::FlagList::with([
+                Flag::with_name("help", Value::Set(&v_help), Some("Show usage information")),
+                Flag::with_name("platform", Value::Parse(&v_platform), Some("ID of the target platform")),
+                Flag::with_name("update", Value::Toggle(&v_update), Some("Whether to allow updating existing platform integration")),
+            ]);
+            let flags_root = lib::args::FlagList::with([
+                Flag::with_name("help", Value::Set(&v_help), Some("Show usage information")),
+                Flag::with_name("manifest", Value::Parse(&v_manifest), Some("Path to the Cargo manifest")),
+            ]);
+
+            let cmds_root = lib::args::CommandList::with([
+                lib::args::Command::with_name(
+                    Cmd::Build, "build", Default::default(), &flags_build, None,
+                    Some("Build artifacts for the specified platform"),
+                ),
+                lib::args::Command::with_name(
+                    Cmd::Emerge, "emerge", Default::default(), &flags_emerge, None,
+                    Some("Emerge platform integration for the specified platform"),
+                ),
+            ]);
+
+            let root = lib::args::Command::with_name(
+                Cmd::Root, "cargo-osiris", &cmds_root, &flags_root, None,
+                Some("Osiris Apis Build System"),
             );
 
-            match r {
-                Ok(v) => m = v,
-                Err(e) => {
-                    return match e.kind() {
-                        clap::error::ErrorKind::DisplayHelp |
-                        clap::error::ErrorKind::DisplayVersion => {
-                            e.print().expect("Cannot write to STDERR");
-                            Ok(())
-                        },
-                        clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand |
-                        _ => {
-                            e.print().expect("Cannot write to STDERR");
-                            Err(2)
-                        }
+            let r_cmd = lib::args::Parser::new().parse(
+                args.iter().map(|v| lib::compat::OsStr::from_osstr(v.as_os_str())),
+                &root,
+            );
+
+            let mut fmt_stderr = lib::compat::Write(std::io::stderr().lock());
+            let mut fmt_stdout = lib::compat::Write(std::io::stderr().lock());
+
+            // Handle all errors of the command-line parser. Note that we get
+            // a batch of errors, which we all propagate to the user.
+            let cmd = match r_cmd {
+                Ok(v) => v,
+                Err(errors) => {
+                    eprintln!("Cannot parse command-line arguments:");
+                    for e in errors.iter() {
+                        eprintln!("- {}", e);
                     }
-                }
+                    return Err(2);
+                },
+            };
+
+            // If `--help` was requested, show usage information on `stdout`
+            // and exit with success.
+            if v_help
+                .help(&root, &mut fmt_stdout)
+                .expect("STDERR must be writable")
+            {
+                return Ok(());
             }
 
-            match m.subcommand() {
-                Some(("build", m_op)) => self.op_build(&m, m_op),
-                Some(("emerge", m_op)) => self.op_emerge(&m, m_op),
-                _ => std::unreachable!(),
+            match cmd {
+                Cmd::Root => {
+                    // If a non-selectable command was chosen, print usage
+                    // information on `stderr` and return failure.
+                    lib::args::Help::help_for(&root, &mut fmt_stderr, &cmd)
+                        .expect("STDERR must be writable");
+                    Err(2)
+                },
+                Cmd::Build => self.op_build(
+                    &*v_manifest.borrow(),
+                    &*v_platform.borrow(),
+                ),
+                Cmd::Emerge => self.op_emerge(
+                    &*v_manifest.borrow(),
+                    &*v_platform.borrow(),
+                    &*v_update.borrow(),
+                ),
             }
         }
     }
