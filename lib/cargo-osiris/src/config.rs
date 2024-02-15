@@ -16,10 +16,8 @@
 use crate::{cargo, lib, misc};
 use std::collections::BTreeMap;
 
-/// ## Validation Error
-///
-/// This represents the errors possible when validating the configuration
-/// and parsing it into the in-memory structured layout.
+/// Enumeration of all errors that can occur when assembling the configuration
+/// data from source material.
 #[derive(Debug)]
 pub enum Error {
     /// Specified key is required, but missing
@@ -28,7 +26,7 @@ pub enum Error {
     DuplicatePlatform(String),
 }
 
-/// ## Android Configuration
+/// Android specific configuration for a platform integration.
 pub struct ConfigPlatformAndroid {
     pub application_id: String,
     pub namespace: String,
@@ -43,22 +41,23 @@ pub struct ConfigPlatformAndroid {
     pub version_name: String,
 }
 
-/// ## MacOS Configuration
+/// MacOS specific configuration for a platform integration.
 pub struct ConfigPlatformMacos {
 }
 
-/// ## Platform Union
+/// Union for platform specific configuration that is part of a platform
+/// integration configuration.
 pub enum ConfigPlatformConfiguration {
     Android(ConfigPlatformAndroid),
     Macos(ConfigPlatformMacos),
 }
 
-/// ## Platform Configuration
+/// Configuration for a specific platform integration.
 pub struct ConfigPlatform {
     /// Absolute path to the platform root.
     pub path_platform: std::path::PathBuf,
 
-    /// Platform ID sourced from TOML
+    /// Platform ID
     pub id: String,
     /// Symbolized Platform ID
     pub id_symbol: String,
@@ -67,20 +66,21 @@ pub struct ConfigPlatform {
     pub configuration: ConfigPlatformConfiguration,
 }
 
-/// ## Configuration Root
+/// Root object of the build system configuration. This contains sanitized
+/// data with defaults filled in.
 pub struct Config {
     /// Absolute path to the root directory of the configuration.
     pub path_root: std::path::PathBuf,
     /// Absolute path to the application root.
     pub path_application: std::path::PathBuf,
 
-    /// Application ID sourced from TOML
+    /// Application ID
     pub id: String,
     /// Symbolized Application ID
     pub id_symbol: String,
-    /// Application name sourced from TOML
+    /// Application name
     pub name: String,
-    /// Application package name sourced from TOML
+    /// Application package name
     pub package: Option<String>,
 
     /// Platform Configurations
