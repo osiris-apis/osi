@@ -401,4 +401,20 @@ impl ConfigPlatform {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    // Verify a simple configuration without platforms
+    #[test]
+    fn simple_config() {
+        let data = Some(cargo::MdOsi::V1(cargo::MdOsiV1 {
+            application: Some(cargo::MdOsiApplication {
+                id: Some("ID".into()),
+                name: None,
+            }),
+            platforms: Vec::new(),
+        }));
+        let config = Config::from_cargo(&data, &".").unwrap();
+
+        assert_eq!(config.id, "ID");
+    }
 }
