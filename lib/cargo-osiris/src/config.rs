@@ -330,12 +330,12 @@ impl Config {
     /// absolute, it is anchored in the current working directory at the time
     /// of this function call.
     pub fn from_cargo(
-        data: &cargo::Metadata,
+        data: &Option<cargo::MdOsi>,
         path: &dyn AsRef<std::path::Path>,
     ) -> Result<Self, Error> {
-        let mdosi = match data.osiris {
+        let mdosi = match data {
             None => return Ok(Self::with_root(path)),
-            Some(cargo::MdOsi::V1(ref v)) => v,
+            Some(cargo::MdOsi::V1(v)) => v,
         };
 
         // Remember the absolute path to the directory of the configuration.

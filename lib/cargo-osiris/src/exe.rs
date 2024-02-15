@@ -57,7 +57,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
             }?;
 
             // Build internal configuration based on the metadata.
-            let config = match config::Config::from_cargo(&metadata, &manifest_path) {
+            let config = match config::Config::from_cargo(&metadata.osiris, &manifest_path) {
                 Ok(v) => Ok(v),
                 Err(e) => {
                     eprintln!("Cannot build configuration: {}", e);
