@@ -23,7 +23,6 @@ mod exe;
 mod misc;
 mod op;
 mod platform;
-mod toml;
 
 use osi_lib as lib;
 
