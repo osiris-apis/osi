@@ -31,11 +31,11 @@ android.manifest-file = "src/platform/android/AndroidManifest.xml"
 android.resource-dirs = ["src/platform/android/res"]
 
 [target.'cfg(target_os = "linux")'.dependencies]
-adw = { features = ["v1_1"], package = "libadwaita", version = "0.5" }
-gtk = { features = ["v4_6"], package = "gtk4", version = "0.7" }
+adw = { features = ["v1_1"], workspace = true }
+gtk = { features = ["v4_6"], workspace = true }
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]
-version = "0.51"
+workspace = true
 features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",

@@ -9,7 +9,9 @@ default-members = [
 ]
 
 [workspace.dependencies]
+adw = { package = "libadwaita", version = "0.5" }
 gio = { features = ["v2_70"], version = "0.18" }
+gtk = { package = "gtk4", version = "0.7" }
 osi-apis = { path = "./lib/osi-apis" }
 osi-derive = { path = "./lib/osi-derive" }
 osi-derive-proc = { path = "./lib/osi-derive-proc" }
@@ -21,6 +23,7 @@ osiris-windows = { path = "./lib/osiris-windows" }
 proc-macro2 = { version = "1.0" }
 quote = { version = "1.0" }
 syn = { version = "2.0" }
+windows = { version = "0.51" }
 
 [workspace.package]
 categories = [
