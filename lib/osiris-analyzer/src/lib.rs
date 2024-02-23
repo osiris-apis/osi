@@ -13,6 +13,13 @@ fn run() -> std::process::ExitCode {
     app.run()
 }
 
+#[cfg(target_os = "macos")]
+fn run() -> std::process::ExitCode {
+    let app = platform::macos::App::new();
+
+    app.run()
+}
+
 #[cfg(target_os = "windows")]
 fn run() -> std::process::ExitCode {
     let app = platform::windows::App::new();
@@ -20,7 +27,11 @@ fn run() -> std::process::ExitCode {
     app.run()
 }
 
-#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+#[cfg(not(any(
+    target_os = "linux",
+    target_os = "macos",
+    target_os = "windows",
+)))]
 fn run() -> std::process::ExitCode {
     1.into()
 }

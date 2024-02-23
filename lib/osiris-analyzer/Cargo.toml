@@ -34,6 +34,20 @@ android.resource-dirs = ["src/platform/android/res"]
 adw = { features = ["v1_1"], workspace = true }
 gtk = { features = ["v4_6"], workspace = true }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { workspace = true }
+
+[target.'cfg(target_os = "macos")'.dependencies.icrate]
+workspace = true
+features = [
+        "AppKit",
+        "AppKit_NSApplication",
+        "CoreData",
+        "Foundation",
+        "Foundation_NSNotification",
+        "Foundation_NSThread",
+]
+
 [target.'cfg(target_os = "windows")'.dependencies.windows]
 workspace = true
 features = [

@@ -12,6 +12,8 @@ default-members = [
 adw = { package = "libadwaita", version = "0.5" }
 gio = { features = ["v2_70"], version = "0.18" }
 gtk = { package = "gtk4", version = "0.7" }
+icrate = { version = "0.1" }
+objc2 = { version = "0.5" }
 osi-apis = { path = "./lib/osi-apis" }
 osi-derive = { path = "./lib/osi-derive" }
 osi-derive-proc = { path = "./lib/osi-derive-proc" }
