@@ -42,6 +42,7 @@ workspace = true
 features = [
         "AppKit",
         "AppKit_NSApplication",
+        "AppKit_NSWindow",
         "CoreData",
         "Foundation",
         "Foundation_NSNotification",
