@@ -599,9 +599,9 @@ impl<'ctx> Direct<'ctx> {
                 default_features: true,
                 envs: vec![(linker_env.into(), linker_path.into())],
                 features: Vec::new(),
+                manifest: self.build.config.path_manifest.clone(),
                 profile: None,
                 target: Some(target.into()),
-                workspace: self.build.config.path_application.clone(),
             };
 
             let build = query.run().map_err(

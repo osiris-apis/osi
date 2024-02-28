@@ -157,15 +157,14 @@ struct MetadataBlob {
 /// It is to be filled in by the caller.
 #[derive(Clone, Debug)]
 pub struct MetadataQuery {
+    /// Path to the Cargo manifest file to use (preferably an absolute path).
+    pub manifest: std::path::PathBuf,
     /// Name of the target package in the workspace. If `None`, the root
     /// package of the workspace is used, if any.
     pub package: Option<String>,
     /// The target platform to compile for. If `None`, a generic request for
     /// all possible targets is performed.
     pub target: Option<String>,
-    /// Path to the workspace directory (or package directory) where
-    /// `Cargo.toml` resides (preferably an absolute path).
-    pub workspace: std::path::PathBuf,
 }
 
 /// Output of a `cargo build` run with only relevant pieces retained.
@@ -193,13 +192,12 @@ pub struct BuildQuery {
     pub envs: Vec<(std::ffi::OsString, std::ffi::OsString)>,
     /// Array of features to enable.
     pub features: Vec<String>,
+    /// Path to the Cargo manifest file to use (preferably an absolute path).
+    pub manifest: std::path::PathBuf,
     /// The build profile to use.
     pub profile: Option<String>,
     /// The target platform to compile for.
     pub target: Option<String>,
-    /// Path to the workspace directory (or package directory) where
-    /// `Cargo.toml` resides (preferably an absolute path).
-    pub workspace: std::path::PathBuf,
 }
 
 // Return the Cargo command to use for invocations of Cargo. This will
@@ -778,11 +776,8 @@ impl MetadataQuery {
         ]);
 
         // Append path to the manifest.
-        let mut path_manifest = std::path::PathBuf::new();
-        path_manifest.push(&self.workspace);
-        path_manifest.push("Cargo.toml");
         cmd.arg("--manifest-path");
-        cmd.arg(&path_manifest);
+        cmd.arg(&self.manifest);
 
         // Run cargo and verify it exited successfully.
         let output = cmd.output().map_err(|v| Error::Exec(v))?;
@@ -954,11 +949,8 @@ impl BuildQuery {
         }
 
         // Append path to the manifest.
-        let mut path_manifest = std::path::PathBuf::new();
-        path_manifest.push(&self.workspace);
-        path_manifest.push("Cargo.toml");
         cmd.arg("--manifest-path");
-        cmd.arg(&path_manifest);
+        cmd.arg(&self.manifest);
 
         // Disable default features, if requested.
         if !self.default_features {
@@ -1142,7 +1134,7 @@ mod tests {
     #[test]
     fn metadata_from_json() {
         let query = MetadataQuery {
-            workspace: ".".into(),
+            manifest: "./Cargo.toml".into(),
             package: Some("foobar".into()),
             target: None,
         };
@@ -1190,7 +1182,7 @@ mod tests {
     #[test]
     fn metadata_java_kotlin() {
         let query = MetadataQuery {
-            workspace: ".".into(),
+            manifest: "./Cargo.toml".into(),
             package: None,
             target: None,
         };

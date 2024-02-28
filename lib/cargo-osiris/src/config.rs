@@ -69,10 +69,10 @@ pub struct ConfigPlatform {
 /// Root object of the build system configuration. This contains sanitized
 /// data with defaults filled in.
 pub struct Config {
-    /// Absolute path to the root directory of the configuration.
-    pub path_root: std::path::PathBuf,
     /// Absolute path to the application root.
     pub path_application: std::path::PathBuf,
+    /// Absolute path to the Cargo manifest.
+    pub path_manifest: std::path::PathBuf,
 
     /// Application ID
     pub id: String,
@@ -108,7 +108,7 @@ impl Config {
 
         // Provide a default path based on the platform ID, if none is
         // specified in the configuration.
-        let v_path_platform = self.path_root.as_path().join(
+        let v_path_platform = self.path_application.as_path().join(
             match platform.path.as_ref() {
                 Some(v) => v.clone(),
                 None => format!("platform/{}", v_id_symbol),
@@ -253,22 +253,21 @@ impl Config {
 
     /// ## Create Configuration without source file
     ///
-    /// Create a configuration simply based on the path to the application
-    /// directory. Almost all keys are filled with their default value. Default
-    /// platform integrations are provided as well.
+    /// Create a configuration simply based on the path to the Cargo manifest.
+    /// Almost all keys are filled with their default value. Default platform
+    /// integrations are provided as well.
     ///
     /// This configuration is useful to test application builds without
     /// having to go through a lengthy configuration process. However, this
     /// configuration is not suitable for deployments.
-    pub fn with_root(
-        path: &dyn AsRef<std::path::Path>,
+    pub fn with_manifest(
+        path_manifest: &dyn AsRef<std::path::Path>,
     ) -> Self {
         // Remember the absolute path to the directory of the configuration.
         // Other relative paths in the configuration are relative to it.
-        let v_path_root = misc::absdir(path);
+        let v_path_application = misc::absdir(path_manifest);
 
         // Provide default values for everything else.
-        let v_path_application = v_path_root.clone();
         let v_id = "unknown";
         let v_id_symbol = lib::str::symbolize(v_id);
         let v_name = v_id;
@@ -277,8 +276,8 @@ impl Config {
         // Create initial configuration with basic data. Further information
         // will be procedurally added to it.
         let mut config = Config {
-            path_root: v_path_root,
             path_application: v_path_application,
+            path_manifest: path_manifest.as_ref().into(),
 
             id: v_id.to_string(),
             id_symbol: v_id_symbol,
@@ -292,7 +291,7 @@ impl Config {
         config.platforms.insert(
             "android".to_string(),
             ConfigPlatform {
-                path_platform: config.path_root.as_path().join("platform/android"),
+                path_platform: config.path_application.as_path().join("platform/android"),
                 id: "android".to_string(),
                 id_symbol: "android".to_string(),
 
@@ -331,19 +330,16 @@ impl Config {
     /// of this function call.
     pub fn from_cargo(
         data: &Option<cargo::MdOsi>,
-        path: &dyn AsRef<std::path::Path>,
+        path_manifest: &dyn AsRef<std::path::Path>,
     ) -> Result<Self, Error> {
         let mdosi = match data {
-            None => return Ok(Self::with_root(path)),
+            None => return Ok(Self::with_manifest(path_manifest)),
             Some(cargo::MdOsi::V1(v)) => v,
         };
 
         // Remember the absolute path to the directory of the configuration.
         // Other relative paths in the configuration are relative to it.
-        let v_path_root = misc::absdir(path);
-
-        // The application path is inherited from the metadata.
-        let v_path_application = v_path_root.clone();
+        let v_path_application = misc::absdir(path_manifest);
 
         // Package information is inherited from the metadata.
         let v_package = None;
@@ -365,8 +361,8 @@ impl Config {
         // Create initial configuration with basic data. Further information
         // will be procedurally added to it.
         let mut config = Config {
-            path_root: v_path_root,
             path_application: v_path_application,
+            path_manifest: path_manifest.as_ref().into(),
 
             id: v_id.clone(),
             id_symbol: v_id_symbol,

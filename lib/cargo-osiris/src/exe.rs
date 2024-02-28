@@ -35,11 +35,11 @@ pub fn cargo_osiris() -> std::process::ExitCode {
             &self,
             v_manifest: &Option<String>,
         ) -> Result<(cargo::Metadata, config::Config), u8> {
-            let manifest_path: std::path::PathBuf = v_manifest.as_deref().unwrap_or(".").into();
+            let manifest_path: std::path::PathBuf = v_manifest.as_deref().unwrap_or("./Cargo.toml").into();
 
             // Build query parameters.
             let query = cargo::MetadataQuery {
-                workspace: manifest_path.clone(),
+                manifest: manifest_path.clone(),
                 package: None,
                 target: None,
             };
