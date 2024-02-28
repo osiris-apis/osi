@@ -6,25 +6,30 @@
 
 use crate::{cargo, config, lib, platform};
 
+/// Error definitions shared across most implemented operations, describing
+/// errors when accessing or modifying data store on the file system.
+pub enum ErrorFileSystem {
+    /// Cannot traverse the specified directory
+    DirectoryTraversal { path: std::ffi::OsString, io: std::io::Error },
+    /// Cannot create the specified build artifact directory
+    DirectoryCreation { path: std::ffi::OsString, io: std::io::Error },
+    /// Cannot remove the specified build artifact directory
+    DirectoryRemoval { path: std::ffi::OsString, io: std::io::Error },
+    /// Updating the file at the specified path failed with the given error
+    FileUpdate { path: std::path::PathBuf, io: std::io::Error },
+    /// Copying a file failed with the given error.
+    FileCopy { from: std::path::PathBuf, to: std::path::PathBuf, io: std::io::Error },
+}
+
 /// ## Build Errors
 ///
 /// This is the exhaustive list of possible errors raised by the build
 /// operation. See each error for details.
-///
-/// XXX: File-system errors should carry the IO-Error.
 pub enum BuildError {
     /// Uncaught error propagation.
     Uncaught(lib::error::Uncaught),
-    /// Cannot traverse the specified directory.
-    DirectoryTraversal(std::ffi::OsString),
-    /// Cannot create the specified build artifact directory.
-    DirectoryCreation(std::ffi::OsString),
-    /// Cannot remove the specified build artifact directory.
-    DirectoryRemoval(std::ffi::OsString),
-    /// Updating the file at the specified path failed with the given error.
-    FileUpdate(std::path::PathBuf, std::io::Error),
-    /// Copying a file failed with the given error.
-    FileCopy(std::path::PathBuf, std::path::PathBuf, std::io::Error),
+    /// File system errors
+    FileSystem(ErrorFileSystem),
     /// Execution of the given tool could not commence.
     Exec(String, std::io::Error),
     /// Given tool failed executing.
@@ -41,6 +46,12 @@ impl From<lib::error::Uncaught> for BuildError {
     }
 }
 
+impl From<ErrorFileSystem> for BuildError {
+    fn from(v: ErrorFileSystem) -> Self {
+        Self::FileSystem(v)
+    }
+}
+
 impl From<cargo::Error> for BuildError {
     fn from(v: cargo::Error) -> Self {
         Self::Cargo(v)
@@ -50,6 +61,18 @@ impl From<cargo::Error> for BuildError {
 impl From<platform::android::BuildError> for BuildError {
     fn from(v: platform::android::BuildError) -> Self {
         Self::AndroidPlatform(v)
+    }
+}
+
+impl core::fmt::Display for ErrorFileSystem {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+        match self {
+            ErrorFileSystem::DirectoryTraversal { path, io } => fmt.write_fmt(core::format_args!("Cannot traverse directory ({}): {}", path.to_string_lossy(), io)),
+            ErrorFileSystem::DirectoryCreation { path, io } => fmt.write_fmt(core::format_args!("Cannot create directory ({}): {}", path.to_string_lossy(), io)),
+            ErrorFileSystem::DirectoryRemoval { path, io } => fmt.write_fmt(core::format_args!("Cannot remove directory ({}): {}", path.to_string_lossy(), io)),
+            ErrorFileSystem::FileUpdate { path, io } => fmt.write_fmt(core::format_args!("Cannot update file ({}): {}", path.to_string_lossy(), io)),
+            ErrorFileSystem::FileCopy { from, to, io } => fmt.write_fmt(core::format_args!("Cannot copy file ({} -> {}): {}", from.to_string_lossy(), to.to_string_lossy(), io)),
+        }
     }
 }
 
@@ -65,14 +88,14 @@ pub fn lsrdir(path: &std::path::Path) -> Result<Vec<std::path::PathBuf>, BuildEr
 
     while let Some(ref dir) = todo.pop() {
         let entries = std::fs::read_dir(dir).map_err(
-            |_| BuildError::DirectoryTraversal(dir.into()),
+            |io| ErrorFileSystem::DirectoryTraversal { path: dir.into(), io },
         )?;
         for iter in entries {
             let entry = iter.map_err(
-                |_| BuildError::DirectoryTraversal(dir.into()),
+                |io| ErrorFileSystem::DirectoryTraversal { path: dir.into(), io },
             )?;
             let mut entry_ft = entry.file_type().map_err(
-                |_| BuildError::DirectoryTraversal(dir.into()),
+                |io| ErrorFileSystem::DirectoryTraversal { path: dir.into(), io },
             )?;
             let entry_path = dir.join(entry.file_name());
 
@@ -86,12 +109,18 @@ pub fn lsrdir(path: &std::path::Path) -> Result<Vec<std::path::PathBuf>, BuildEr
 
             if entry_ft.is_symlink() {
                 let entry_md = std::fs::metadata(entry_path.as_path()).map_err(
-                    |_| BuildError::DirectoryTraversal((&entry_path).into()),
+                    |io| ErrorFileSystem::DirectoryTraversal { path: (&entry_path).into(), io },
                 )?;
 
                 entry_ft = entry_md.file_type();
                 if entry_ft.is_symlink() {
-                    return Err(BuildError::DirectoryTraversal((&entry_path).into()));
+                    return Err(ErrorFileSystem::DirectoryTraversal {
+                        path: (&entry_path).into(),
+                        io: std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "Symlink entry forms a loop",
+                        ),
+                    }.into());
                 }
             }
 
@@ -112,7 +141,7 @@ pub fn lsrdir(path: &std::path::Path) -> Result<Vec<std::path::PathBuf>, BuildEr
 /// converts failures into the local error domain.
 pub fn mkdir(path: &std::path::Path) -> Result<(), BuildError> {
     std::fs::create_dir_all(path).map_err(
-        |_| BuildError::DirectoryCreation(path.into()),
+        |io| ErrorFileSystem::DirectoryCreation { path: path.into(), io },
     )?;
 
     Ok(())
@@ -129,7 +158,7 @@ pub fn mkdir(path: &std::path::Path) -> Result<(), BuildError> {
 pub fn rmdir(path: &std::path::Path) -> Result<(), BuildError> {
     if path.exists() {
         std::fs::remove_dir_all(path).map_err(
-            |_| BuildError::DirectoryRemoval(path.into()),
+            |io| ErrorFileSystem::DirectoryRemoval { path: path.into(), io },
         )?;
     }
 
@@ -145,7 +174,7 @@ pub fn copy_file(
     dst: &std::path::Path,
 ) -> Result<(), BuildError> {
     std::fs::copy(src, dst).map_err(
-        |v| BuildError::FileCopy(src.into(), dst.into(), v),
+        |io| ErrorFileSystem::FileCopy { from: src.into(), to: dst.into(), io },
     )?;
 
     Ok(())
@@ -179,14 +208,14 @@ pub fn update_file(
         .create(true)
         .open(path)
         .map_err(
-            |v| BuildError::FileUpdate(path.into(), v),
+            |io| ErrorFileSystem::FileUpdate { path: path.into(), io },
         )?;
 
     // Read the entire file content into memory.
     let mut old = Vec::new();
     <std::fs::File as std::io::Read>::read_to_end(&mut f, &mut old)
         .map_err(
-            |v| BuildError::FileUpdate(path.into(), v),
+            |io| ErrorFileSystem::FileUpdate { path: path.into(), io },
         )?;
 
     // If the file has to be updated, rewind the position, truncate the file
@@ -194,20 +223,20 @@ pub fn update_file(
     let new = if old != content {
         <std::fs::File as std::io::Seek>::rewind(&mut f)
             .map_err(
-                |v| BuildError::FileUpdate(path.into(), v),
+                |io| ErrorFileSystem::FileUpdate { path: path.into(), io },
             )?;
 
         f.set_len(0).map_err(
-            |v| BuildError::FileUpdate(path.into(), v),
+            |io| ErrorFileSystem::FileUpdate { path: path.into(), io },
         )?;
 
         <std::fs::File as std::io::Write>::write_all(&mut f, content)
             .map_err(
-                |v| BuildError::FileUpdate(path.into(), v),
+                |io| ErrorFileSystem::FileUpdate { path: path.into(), io },
             )?;
 
         f.sync_all().map_err(
-            |v| BuildError::FileUpdate(path.into(), v),
+            |io| ErrorFileSystem::FileUpdate { path: path.into(), io },
         )?;
 
         true

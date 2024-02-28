@@ -107,24 +107,8 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                     eprintln!("Cannot build platform integration: Uncaught failure: {}", v);
                     Err(1)
                 },
-                Err(op::BuildError::DirectoryTraversal(dir)) => {
-                    eprintln!("Cannot build platform integration: Failed to traverse directory {:?}", dir);
-                    Err(1)
-                },
-                Err(op::BuildError::DirectoryCreation(dir)) => {
-                    eprintln!("Cannot build platform integration: Failed to create directory {:?}", dir);
-                    Err(1)
-                },
-                Err(op::BuildError::DirectoryRemoval(dir)) => {
-                    eprintln!("Cannot build platform integration: Failed to remove directory {:?}", dir);
-                    Err(1)
-                },
-                Err(op::BuildError::FileCopy(src, dst, err)) => {
-                    eprintln!("Cannot build platform integration: Failed to copy file {} -> {}: {}", src.display(), dst.display(), err);
-                    Err(1)
-                },
-                Err(op::BuildError::FileUpdate(path, err)) => {
-                    eprintln!("Cannot build platform integration: Failed to update file {}: {}", path.display(), err);
+                Err(op::BuildError::FileSystem(fs)) => {
+                    eprintln!("Cannot build platform integration: {}", fs);
                     Err(1)
                 },
                 Err(op::BuildError::Exec(tool, v)) => {

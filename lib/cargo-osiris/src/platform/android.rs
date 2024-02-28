@@ -290,11 +290,11 @@ impl<'ctx> Direct<'ctx> {
             .flat_map(|v| v.resource_dirs.iter())
         {
             let sdirs = std::fs::read_dir(rdir).map_err(
-                |_| op::BuildError::DirectoryTraversal(rdir.into()),
+                |io| op::ErrorFileSystem::DirectoryTraversal { path: rdir.into(), io },
             )?;
             for sdir_iter in sdirs {
                 let sdir_entry = sdir_iter.map_err(
-                    |_| op::BuildError::DirectoryTraversal(rdir.into()),
+                    |io| op::ErrorFileSystem::DirectoryTraversal { path: rdir.into(), io },
                 )?;
                 let sdir = &sdir_entry.path();
 
@@ -303,11 +303,11 @@ impl<'ctx> Direct<'ctx> {
                 }
 
                 let tdirs = std::fs::read_dir(sdir).map_err(
-                    |_| op::BuildError::DirectoryTraversal(sdir.into()),
+                    |io| op::ErrorFileSystem::DirectoryTraversal { path: sdir.into(), io },
                 )?;
                 for tdir_iter in tdirs {
                     let tdir_entry = tdir_iter.map_err(
-                        |_| op::BuildError::DirectoryTraversal(sdir.into()),
+                        |io| op::ErrorFileSystem::DirectoryTraversal { path: sdir.into(), io },
                     )?;
                     let tdir = &tdir_entry.path();
 
