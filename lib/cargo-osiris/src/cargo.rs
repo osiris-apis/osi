@@ -142,6 +142,8 @@ pub struct Metadata {
     pub android_sets: Vec<MetadataAndroid>,
     /// Osiris package metadata
     pub osiris: Option<MdOsi>,
+    /// Package ID of the target package
+    pub package_id: String,
     /// Target directory of the package build
     pub target_directory: String,
 }
@@ -634,7 +636,7 @@ impl MetadataBlob {
     // new Metadata object.
     fn parse(&self, query: &MetadataQuery) -> Result<Metadata, Error> {
         // Extract `target_directory` from the blob. It is a mandatory field.
-        let data_target_directory = self.json.get("target_directory").ok_or(Error::Data)?
+        let v_target_directory = self.json.get("target_directory").ok_or(Error::Data)?
             .as_str().ok_or(Error::Data)?
             .to_string();
 
@@ -754,7 +756,8 @@ impl MetadataBlob {
             Metadata {
                 android_sets: android_sets,
                 osiris: pkgmd_osi,
-                target_directory: data_target_directory,
+                package_id: root,
+                target_directory: v_target_directory,
             }
         )
     }
@@ -1172,6 +1175,7 @@ mod tests {
             Metadata {
                 android_sets: Vec::new(),
                 osiris: None,
+                package_id: "foobar (...)".into(),
                 target_directory: ".".into(),
             },
         );
@@ -1277,6 +1281,7 @@ mod tests {
                     },
                 ],
                 osiris: None,
+                package_id: "root (...)".into(),
                 target_directory: ".".into(),
             },
         );
