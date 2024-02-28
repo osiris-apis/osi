@@ -260,9 +260,7 @@ pub fn build(
     path_build.push(&metadata.target_directory);
     path_build.push("osi");
     path_build.push(&platform.id_symbol);
-    std::fs::create_dir_all(path_build.as_path()).map_err(
-        |_| BuildError::DirectoryCreation(path_build.as_os_str().to_os_string())
-    )?;
+    mkdir(path_build.as_path())?;
 
     // Invoke the platform-dependent handler. Grant the path-buffers to it, so
     // it can reuse it for further operations.
