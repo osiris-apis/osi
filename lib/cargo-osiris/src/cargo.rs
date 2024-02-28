@@ -935,9 +935,8 @@ impl BuildQuery {
         // Build the cargo-build invocation.
         let mut cmd = std::process::Command::new(cargo_command());
         cmd.args([
-            "build",
+            "rustc",
             "--message-format=json-render-diagnostics",
-            "--quiet",
         ]);
 
         // Append all desired environment variables.
