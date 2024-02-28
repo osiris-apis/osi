@@ -17,8 +17,17 @@ pub enum ErrorFileSystem {
     DirectoryRemoval { path: std::ffi::OsString, io: std::io::Error },
     /// Updating the file at the specified path failed with the given error
     FileUpdate { path: std::path::PathBuf, io: std::io::Error },
-    /// Copying a file failed with the given error.
+    /// Copying a file failed with the given error
     FileCopy { from: std::path::PathBuf, to: std::path::PathBuf, io: std::io::Error },
+}
+
+/// Error definitions shared across most implemented operations, describing
+/// errors when spawning processes and waiting for their completion.
+pub enum ErrorProcess {
+    /// Execution of the given tool could not commence
+    Exec { name: String, io: std::io::Error },
+    /// Given tool exited with an error condition
+    Exit { name: String, code: std::process::ExitStatus },
 }
 
 /// ## Build Errors
@@ -30,6 +39,8 @@ pub enum BuildError {
     Uncaught(lib::error::Uncaught),
     /// File system errors
     FileSystem(ErrorFileSystem),
+    /// Process execution errors
+    Process(ErrorProcess),
     /// Execution of the given tool could not commence.
     Exec(String, std::io::Error),
     /// Given tool failed executing.
@@ -49,6 +60,12 @@ impl From<lib::error::Uncaught> for BuildError {
 impl From<ErrorFileSystem> for BuildError {
     fn from(v: ErrorFileSystem) -> Self {
         Self::FileSystem(v)
+    }
+}
+
+impl From<ErrorProcess> for BuildError {
+    fn from(v: ErrorProcess) -> Self {
+        Self::Process(v)
     }
 }
 
@@ -72,6 +89,15 @@ impl core::fmt::Display for ErrorFileSystem {
             ErrorFileSystem::DirectoryRemoval { path, io } => fmt.write_fmt(core::format_args!("Cannot remove directory ({}): {}", path.to_string_lossy(), io)),
             ErrorFileSystem::FileUpdate { path, io } => fmt.write_fmt(core::format_args!("Cannot update file ({}): {}", path.to_string_lossy(), io)),
             ErrorFileSystem::FileCopy { from, to, io } => fmt.write_fmt(core::format_args!("Cannot copy file ({} -> {}): {}", from.to_string_lossy(), to.to_string_lossy(), io)),
+        }
+    }
+}
+
+impl core::fmt::Display for ErrorProcess {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+        match self {
+            ErrorProcess::Exec { name, io } => fmt.write_fmt(core::format_args!("Execution of `{}` could not commence: {}", name, io)),
+            ErrorProcess::Exit { name, code } => fmt.write_fmt(core::format_args!("Execution of `{}` ended with a failure: {}", name, code)),
         }
     }
 }

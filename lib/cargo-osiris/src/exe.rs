@@ -107,8 +107,12 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                     eprintln!("Cannot build platform integration: Uncaught failure: {}", v);
                     Err(1)
                 },
-                Err(op::BuildError::FileSystem(fs)) => {
-                    eprintln!("Cannot build platform integration: {}", fs);
+                Err(op::BuildError::FileSystem(v)) => {
+                    eprintln!("Cannot build platform integration: {}", v);
+                    Err(1)
+                },
+                Err(op::BuildError::Process(v)) => {
+                    eprintln!("Cannot build platform integration: {}", v);
                     Err(1)
                 },
                 Err(op::BuildError::Exec(tool, v)) => {
