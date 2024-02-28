@@ -45,20 +45,6 @@ pub enum Error {
     MdOsi(MdOsiError),
 }
 
-/// Metadata required to bundle an application of library for the Android
-/// platform.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct MetadataAndroid {
-    /// Java source directories to be included in an Android build
-    pub java_dirs: Vec<std::path::PathBuf>,
-    /// Kotlin source directories to be included in an Android build
-    pub kotlin_dirs: Vec<std::path::PathBuf>,
-    /// Android manifest to be included in an Android build
-    pub manifest_file: Option<std::path::PathBuf>,
-    /// Android resource directories to be included in an Android build
-    pub resource_dirs: Vec<std::path::PathBuf>,
-}
-
 /// Metadata about the application independent of the target platform.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct MdOsiApplication {
@@ -132,6 +118,20 @@ pub struct MdOsiV1 {
 pub enum MdOsi {
     /// Version `1` of the metadata format.
     V1(MdOsiV1),
+}
+
+/// Metadata required to bundle an application of library for the Android
+/// platform.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct MetadataAndroid {
+    /// Java source directories to be included in an Android build
+    pub java_dirs: Vec<std::path::PathBuf>,
+    /// Kotlin source directories to be included in an Android build
+    pub kotlin_dirs: Vec<std::path::PathBuf>,
+    /// Android manifest to be included in an Android build
+    pub manifest_file: Option<std::path::PathBuf>,
+    /// Android resource directories to be included in an Android build
+    pub resource_dirs: Vec<std::path::PathBuf>,
 }
 
 /// Reduced metadata as returned by an invocation of `cargo-metadata`. Only the
