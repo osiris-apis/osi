@@ -35,24 +35,6 @@ pub enum BuildError {
     AndroidPlatform(platform::android::BuildError),
 }
 
-/// ## Emerge Errors
-///
-/// This is the exhaustive list of possible errors raised by the emerge
-/// operation. See each error for details.
-pub enum EmergeError {
-    /// Platform integration is already present and updating was not
-    /// allowed by the caller.
-    Already,
-    /// Cannot access the specified platform directory.
-    PlatformDirectory(std::ffi::OsString),
-    /// Creation of the directory at the specified path failed.
-    DirectoryCreation(std::ffi::OsString),
-    /// Updating the file at the specified path failed with the given error.
-    FileUpdate(std::ffi::OsString, std::io::Error),
-    /// Removing the file at the specified path failed with the given error.
-    FileRemoval(std::ffi::OsString, std::io::Error),
-}
-
 impl From<lib::error::Uncaught> for BuildError {
     fn from(v: lib::error::Uncaught) -> Self {
         Self::Uncaught(v)
@@ -303,7 +285,7 @@ pub fn emerge(
     _platform: &config::ConfigPlatform,
     _path_override: Option<&std::path::Path>,
     _update: bool,
-) -> Result<(), EmergeError> {
+) -> Result<(), ()> {
     // XXX: To be implemented.
     Ok(())
 }

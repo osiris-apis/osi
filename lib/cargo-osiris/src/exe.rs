@@ -19,7 +19,6 @@ pub fn cargo_osiris() -> std::process::ExitCode {
     enum Cmd {
         Root,
         Build,
-        Emerge,
     }
 
     struct Cli {
@@ -252,47 +251,6 @@ pub fn cargo_osiris() -> std::process::ExitCode {
             }
         }
 
-        fn op_emerge(
-            &self,
-            v_manifest: &Option<String>,
-            v_platform: &Option<String>,
-            v_update: &bool,
-        ) -> Result<(), u8> {
-            let (_metadata, config) = self.metadata(v_manifest)?;
-            let platform = self.platform(&config, v_platform)?;
-
-            match op::emerge(
-                &config,
-                platform,
-                None,
-                *v_update,
-            ) {
-                Err(op::EmergeError::Already) => {
-                    eprintln!("Cannot emerge platform integration: Platform code already present");
-                    Err(1)
-                },
-                Err(op::EmergeError::PlatformDirectory(dir)) => {
-                    eprintln!("Cannot emerge platform integration: Failed to access platform directory {:?}", dir);
-                    Err(1)
-                },
-                Err(op::EmergeError::DirectoryCreation(dir)) => {
-                    eprintln!("Cannot emerge platform integration: Failed to create directory {:?}", dir);
-                    Err(1)
-                },
-                Err(op::EmergeError::FileUpdate(file, error)) => {
-                    eprintln!("Cannot emerge platform integration: Failed to update {:?} ({})", file, error);
-                    Err(1)
-                },
-                Err(op::EmergeError::FileRemoval(file, error)) => {
-                    eprintln!("Cannot emerge platform integration: Failed to remove {:?} ({})", file, error);
-                    Err(1)
-                },
-                Ok(_) => {
-                    Ok(())
-                },
-            }
-        }
-
         fn run(&self) -> Result<(), u8> {
             use crate::lib::args::{Flag, Value};
 
@@ -301,16 +259,10 @@ pub fn cargo_osiris() -> std::process::ExitCode {
             let v_help = lib::args::Help::new();
             let v_manifest: core::cell::RefCell<Option<String>> = Default::default();
             let v_platform: core::cell::RefCell<Option<String>> = Default::default();
-            let v_update: core::cell::RefCell<bool> = Default::default();
 
             let flags_build = lib::args::FlagList::with([
                 Flag::with_name("help", Value::Set(&v_help), Some("Show usage information")),
                 Flag::with_name("platform", Value::Parse(&v_platform), Some("ID of the target platform")),
-            ]);
-            let flags_emerge = lib::args::FlagList::with([
-                Flag::with_name("help", Value::Set(&v_help), Some("Show usage information")),
-                Flag::with_name("platform", Value::Parse(&v_platform), Some("ID of the target platform")),
-                Flag::with_name("update", Value::Toggle(&v_update), Some("Whether to allow updating existing platform integration")),
             ]);
             let flags_root = lib::args::FlagList::with([
                 Flag::with_name("help", Value::Set(&v_help), Some("Show usage information")),
@@ -321,10 +273,6 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                 lib::args::Command::with_name(
                     Cmd::Build, "build", Default::default(), &flags_build, None,
                     Some("Build artifacts for the specified platform"),
-                ),
-                lib::args::Command::with_name(
-                    Cmd::Emerge, "emerge", Default::default(), &flags_emerge, None,
-                    Some("Emerge platform integration for the specified platform"),
                 ),
             ]);
 
@@ -374,11 +322,6 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                 Cmd::Build => self.op_build(
                     &*v_manifest.borrow(),
                     &*v_platform.borrow(),
-                ),
-                Cmd::Emerge => self.op_emerge(
-                    &*v_manifest.borrow(),
-                    &*v_platform.borrow(),
-                    &*v_update.borrow(),
                 ),
             }
         }
