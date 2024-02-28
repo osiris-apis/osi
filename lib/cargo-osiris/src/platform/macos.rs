@@ -5,6 +5,9 @@
 
 use crate::{cargo, config, op};
 
+pub enum ErrorBuild {
+}
+
 struct Build<'ctx> {
     // Configuration
     pub build_dir: &'ctx std::path::Path,
@@ -28,6 +31,14 @@ impl<'ctx> Build<'ctx> {
             macos: macos,
             metadata: metadata,
             platform: platform,
+        }
+    }
+}
+
+impl core::fmt::Display for ErrorBuild {
+    fn fmt(&self, _fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+        match self {
+            _ => todo!(),
         }
     }
 }

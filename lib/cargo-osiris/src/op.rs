@@ -49,6 +49,8 @@ pub enum BuildError {
     Cargo(cargo::Error),
     /// Android platform specific errors.
     AndroidPlatform(platform::android::BuildError),
+    /// macOS platform specific errors.
+    MacosPlatform(platform::macos::ErrorBuild),
 }
 
 impl From<lib::error::Uncaught> for BuildError {
@@ -78,6 +80,12 @@ impl From<cargo::Error> for BuildError {
 impl From<platform::android::BuildError> for BuildError {
     fn from(v: platform::android::BuildError) -> Self {
         Self::AndroidPlatform(v)
+    }
+}
+
+impl From<platform::macos::ErrorBuild> for BuildError {
+    fn from(v: platform::macos::ErrorBuild) -> Self {
+        Self::MacosPlatform(v)
     }
 }
 

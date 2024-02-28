@@ -233,6 +233,10 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                         Err(1)
                     },
                 },
+                Err(op::BuildError::MacosPlatform(sub)) => {
+                    eprintln!("Cannot build macOS platform integration: {}", sub);
+                    Err(1)
+                },
                 Ok(_) => {
                     Ok(())
                 },
