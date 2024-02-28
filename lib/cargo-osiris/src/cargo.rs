@@ -196,6 +196,9 @@ pub struct BuildQuery {
     pub features: Vec<String>,
     /// Path to the Cargo manifest file to use (preferably an absolute path).
     pub manifest: std::path::PathBuf,
+    /// Name of the target package in the workspace. If `None`, the root
+    /// package of the workspace is used, if any.
+    pub package: Option<String>,
     /// The build profile to use.
     pub profile: Option<String>,
     /// The target platform to compile for.
@@ -957,6 +960,12 @@ impl BuildQuery {
         // Disable default features, if requested.
         if !self.default_features {
             cmd.arg("--no-default-features");
+        }
+
+        // Select requested package.
+        if let Some(ref package) = self.package {
+            cmd.arg("--package");
+            cmd.arg(package);
         }
 
         // Select requested profile.

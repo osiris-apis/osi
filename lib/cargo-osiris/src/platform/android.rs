@@ -600,6 +600,7 @@ impl<'ctx> Direct<'ctx> {
                 envs: vec![(linker_env.into(), linker_path.into())],
                 features: Vec::new(),
                 manifest: self.build.config.path_manifest.clone(),
+                package: None,
                 profile: None,
                 target: Some(target.into()),
             };
