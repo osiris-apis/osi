@@ -9,11 +9,11 @@
 
 use crate::{cargo, config, lib, op, platform};
 
-/// ## Cargo Osiris
+/// Application entry-point of cargo-osiris.
 ///
-/// This is the entry-point of `cargo-osiris`, the main command-line tool to
-/// interact with the Osiris Build System. It can be invoked as a standalone
-/// tool or via `cargo osiris ...`.
+/// This is the entry-point to the build-system command-line tool of Osiris. It
+/// is used to interact with the Osiris Build System. It can be invoked as a
+/// standalone tool or via `cargo osiris ...`.
 pub fn cargo_osiris() -> std::process::ExitCode {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum Cmd {
@@ -30,16 +30,16 @@ pub fn cargo_osiris() -> std::process::ExitCode {
             }
         }
 
-        // Query Cargo for package metadata.
-        fn metadata(
+        // Build configuraton from Cargo metadata.
+        fn config(
             &self,
-            v_manifest: &Option<String>,
+            cargo_args: &cargo::Arguments,
         ) -> Result<(cargo::Metadata, config::Config), u8> {
-            let manifest_path: std::path::PathBuf = v_manifest.as_deref().unwrap_or("./Cargo.toml").into();
+            let manifest_path = cargo_args.manifest_path();
 
             // Build query parameters.
             let query = cargo::MetadataQuery {
-                manifest: manifest_path.clone(),
+                manifest: manifest_path.into(),
                 package: None,
                 target: None,
             };
@@ -92,10 +92,10 @@ pub fn cargo_osiris() -> std::process::ExitCode {
 
         fn op_build(
             &self,
-            v_manifest: &Option<String>,
             v_platform: &Option<String>,
+            cargo_args: &cargo::Arguments,
         ) -> Result<(), u8> {
-            let (metadata, config) = self.metadata(v_manifest)?;
+            let (metadata, config) = self.config(cargo_args)?;
             let platform = self.platform(&config, v_platform)?;
 
             match op::build(
@@ -249,16 +249,30 @@ pub fn cargo_osiris() -> std::process::ExitCode {
             let args = std::env::args_os().skip(1).collect::<Vec<std::ffi::OsString>>();
 
             let v_help = lib::args::Help::new();
-            let v_manifest: core::cell::RefCell<Option<String>> = Default::default();
             let v_platform: core::cell::RefCell<Option<String>> = Default::default();
+
+            let v_default_features: core::cell::RefCell<Option<bool>> = Default::default();
+            let v_features: core::cell::RefCell<Vec<&str>> = Default::default();
+            let v_frozen: core::cell::RefCell<Option<bool>> = Default::default();
+            let v_manifest_path: core::cell::RefCell<Option<std::ffi::OsString>> = Default::default();
+            let v_package: core::cell::RefCell<Option<String>> = Default::default();
+            let v_profile: core::cell::RefCell<Option<String>> = Default::default();
+            let v_target_dir: core::cell::RefCell<Option<std::ffi::OsString>> = Default::default();
 
             let flags_build = lib::args::FlagList::with([
                 Flag::with_name("help", Value::Set(&v_help), Some("Show usage information")),
                 Flag::with_name("platform", Value::Parse(&v_platform), Some("ID of the target platform")),
+
+                Flag::with_name("default-features", Value::Toggle(&v_default_features), Some("Enable/Disable default package features")),
+                Flag::with_name("features", Value::Parse(&v_features), Some("Enable specified package features")),
+                Flag::with_name("frozen", Value::Parse(&v_frozen), Some("Use `Cargo.lock` without checking for updates")),
+                Flag::with_name("manifest-path", Value::Parse(&v_manifest_path), Some("Path to `Cargo.toml`")),
+                Flag::with_name("package", Value::Parse(&v_package), Some("Workspace package to build")),
+                Flag::with_name("profile", Value::Parse(&v_profile), Some("Name of the build profile")),
+                Flag::with_name("target-dir", Value::Parse(&v_target_dir), Some("Path to the target directory")),
             ]);
             let flags_root = lib::args::FlagList::with([
                 Flag::with_name("help", Value::Set(&v_help), Some("Show usage information")),
-                Flag::with_name("manifest", Value::Parse(&v_manifest), Some("Path to the Cargo manifest")),
             ]);
 
             let cmds_root = lib::args::CommandList::with([
@@ -312,8 +326,16 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                     Err(2)
                 },
                 Cmd::Build => self.op_build(
-                    &*v_manifest.borrow(),
                     &*v_platform.borrow(),
+                    &cargo::Arguments {
+                        default_features: *v_default_features.borrow(),
+                        features: v_features.borrow().iter().map(|v| (*v).into()).collect(),
+                        frozen: *v_frozen.borrow(),
+                        manifest_path: v_manifest_path.borrow().as_ref().map(|v| v.into()),
+                        package: v_package.borrow().clone(),
+                        profile: v_profile.borrow().clone(),
+                        target_dir: v_target_dir.borrow().as_ref().map(|v| v.into()),
+                    },
                 ),
             }
         }

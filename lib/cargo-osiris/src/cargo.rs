@@ -45,6 +45,20 @@ pub enum Error {
     MdOsi(MdOsiError),
 }
 
+/// Cargo arguments shared across different Cargo sub-commands. They select
+/// the workspace and package to operate on, as well as the configuration for
+/// the package.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct Arguments {
+    pub default_features: Option<bool>,
+    pub features: Vec<String>,
+    pub frozen: Option<bool>,
+    pub manifest_path: Option<std::path::PathBuf>,
+    pub package: Option<String>,
+    pub profile: Option<String>,
+    pub target_dir: Option<std::path::PathBuf>,
+}
+
 /// Metadata about the application independent of the target platform.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct MdOsiApplication {
@@ -246,6 +260,16 @@ impl core::fmt::Display for Error {
 impl core::convert::From<MdOsiError> for Error {
     fn from(v: MdOsiError) -> Self {
         Error::MdOsi(v)
+    }
+}
+
+impl Arguments {
+    /// Yield the path to the manifest, returning the default if none was
+    /// specified.
+    pub fn manifest_path(&self) -> &std::path::Path {
+        self.manifest_path.as_deref().unwrap_or(
+            std::path::Path::new("./Cargo.toml"),
+        )
     }
 }
 
