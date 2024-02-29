@@ -33,9 +33,9 @@ pub fn cargo_osiris() -> std::process::ExitCode {
         // Build configuraton from Cargo metadata.
         fn config(
             &self,
-            cargo_args: &cargo::Arguments,
+            cargo_arguments: &cargo::Arguments,
         ) -> Result<(cargo::Metadata, config::Config), u8> {
-            let manifest_path = cargo_args.manifest_path();
+            let manifest_path = cargo_arguments.manifest_path();
 
             // Build query parameters.
             let query = cargo::MetadataQuery {
@@ -93,16 +93,18 @@ pub fn cargo_osiris() -> std::process::ExitCode {
         fn op_build(
             &self,
             v_platform: &Option<String>,
-            cargo_args: &cargo::Arguments,
+            cargo_arguments: &cargo::Arguments,
         ) -> Result<(), u8> {
-            let (metadata, config) = self.config(cargo_args)?;
+            let (metadata, config) = self.config(cargo_arguments)?;
             let platform = self.platform(&config, v_platform)?;
+            let build = op::Build {
+                cargo_arguments: cargo_arguments,
+                cargo_metadata: &metadata,
+                config: &config,
+                platform: &platform,
+            };
 
-            match op::build(
-                &config,
-                &metadata,
-                platform,
-            ) {
+            match build.build() {
                 Err(op::BuildError::Uncaught(v)) => {
                     eprintln!("Cannot build platform integration: Uncaught failure: {}", v);
                     Err(1)

@@ -53,6 +53,14 @@ pub enum BuildError {
     MacosPlatform(platform::macos::ErrorBuild),
 }
 
+/// Collection of parameters for a build operation.
+pub struct Build<'ctx> {
+    pub cargo_arguments: &'ctx cargo::Arguments,
+    pub cargo_metadata: &'ctx cargo::Metadata,
+    pub config: &'ctx config::Config,
+    pub platform: &'ctx config::ConfigPlatform,
+}
+
 impl From<lib::error::Uncaught> for BuildError {
     fn from(v: lib::error::Uncaught) -> Self {
         Self::Uncaught(v)
@@ -283,51 +291,51 @@ pub fn update_file(
     Ok(new)
 }
 
-/// ## Build platform integration
-///
-/// Perform a full build of the platform integration of the specified platform.
-/// If no persistent platform integration is located in the platform directory,
-/// an ephemeral platform integration is created and built.
-///
-/// The target directory of the current crate is used to store any build
-/// artifacts. Hence, you likely want to call this through `cargo <external>`
-/// to ensure cargo integration is hooked up as expected.
-pub fn build(
-    config: &config::Config,
-    metadata: &cargo::Metadata,
-    platform: &config::ConfigPlatform,
-) -> Result<(), BuildError> {
-    let mut path_build = std::path::PathBuf::new();
+impl<'ctx> Build<'ctx> {
+    /// ## Build platform integration
+    ///
+    /// Perform a full build of the platform integration of the specified platform.
+    /// If no persistent platform integration is located in the platform directory,
+    /// an ephemeral platform integration is created and built.
+    ///
+    /// The target directory of the current crate is used to store any build
+    /// artifacts. Hence, you likely want to call this through `cargo <external>`
+    /// to ensure cargo integration is hooked up as expected.
+    pub fn build(
+        &self,
+    ) -> Result<(), BuildError> {
+        let mut path_build = std::path::PathBuf::new();
 
-    // Create a build directory for all output artifacts of the build process.
-    // Re-use the existing directory, if possible, to speed up builds. The
-    // directory is created at: `<target>/osi/<platform>`.
-    path_build.push(&metadata.target_directory);
-    path_build.push("osi");
-    path_build.push(&platform.id_symbol);
-    mkdir(path_build.as_path())?;
+        // Create a build directory for all output artifacts of the build process.
+        // Re-use the existing directory, if possible, to speed up builds. The
+        // directory is created at: `<target>/osi/<platform>`.
+        path_build.push(&self.cargo_metadata.target_directory);
+        path_build.push("osi");
+        path_build.push(&self.platform.id_symbol);
+        mkdir(path_build.as_path())?;
 
-    // Invoke the platform-dependent handler. Grant the path-buffers to it, so
-    // it can reuse it for further operations.
-    match platform.configuration {
-        config::ConfigPlatformConfiguration::Android(ref v) => {
-            platform::android::build(
-                config,
-                metadata,
-                platform,
-                v,
-                path_build.as_path(),
-            )
-        },
-        config::ConfigPlatformConfiguration::Macos(ref v) => {
-            platform::macos::build(
-                config,
-                metadata,
-                platform,
-                v,
-                path_build.as_path(),
-            )
-        },
+        // Invoke the platform-dependent handler. Grant the path-buffers to it, so
+        // it can reuse it for further operations.
+        match self.platform.configuration {
+            config::ConfigPlatformConfiguration::Android(ref v) => {
+                platform::android::build(
+                    self.config,
+                    self.cargo_metadata,
+                    self.platform,
+                    v,
+                    path_build.as_path(),
+                )
+            },
+            config::ConfigPlatformConfiguration::Macos(ref v) => {
+                platform::macos::build(
+                    self.config,
+                    self.cargo_metadata,
+                    self.platform,
+                    v,
+                    path_build.as_path(),
+                )
+            },
+        }
     }
 }
 
