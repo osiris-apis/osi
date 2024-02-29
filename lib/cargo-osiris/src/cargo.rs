@@ -48,7 +48,7 @@ pub enum Error {
 /// Cargo arguments shared across different Cargo sub-commands. They select
 /// the workspace and package to operate on, as well as the configuration for
 /// the package.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Arguments {
     pub default_features: Option<bool>,
     pub features: Vec<String>,
@@ -172,12 +172,9 @@ struct MetadataBlob {
 /// Open-coded structure with all parameters for a query to `cargo-metadata`.
 /// It is to be filled in by the caller.
 #[derive(Clone, Debug)]
-pub struct MetadataQuery {
-    /// Path to the Cargo manifest file to use (preferably an absolute path).
-    pub manifest: std::path::PathBuf,
-    /// Name of the target package in the workspace. If `None`, the root
-    /// package of the workspace is used, if any.
-    pub package: Option<String>,
+pub struct MetadataQuery<'ctx> {
+    /// Package, workspace, and configuration arguments for Cargo.
+    pub cargo_arguments: &'ctx Arguments,
     /// The target platform to compile for. If `None`, a generic request for
     /// all possible targets is performed.
     pub target: Option<String>,
@@ -264,12 +261,23 @@ impl core::convert::From<MdOsiError> for Error {
 }
 
 impl Arguments {
+    /// Yield whether frozen operation should be chosen.
+    pub fn frozen(&self) -> bool {
+        self.frozen.unwrap_or(false)
+    }
+
     /// Yield the path to the manifest, returning the default if none was
     /// specified.
     pub fn manifest_path(&self) -> &std::path::Path {
         self.manifest_path.as_deref().unwrap_or(
             std::path::Path::new("./Cargo.toml"),
         )
+    }
+
+    /// Yield whether default features should be disabled with this
+    /// configuration.
+    pub fn no_default_features(&self) -> bool {
+        !self.default_features.unwrap_or(true)
     }
 }
 
@@ -669,7 +677,7 @@ impl MetadataBlob {
 
         // If no package name was specified, find the root package in the metadata. If none
         // is present, raise an error to the caller.
-        let root_raw = match &query.package {
+        let root_raw = match &query.cargo_arguments.package {
             None => match self.json.get("resolve") {
                 Some(serde_json::Value::Object(v)) => match v.get("root") {
                     Some(serde_json::Value::String(v)) => Ok(v),
@@ -790,7 +798,7 @@ impl MetadataBlob {
     }
 }
 
-impl MetadataQuery {
+impl<'ctx> MetadataQuery<'ctx> {
     /// Query Cargo for all metadata for the specified workspace. This will
     /// invoke `cargo metadata` and parse all the cargo metadata into the
     /// `Metadata` object. Only the bits required by the crate are fetched,
@@ -805,9 +813,25 @@ impl MetadataQuery {
             "--quiet",
         ]);
 
+        // Append the selected features.
+        for v in &self.cargo_arguments.features {
+            cmd.arg("--features");
+            cmd.arg(v);
+        }
+
+        // Freeze dependencies, if requested.
+        if self.cargo_arguments.frozen() {
+            cmd.arg("--frozen");
+        }
+
         // Append path to the manifest.
         cmd.arg("--manifest-path");
-        cmd.arg(&self.manifest);
+        cmd.arg(self.cargo_arguments.manifest_path());
+
+        // Append default-feature selector, if set.
+        if self.cargo_arguments.no_default_features() {
+            cmd.arg("--no-default-features");
+        }
 
         // Run cargo and verify it exited successfully.
         let output = cmd.output().map_err(|v| Error::Exec(v))?;
@@ -1169,8 +1193,10 @@ mod tests {
     #[test]
     fn metadata_from_json() {
         let query = MetadataQuery {
-            manifest: "./Cargo.toml".into(),
-            package: Some("foobar".into()),
+            cargo_arguments: &Arguments {
+                package: Some("foobar".into()),
+                ..Default::default()
+            },
             target: None,
         };
 
@@ -1218,8 +1244,7 @@ mod tests {
     #[test]
     fn metadata_java_kotlin() {
         let query = MetadataQuery {
-            manifest: "./Cargo.toml".into(),
-            package: None,
+            cargo_arguments: &Default::default(),
             target: None,
         };
 

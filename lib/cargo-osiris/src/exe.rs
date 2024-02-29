@@ -39,8 +39,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
 
             // Build query parameters.
             let query = cargo::MetadataQuery {
-                manifest: manifest_path.into(),
-                package: None,
+                cargo_arguments: cargo_arguments,
                 target: None,
             };
 
