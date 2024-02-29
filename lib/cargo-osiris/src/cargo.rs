@@ -185,6 +185,8 @@ pub struct MetadataQuery<'ctx> {
 /// Information on a single artifact produced by a build query.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct BuildArtifact {
+    /// Whether this is an executable.
+    pub is_executable: bool,
     /// Package ID of the origin of this artifact.
     pub package_id: String,
     /// Path to the artifact.
@@ -959,6 +961,11 @@ impl BuildBlob {
                     //      of Cargo. We do our best and blacklist artifacts we
                     //      know we are not interested in.
                     if let Some(package_id) = o_package_id {
+                        let o_executable = match report.get("executable") {
+                            Some(serde_json::Value::String(v)) => Some(v),
+                            _ => None,
+                        };
+
                         if let Some(serde_json::Value::Array(filenames)) = report.get("filenames") {
                             for filename in filenames.iter() {
                                 if let serde_json::Value::String(filename_str) = filename {
@@ -973,6 +980,7 @@ impl BuildBlob {
 
                                     if save {
                                         artifacts.push(BuildArtifact {
+                                            is_executable: Some(filename_str) == o_executable,
                                             package_id: package_id.into(),
                                             path: filename_str.clone(),
                                         });
