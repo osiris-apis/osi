@@ -182,12 +182,20 @@ pub struct MetadataQuery<'ctx> {
     pub target: Option<String>,
 }
 
+/// Information on a single artifact produced by a build query.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct BuildArtifact {
+    /// Package ID of the origin of this artifact.
+    pub package_id: String,
+    /// Path to the artifact.
+    pub path: String,
+}
+
 /// Output of a `cargo build` run with only relevant pieces retained.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Build {
-    /// List of absolute paths to artifacts produced by the build. This is a
-    /// filtered list including only final production artifacts.
-    pub artifacts: Vec<String>,
+    /// List of artifacts produced by the build.
+    pub artifacts: Vec<BuildArtifact>,
 }
 
 // Intermediate state after cargo-build returned, but the blob was not yet
@@ -878,7 +886,7 @@ impl BuildBlob {
 
     // Parse all desired fields in the `Build` blob and expose them as a
     // new `Build` object.
-    fn parse(&self, query: &BuildQuery) -> Result<Build, Error> {
+    fn parse(&self) -> Result<Build, Error> {
         let mut success = false;
         let mut artifacts = Vec::new();
 
@@ -926,6 +934,13 @@ impl BuildBlob {
                         }
                     }
 
+                    // Remember the package-id of every artifact we are
+                    // interested in, so we can track it properly.
+                    let o_package_id = match (collect, report.get("package_id")) {
+                        (true, Some(serde_json::Value::String(id))) => Some(id),
+                        _ => None,
+                    };
+
                     // If this was a report of interest, remember the artifact
                     // filenames. Unfortunately, targets like libraries will
                     // report all their artifacts combined, with no way to tell
@@ -943,7 +958,7 @@ impl BuildBlob {
                     //      the filename extensions of all supported platforms
                     //      of Cargo. We do our best and blacklist artifacts we
                     //      know we are not interested in.
-                    if collect {
+                    if let Some(package_id) = o_package_id {
                         if let Some(serde_json::Value::Array(filenames)) = report.get("filenames") {
                             for filename in filenames.iter() {
                                 if let serde_json::Value::String(filename_str) = filename {
@@ -957,7 +972,10 @@ impl BuildBlob {
                                     };
 
                                     if save {
-                                        artifacts.push(filename_str.clone());
+                                        artifacts.push(BuildArtifact {
+                                            package_id: package_id.into(),
+                                            path: filename_str.clone(),
+                                        });
                                     }
                                 }
                             }
@@ -1061,7 +1079,7 @@ impl<'ctx> BuildQuery<'ctx> {
         let blob = BuildBlob::from_bytes(&output.stdout)?;
 
         // Parse data into a `Build` object.
-        blob.parse(self)
+        blob.parse()
     }
 }
 

@@ -633,7 +633,7 @@ impl<'ctx> Direct<'ctx> {
             path.push(abi);
             op::mkdir(path.as_path())?;
             for v in &set.artifacts {
-                let file_name = std::path::Path::new(v)
+                let file_name = std::path::Path::new(&v.path)
                     .file_name()
                     .expect("Cargo artifact has no file-name");
 
@@ -643,7 +643,7 @@ impl<'ctx> Direct<'ctx> {
 
                 path.push(file_name);
                 add.push(lib_path.into());
-                op::copy_file(std::path::Path::new(v), path.as_path())?;
+                op::copy_file(std::path::Path::new(&v.path), path.as_path())?;
                 path.pop();
             }
             path.pop();
