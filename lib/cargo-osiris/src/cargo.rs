@@ -158,6 +158,8 @@ pub struct Metadata {
     pub osiris: Option<MdOsi>,
     /// Package ID of the target package
     pub package_id: String,
+    /// Package name of the target package
+    pub package_name: String,
     /// Target directory of the package build
     pub target_directory: String,
 }
@@ -668,7 +670,7 @@ impl MetadataBlob {
 
         // If no package name was specified, find the root package in the metadata. If none
         // is present, raise an error to the caller.
-        let root_raw = match &query.cargo_arguments.package {
+        let package_raw = match &query.cargo_arguments.package {
             None => match self.json.get("resolve") {
                 Some(serde_json::Value::Object(v)) => match v.get("root") {
                     Some(serde_json::Value::String(v)) => Ok(v),
@@ -678,16 +680,17 @@ impl MetadataBlob {
             },
             Some(v) => Ok(v),
         }?;
-        let root = self.resolve_local_package(root_raw)?;
+        let package_id = self.resolve_local_package(package_raw)?;
 
         // Walk the dependency graph and collect all packages that are part of
         // this compilation. We have to do this, since only the dependency
         // graph is affected by target-filtering and feature-selection, and we
         // want to avoid any build or dev dependencies.
-        let ids = self.involved_ids(&root);
+        let ids = self.involved_ids(&package_id);
 
         // Now walk the package list and extract all data we desire.
         let mut android_sets = Vec::new();
+        let mut o_package_name = None;
         let mut pkgmd_osi = None;
         if let Some(serde_json::Value::Array(packages)) = self.json.get("packages") {
             for pkg in packages.iter() {
@@ -696,17 +699,26 @@ impl MetadataBlob {
                 let mut manifest_file = None;
                 let mut res_dirs = Vec::new();
 
-                // Skip any packages that we are not interested in.
+                // Get the package ID and remember whether it is the root.
                 let id = match pkg.get("id") {
                     Some(serde_json::Value::String(v)) => v,
                     _ => continue
                 };
+                let is_root = *id == package_id;
+
+                // Remember the original package-name of the root package.
+                if is_root {
+                    if let Some(serde_json::Value::String(v)) = pkg.get("name") {
+                        o_package_name = Some(v.into());
+                    }
+                }
+
+                // Skip packages we are not interested in.
                 if !ids.contains(id) {
                     continue;
                 }
-                let is_root = *id == root;
 
-                // Get the absolute path to the package root. We need this
+                // Get the absolute path to the package root. We need this to
                 // normalize other paths in the package metadata.
                 let manifest_path = match pkg.get("manifest_path") {
                     Some(serde_json::Value::String(v)) => v,
@@ -777,12 +789,17 @@ impl MetadataBlob {
             }
         }
 
+        let package_name = o_package_name.ok_or_else(
+            || Error::Data,
+        )?;
+
         // Return the parsed `Metadata` object.
         Ok(
             Metadata {
                 android_sets: android_sets,
                 osiris: pkgmd_osi,
-                package_id: root,
+                package_id: package_id,
+                package_name: package_name,
                 target_directory: v_target_directory,
             }
         )
@@ -861,7 +878,7 @@ impl BuildBlob {
 
     // Parse all desired fields in the `Build` blob and expose them as a
     // new `Build` object.
-    fn parse(&self) -> Result<Build, Error> {
+    fn parse(&self, query: &BuildQuery) -> Result<Build, Error> {
         let mut success = false;
         let mut artifacts = Vec::new();
 
@@ -1044,7 +1061,7 @@ impl<'ctx> BuildQuery<'ctx> {
         let blob = BuildBlob::from_bytes(&output.stdout)?;
 
         // Parse data into a `Build` object.
-        blob.parse()
+        blob.parse(self)
     }
 }
 
@@ -1236,6 +1253,7 @@ mod tests {
                 android_sets: Vec::new(),
                 osiris: None,
                 package_id: "foobar (...)".into(),
+                package_name: "foobar".into(),
                 target_directory: ".".into(),
             },
         );
@@ -1278,7 +1296,8 @@ mod tests {
                         {
                             "id": "root (...)",
                             "manifest_path": "./Cargo.toml",
-                            "metadata": null
+                            "metadata": null,
+                            "name": "root"
                         },
                         {
                             "id": "dep0 (...)",
@@ -1292,7 +1311,8 @@ mod tests {
                                         ]
                                     }
                                 }
-                            }
+                            },
+                            "name": "dep0"
                         },
                         {
                             "id": "dep1 (...)",
@@ -1310,7 +1330,8 @@ mod tests {
                                         "bar"
                                     ]
                                 }
-                            }
+                            },
+                            "name": "dep1"
                         }
                     ]
                 }"#,
@@ -1341,6 +1362,7 @@ mod tests {
                 ],
                 osiris: None,
                 package_id: "root (...)".into(),
+                package_name: "root".into(),
                 target_directory: ".".into(),
             },
         );

@@ -85,6 +85,8 @@ pub struct Config {
 
     /// Platform Configurations
     pub platforms: BTreeMap<String, ConfigPlatform>,
+    /// Default platform configurations
+    pub platform_defaults: BTreeMap<String, ConfigPlatform>,
 }
 
 impl core::fmt::Display for Error {
@@ -97,6 +99,50 @@ impl core::fmt::Display for Error {
 }
 
 impl Config {
+    fn add_default_platforms(&mut self) {
+        self.platforms.insert(
+            "android".to_string(),
+            ConfigPlatform {
+                path_platform: (&self.path_application).join("platform/android"),
+
+                id: "android".to_string(),
+                id_symbol: "android".to_string(),
+
+                configuration: ConfigPlatformConfiguration::Android(
+                    ConfigPlatformAndroid {
+                        application_id: "com.example.unknown".to_string(),
+                        namespace: "com.example".to_string(),
+
+                        compile_sdk: 31,
+                        min_sdk: 31,
+                        target_sdk: 31,
+
+                        abis: ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"]
+                            .iter().map(|v| v.to_string()).collect(),
+
+                        version_code: 1,
+                        version_name: "0.1.0".to_string(),
+                    },
+                ),
+            },
+        );
+
+        self.platforms.insert(
+            "macos".to_string(),
+            ConfigPlatform {
+                path_platform: (&self.path_application).join("platform/macos"),
+
+                id: "macos".to_string(),
+                id_symbol: "macos".to_string(),
+
+                configuration: ConfigPlatformConfiguration::Macos(
+                    ConfigPlatformMacos {
+                    },
+                ),
+            },
+        );
+    }
+
     // Verify a platform configuration and add it to the set.
     fn add_platform_from_cargo(
         &mut self,
@@ -251,72 +297,6 @@ impl Config {
         }
     }
 
-    /// ## Create Configuration without source file
-    ///
-    /// Create a configuration simply based on the path to the Cargo manifest.
-    /// Almost all keys are filled with their default value. Default platform
-    /// integrations are provided as well.
-    ///
-    /// This configuration is useful to test application builds without
-    /// having to go through a lengthy configuration process. However, this
-    /// configuration is not suitable for deployments.
-    pub fn with_manifest(
-        path_manifest: &dyn AsRef<std::path::Path>,
-    ) -> Self {
-        // Remember the absolute path to the directory of the configuration.
-        // Other relative paths in the configuration are relative to it.
-        let v_path_application = misc::absdir(path_manifest);
-
-        // Provide default values for everything else.
-        let v_id = "unknown";
-        let v_id_symbol = lib::str::symbolize(v_id);
-        let v_name = v_id;
-        let v_package = None;
-
-        // Create initial configuration with basic data. Further information
-        // will be procedurally added to it.
-        let mut config = Config {
-            path_application: v_path_application,
-            path_manifest: path_manifest.as_ref().into(),
-
-            id: v_id.to_string(),
-            id_symbol: v_id_symbol,
-            name: v_name.to_string(),
-            package: v_package,
-
-            platforms: BTreeMap::new(),
-        };
-
-        // Insert default Android platform configuration.
-        config.platforms.insert(
-            "android".to_string(),
-            ConfigPlatform {
-                path_platform: config.path_application.as_path().join("platform/android"),
-                id: "android".to_string(),
-                id_symbol: "android".to_string(),
-
-                configuration: ConfigPlatformConfiguration::Android(
-                    ConfigPlatformAndroid {
-                        application_id: "com.example.unknown".to_string(),
-                        namespace: "com.example".to_string(),
-
-                        compile_sdk: 31,
-                        min_sdk: 31,
-                        target_sdk: 31,
-
-                        abis: ["armeabi-v7a", "arm64-v8a", "x86", "x86_64"]
-                            .iter().map(|v| v.to_string()).collect(),
-
-                        version_code: 1,
-                        version_name: "0.1.0".to_string(),
-                    },
-                ),
-            },
-        );
-
-        config
-    }
-
     /// Create internal configuration from the Cargo metadata of an application
     /// manifest.
     ///
@@ -329,53 +309,77 @@ impl Config {
     /// absolute, it is anchored in the current working directory at the time
     /// of this function call.
     pub fn from_cargo(
-        data: &Option<cargo::MdOsi>,
+        data: &cargo::Metadata,
         path_manifest: &dyn AsRef<std::path::Path>,
     ) -> Result<Self, Error> {
-        let mdosi = match data {
-            None => return Ok(Self::with_manifest(path_manifest)),
-            Some(cargo::MdOsi::V1(v)) => v,
-        };
-
         // Remember the absolute path to the directory of the configuration.
         // Other relative paths in the configuration are relative to it.
         let v_path_application = misc::absdir(path_manifest);
 
-        // Package information is inherited from the metadata.
-        let v_package = None;
+        // Use the package-name as application name. Derive its ID from
+        // it by masking unsupported characters.
+        let mut v_name = data.package_name.clone();
+        let mut v_id = v_name.clone();
+        let mut v_id_symbol = lib::str::symbolize(&v_id);
 
-        // `application.id` is required, so `[application]` must be there.
-        let data_application = mdosi.application.as_ref()
-            .ok_or(Error::MissingKey(".application.id"))?;
+        let mut config = match data.osiris {
+            None => {
+                // Create a default configuration from the information in the
+                // Cargo manifest.
+                Config {
+                    path_application: v_path_application,
+                    path_manifest: path_manifest.as_ref().into(),
 
-        // They application ID is required. We cannot generate it or create
-        // a suitable default. A lot of other symbols depend on it, and we do
-        // not provide a filler. The user can do that, if they wish.
-        let v_id = data_application.id.as_ref()
-            .ok_or(Error::MissingKey(".application.id"))?;
-        let v_id_symbol = lib::str::symbolize(v_id);
+                    id: v_id,
+                    id_symbol: v_id_symbol,
+                    name: v_name,
+                    package: None,
 
-        // Use the application ID as name if none is given.
-        let v_name = data_application.name.as_ref().unwrap_or(v_id);
+                    platforms: BTreeMap::new(),
+                    platform_defaults: BTreeMap::new(),
+                }
+            },
+            Some(cargo::MdOsi::V1(ref mdosi)) => {
+                // Override the defaults with values from the application
+                // configuration, if any.
+                if let Some(ref mdosi_application) = mdosi.application {
+                    if let Some(ref v) = mdosi_application.id {
+                        v_id = v.into();
+                        v_id_symbol = lib::str::symbolize(&v_id);
+                        v_name = v_id.clone();
+                    }
 
-        // Create initial configuration with basic data. Further information
-        // will be procedurally added to it.
-        let mut config = Config {
-            path_application: v_path_application,
-            path_manifest: path_manifest.as_ref().into(),
+                    if let Some(ref v) = mdosi_application.name {
+                        v_name = v.into();
+                    }
+                }
 
-            id: v_id.clone(),
-            id_symbol: v_id_symbol,
-            name: v_name.clone(),
-            package: v_package,
+                // Create initial configuration with basic data. Further
+                // information will be procedurally added to it.
+                let mut config = Config {
+                    path_application: v_path_application,
+                    path_manifest: path_manifest.as_ref().into(),
 
-            platforms: BTreeMap::new(),
+                    id: v_id,
+                    id_symbol: v_id_symbol,
+                    name: v_name,
+                    package: None,
+
+                    platforms: BTreeMap::new(),
+                    platform_defaults: BTreeMap::new(),
+                };
+
+                // Collect all platform configuration.
+                for platform in mdosi.platforms.iter() {
+                    config.add_platform_from_cargo(platform)?;
+                }
+
+                config
+            },
         };
 
-        // Collect all platform configuration.
-        for platform in mdosi.platforms.iter() {
-            config.add_platform_from_cargo(platform)?;
-        }
+        // Create defaults for all platforms.
+        config.add_default_platforms();
 
         Ok(config)
     }
@@ -402,13 +406,19 @@ mod tests {
     // Verify a simple configuration without platforms
     #[test]
     fn simple_config() {
-        let data = Some(cargo::MdOsi::V1(cargo::MdOsiV1 {
-            application: Some(cargo::MdOsiApplication {
-                id: Some("ID".into()),
-                name: None,
-            }),
-            platforms: Vec::new(),
-        }));
+        let data = cargo::Metadata {
+            android_sets: Vec::new(),
+            osiris: Some(cargo::MdOsi::V1(cargo::MdOsiV1 {
+                application: Some(cargo::MdOsiApplication {
+                    id: Some("ID".into()),
+                    name: None,
+                }),
+                platforms: Vec::new(),
+            })),
+            package_id: "foobar (...)".into(),
+            package_name: "foobar".into(),
+            target_directory: "./target".into(),
+        };
         let config = Config::from_cargo(&data, &".").unwrap();
 
         assert_eq!(config.id, "ID");
