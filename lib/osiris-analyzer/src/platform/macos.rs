@@ -203,6 +203,8 @@ impl App {
             icrate::AppKit::NSApplication::sharedApplication(mtm)
         };
 
+        app.setActivationPolicy(icrate::AppKit::NSApplicationActivationPolicyRegular);
+
         let app_delegate = AppDelegate::new(mtm);
         app.setDelegate(Some(
             objc2::runtime::ProtocolObject::from_ref(&*app_delegate),
