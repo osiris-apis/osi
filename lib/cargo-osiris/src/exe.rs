@@ -80,7 +80,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                 Some(ref v) => Ok(v),
             }?;
 
-            match config.platforms.get(id) {
+            match config.platform(id) {
                 None => {
                     eprintln!("No platform integration with ID {}", id);
                     Err(1)

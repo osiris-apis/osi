@@ -379,6 +379,21 @@ impl Config {
 
         Ok(config)
     }
+
+    /// Find a platform configuration with the given ID, using the platform
+    /// defaults as fallback if no explicit configuration is available.
+    pub fn platform(
+        &self,
+        id: &str,
+    ) -> Option<&ConfigPlatform> {
+        if let Some(v) = self.platforms.get(id) {
+            Some(v)
+        } else if let Some(v) = self.platform_defaults.get(id) {
+            Some(v)
+        } else {
+            None
+        }
+    }
 }
 
 impl ConfigPlatform {
