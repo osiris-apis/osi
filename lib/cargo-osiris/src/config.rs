@@ -80,8 +80,6 @@ pub struct Config {
     pub id_symbol: String,
     /// Application name
     pub name: String,
-    /// Application package name
-    pub package: Option<String>,
 
     /// Platform Configurations
     pub platforms: BTreeMap<String, ConfigPlatform>,
@@ -333,7 +331,6 @@ impl Config {
                     id: v_id,
                     id_symbol: v_id_symbol,
                     name: v_name,
-                    package: None,
 
                     platforms: BTreeMap::new(),
                     platform_defaults: BTreeMap::new(),
@@ -363,7 +360,6 @@ impl Config {
                     id: v_id,
                     id_symbol: v_id_symbol,
                     name: v_name,
-                    package: None,
 
                     platforms: BTreeMap::new(),
                     platform_defaults: BTreeMap::new(),
