@@ -198,20 +198,11 @@ struct BuildBlob {
 /// Parameters to a `cargo build` operation. To be filled in by the query
 /// requester.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct BuildQuery {
-    /// Whether to enable default features.
-    pub default_features: bool,
+pub struct BuildQuery<'ctx> {
+    /// Package, workspace, and configuration arguments for Cargo.
+    pub cargo_arguments: &'ctx Arguments,
     /// Environment variables to set for the build.
     pub envs: Vec<(std::ffi::OsString, std::ffi::OsString)>,
-    /// Array of features to enable.
-    pub features: Vec<String>,
-    /// Path to the Cargo manifest file to use (preferably an absolute path).
-    pub manifest: std::path::PathBuf,
-    /// Name of the target package in the workspace. If `None`, the root
-    /// package of the workspace is used, if any.
-    pub package: Option<String>,
-    /// The build profile to use.
-    pub profile: Option<String>,
     /// The target platform to compile for.
     pub target: Option<String>,
 }
@@ -979,7 +970,7 @@ impl BuildBlob {
     }
 }
 
-impl BuildQuery {
+impl<'ctx> BuildQuery<'ctx> {
     /// Request a full build operation from Cargo. This will invoke
     /// `cargo build` and parse all the cargo output into a `Build` object.
     pub fn run(&self) -> Result<Build, Error> {
@@ -995,29 +986,34 @@ impl BuildQuery {
             cmd.env(k, v);
         }
 
-        // Append all selected features.
-        for v in &self.features {
+        // Append the selected features.
+        for v in &self.cargo_arguments.features {
             cmd.arg("--features");
             cmd.arg(v);
         }
 
+        // Freeze dependencies, if requested.
+        if self.cargo_arguments.frozen() {
+            cmd.arg("--frozen");
+        }
+
         // Append path to the manifest.
         cmd.arg("--manifest-path");
-        cmd.arg(&self.manifest);
+        cmd.arg(self.cargo_arguments.manifest_path());
 
-        // Disable default features, if requested.
-        if !self.default_features {
+        // Append default-feature selector, if set.
+        if self.cargo_arguments.no_default_features() {
             cmd.arg("--no-default-features");
         }
 
         // Select requested package.
-        if let Some(ref package) = self.package {
+        if let Some(ref package) = self.cargo_arguments.package {
             cmd.arg("--package");
             cmd.arg(package);
         }
 
         // Select requested profile.
-        if let Some(ref profile) = self.profile {
+        if let Some(ref profile) = self.cargo_arguments.profile {
             cmd.arg("--profile");
             cmd.arg(profile);
         }
@@ -1026,6 +1022,12 @@ impl BuildQuery {
         if let Some(ref target) = self.target {
             cmd.arg("--target");
             cmd.arg(target);
+        }
+
+        // Select requested target directory.
+        if let Some(ref target_dir) = self.cargo_arguments.target_dir {
+            cmd.arg("--target-dir");
+            cmd.arg(target_dir);
         }
 
         // Always forward diagnostics to the parent error stream, so

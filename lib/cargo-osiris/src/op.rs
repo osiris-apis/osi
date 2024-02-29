@@ -319,18 +319,14 @@ impl<'ctx> Build<'ctx> {
         match self.platform.configuration {
             config::ConfigPlatformConfiguration::Android(ref v) => {
                 platform::android::build(
-                    self.config,
-                    self.cargo_metadata,
-                    self.platform,
+                    self,
                     v,
                     path_build.as_path(),
                 )
             },
             config::ConfigPlatformConfiguration::Macos(ref v) => {
                 platform::macos::build(
-                    self.config,
-                    self.cargo_metadata,
-                    self.platform,
+                    self,
                     v,
                     path_build.as_path(),
                 )

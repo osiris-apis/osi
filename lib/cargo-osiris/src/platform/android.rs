@@ -82,9 +82,7 @@ struct Build<'ctx> {
     // Configuration
     pub android: &'ctx config::ConfigPlatformAndroid,
     pub build_dir: &'ctx std::path::Path,
-    pub config: &'ctx config::Config,
-    pub metadata: &'ctx cargo::Metadata,
-    pub platform: &'ctx config::ConfigPlatform,
+    pub op: &'ctx op::Build<'ctx>,
 
     // Build directories
     pub apk_dir: std::path::PathBuf,
@@ -120,9 +118,7 @@ struct Direct<'ctx> {
 
 impl<'ctx> Build<'ctx> {
     fn new(
-        config: &'ctx config::Config,
-        metadata: &'ctx cargo::Metadata,
-        platform: &'ctx config::ConfigPlatform,
+        op: &'ctx op::Build,
         android: &'ctx config::ConfigPlatformAndroid,
         build_dir: &'ctx std::path::Path,
     ) -> Self {
@@ -146,9 +142,7 @@ impl<'ctx> Build<'ctx> {
         Self {
             android: android,
             build_dir: build_dir,
-            config: config,
-            metadata: metadata,
-            platform: platform,
+            op: op,
 
             apk_dir: v_apk_dir,
             artifact_dir: v_artifact_dir,
@@ -286,7 +280,7 @@ impl<'ctx> Direct<'ctx> {
         // type directories, which then each contains resource files. Any
         // stray entries are silently ignored.
         res_files = BTreeMap::new();
-        for rdir in self.build.metadata.android_sets.iter()
+        for rdir in self.build.op.cargo_metadata.android_sets.iter()
             .flat_map(|v| v.resource_dirs.iter())
         {
             let sdirs = std::fs::read_dir(rdir).map_err(
@@ -407,7 +401,7 @@ impl<'ctx> Direct<'ctx> {
 
         sources.append(&mut op::lsrdir(self.build.java_dir.as_path())?);
 
-        for set in &self.build.metadata.android_sets {
+        for set in &self.build.op.cargo_metadata.android_sets {
             for dir in &set.java_dirs {
                 sources.append(&mut op::lsrdir(dir.as_path())?);
             }
@@ -451,7 +445,7 @@ impl<'ctx> Direct<'ctx> {
         // the package dependencies. Note that several JVM-languages might
         // share a source tree, so we filter by the `*.kt` file extension.
 
-        for set in &self.build.metadata.android_sets {
+        for set in &self.build.op.cargo_metadata.android_sets {
             for dir in &set.kotlin_dirs {
                 sources.append(&mut op::lsrdir(dir.as_path())?);
             }
@@ -596,12 +590,8 @@ impl<'ctx> Direct<'ctx> {
             let linker_path = self.ndk.root().join(linker_bin);
 
             let query = cargo::BuildQuery {
-                default_features: true,
+                cargo_arguments: self.build.op.cargo_arguments,
                 envs: vec![(linker_env.into(), linker_path.into())],
-                features: Vec::new(),
-                manifest: self.build.config.path_manifest.clone(),
-                package: None,
-                profile: None,
                 target: Some(target.into()),
             };
 
@@ -757,16 +747,12 @@ fn build_direct(
 }
 
 pub fn build(
-    config: &config::Config,
-    metadata: &cargo::Metadata,
-    platform: &config::ConfigPlatform,
+    op: &op::Build,
     android: &config::ConfigPlatformAndroid,
     build_dir: &std::path::Path,
 ) -> Result<(), op::BuildError> {
     let build = Build::new(
-        config,
-        metadata,
-        platform,
+        op,
         android,
         build_dir,
     );

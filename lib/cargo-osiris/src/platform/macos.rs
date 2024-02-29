@@ -11,26 +11,20 @@ pub enum ErrorBuild {
 struct Build<'ctx> {
     // Configuration
     pub build_dir: &'ctx std::path::Path,
-    pub config: &'ctx config::Config,
     pub macos: &'ctx config::ConfigPlatformMacos,
-    pub metadata: &'ctx cargo::Metadata,
-    pub platform: &'ctx config::ConfigPlatform,
+    pub op: &'ctx op::Build<'ctx>,
 }
 
 impl<'ctx> Build<'ctx> {
-    fn new(
-        config: &'ctx config::Config,
-        metadata: &'ctx cargo::Metadata,
-        platform: &'ctx config::ConfigPlatform,
+    pub fn new(
+        op: &'ctx op::Build<'ctx>,
         macos: &'ctx config::ConfigPlatformMacos,
         build_dir: &'ctx std::path::Path,
     ) -> Self {
         Self {
             build_dir: build_dir,
-            config: config,
             macos: macos,
-            metadata: metadata,
-            platform: platform,
+            op: op,
         }
     }
 }
@@ -44,16 +38,12 @@ impl core::fmt::Display for ErrorBuild {
 }
 
 pub fn build(
-    config: &config::Config,
-    metadata: &cargo::Metadata,
-    platform: &config::ConfigPlatform,
+    op: &op::Build,
     macos: &config::ConfigPlatformMacos,
     build_dir: &std::path::Path,
 ) -> Result<(), op::BuildError> {
     let _build = Build::new(
-        config,
-        metadata,
-        platform,
+        op,
         macos,
         build_dir,
     );
