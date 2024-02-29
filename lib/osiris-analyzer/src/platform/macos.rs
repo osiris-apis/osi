@@ -151,16 +151,18 @@ impl AppDelegate {
 
         let wnd_alloc: objc2::rc::Allocated<icrate::AppKit::NSWindow> = mtm.alloc();
         let wnd: objc2::rc::Id<icrate::AppKit::NSWindow> = unsafe {
-            objc2::msg_send_id![
+            icrate::AppKit::NSWindow::initWithContentRect_styleMask_backing_defer(
                 wnd_alloc,
-                initWithContentRect: icrate::Foundation::NSRect {
+                icrate::Foundation::NSRect {
                     origin: icrate::Foundation::CGPoint { x: 0.0, y: 0.0 },
-                    size: icrate::Foundation::CGSize { width: 400.0, height: 400.0 },
-                }
-                styleMask: icrate::AppKit::NSWindowStyleMaskClosable
-                backing: icrate::AppKit::NSBackingStoreBuffered
-                defer: false
-            ]
+                    size: icrate::Foundation::CGSize { width: 800.0, height: 600.0 },
+                },
+                icrate::AppKit::NSWindowStyleMaskClosable
+                    | icrate::AppKit::NSWindowStyleMaskResizable
+                    | icrate::AppKit::NSWindowStyleMaskTitled,
+                icrate::AppKit::NSBackingStoreBuffered,
+                false,
+            )
         };
         wnd.center();
         wnd.setTitle(icrate::Foundation::ns_string!("Osiris Analyzer"));
