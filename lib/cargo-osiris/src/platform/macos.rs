@@ -6,6 +6,8 @@
 use crate::{cargo, config, op};
 use std::collections::BTreeMap;
 
+mod codesign;
+
 pub enum ErrorBuild {
     UnsupportedAbi { abi: String },
 }
