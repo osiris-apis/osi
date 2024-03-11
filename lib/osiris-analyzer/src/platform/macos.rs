@@ -199,20 +199,13 @@ impl AppDelegate {
             }
 
             let log_view = unsafe {
-                icrate::AppKit::NSTextField::initWithFrame(
+                icrate::AppKit::NSTextView::initWithFrame(
                     mtm.alloc(),
                     icrate::Foundation::NSRect::ZERO,
                 )
             };
             unsafe {
-                log_view.setBackgroundColor(
-                    Some(&icrate::AppKit::NSColor::lightGrayColor()),
-                );
-                log_view.setDrawsBackground(true);
                 log_view.setEditable(false);
-                log_view.setTextColor(
-                    Some(&icrate::AppKit::NSColor::blackColor()),
-                );
             }
 
             let log_input = unsafe {
@@ -221,15 +214,6 @@ impl AppDelegate {
                     icrate::Foundation::NSRect::ZERO,
                 )
             };
-            unsafe {
-                log_input.setBackgroundColor(
-                    Some(&icrate::AppKit::NSColor::lightGrayColor()),
-                );
-                log_input.setDrawsBackground(true);
-                log_input.setTextColor(
-                    Some(&icrate::AppKit::NSColor::blackColor()),
-                );
-            }
 
             unsafe {
                 cv.addArrangedSubview(&log_view);
