@@ -149,30 +149,93 @@ impl AppDelegate {
         let mtm = icrate::Foundation::MainThreadMarker::new()
             .expect("macOS applications must run on the main-thread");
         let app = icrate::AppKit::NSApplication::sharedApplication(mtm);
+        let wnd;
 
-        let wnd_alloc: objc2::rc::Allocated<icrate::AppKit::NSWindow> = mtm.alloc();
-        let wnd: objc2::rc::Id<icrate::AppKit::NSWindow> = unsafe {
-            icrate::AppKit::NSWindow::initWithContentRect_styleMask_backing_defer(
-                wnd_alloc,
-                icrate::Foundation::NSRect {
-                    origin: icrate::Foundation::CGPoint { x: 0.0, y: 0.0 },
-                    size: icrate::Foundation::CGSize { width: 800.0, height: 600.0 },
-                },
-                icrate::AppKit::NSWindowStyleMaskClosable
-                    | icrate::AppKit::NSWindowStyleMaskResizable
-                    | icrate::AppKit::NSWindowStyleMaskTitled,
-                icrate::AppKit::NSBackingStoreBuffered,
-                false,
-            )
-        };
-        wnd.center();
-        wnd.setTitle(icrate::Foundation::ns_string!("Osiris Analyzer"));
-        wnd.makeKeyAndOrderFront(None);
+        // Create the main window.
+        {
+            wnd = unsafe {
+                icrate::AppKit::NSWindow::initWithContentRect_styleMask_backing_defer(
+                    mtm.alloc(),
+                    icrate::Foundation::NSRect {
+                        origin: icrate::Foundation::CGPoint { x: 0.0, y: 0.0 },
+                        size: icrate::Foundation::CGSize { width: 800.0, height: 600.0 },
+                    },
+                    icrate::AppKit::NSWindowStyleMaskClosable
+                        | icrate::AppKit::NSWindowStyleMaskResizable
+                        | icrate::AppKit::NSWindowStyleMaskTitled,
+                    icrate::AppKit::NSBackingStoreBuffered,
+                    false,
+                )
+            };
 
-        let var = <Self as objc2::ClassType>::class()
-            .instance_variable("var").unwrap();
-        unsafe {
-            (*var.load_ptr::<AppDelegateVar>(&self.base)).window = Some(wnd);
+            wnd.setTitle(icrate::Foundation::ns_string!("Osiris Apis Analyzer"));
+
+            let var = <Self as objc2::ClassType>::class()
+                .instance_variable("var").unwrap();
+            unsafe {
+                (*var.load_ptr::<AppDelegateVar>(&self.base)).window = Some(wnd.clone());
+            }
+        }
+
+        // Create the content view.
+        {
+            let cv = unsafe {
+                icrate::AppKit::NSStackView::initWithFrame(
+                    mtm.alloc(),
+                    wnd.frame(),
+                )
+            };
+            unsafe {
+                cv.setAlignment(
+                    icrate::AppKit::NSLayoutAttributeWidth,
+                );
+                cv.setDistribution(
+                    icrate::AppKit::NSStackViewDistributionFill,
+                );
+                cv.setOrientation(
+                    icrate::AppKit::NSUserInterfaceLayoutOrientationVertical,
+                );
+                cv.setSpacing(0.);
+            }
+
+            let log_view = unsafe {
+                icrate::AppKit::NSTextField::initWithFrame(
+                    mtm.alloc(),
+                    icrate::Foundation::NSRect::ZERO,
+                )
+            };
+            unsafe {
+                log_view.setBackgroundColor(
+                    Some(&icrate::AppKit::NSColor::lightGrayColor()),
+                );
+                log_view.setDrawsBackground(true);
+                log_view.setEditable(false);
+                log_view.setTextColor(
+                    Some(&icrate::AppKit::NSColor::blackColor()),
+                );
+            }
+
+            let log_input = unsafe {
+                icrate::AppKit::NSTextField::initWithFrame(
+                    mtm.alloc(),
+                    icrate::Foundation::NSRect::ZERO,
+                )
+            };
+            unsafe {
+                log_input.setBackgroundColor(
+                    Some(&icrate::AppKit::NSColor::lightGrayColor()),
+                );
+                log_input.setDrawsBackground(true);
+                log_input.setTextColor(
+                    Some(&icrate::AppKit::NSColor::blackColor()),
+                );
+            }
+
+            unsafe {
+                cv.addArrangedSubview(&log_view);
+                cv.addArrangedSubview(&log_input);
+                wnd.setContentView(Some(&cv));
+            }
         }
 
         // Create the main menu with `Quit` item.
@@ -210,6 +273,12 @@ impl AppDelegate {
             menu_main_app.addItem(&item_main_app_quit);
             menu_main.addItem(&item_main_app);
             app.setMainMenu(Some(&menu_main));
+        }
+
+        // Finalize window initialization.
+        {
+            wnd.center();
+            wnd.makeKeyAndOrderFront(None);
         }
 
         eprintln!("Launched");

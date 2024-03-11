@@ -42,8 +42,11 @@ workspace = true
 features = [
         "AppKit",
         "AppKit_NSApplication",
+        "AppKit_NSColor",
         "AppKit_NSMenu",
         "AppKit_NSMenuItem",
+        "AppKit_NSStackView",
+        "AppKit_NSTextField",
         "AppKit_NSWindow",
         "CoreData",
         "Foundation",
