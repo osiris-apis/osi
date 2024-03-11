@@ -148,6 +148,7 @@ impl AppDelegate {
 
         let mtm = icrate::Foundation::MainThreadMarker::new()
             .expect("macOS applications must run on the main-thread");
+        let app = icrate::AppKit::NSApplication::sharedApplication(mtm);
 
         let wnd_alloc: objc2::rc::Allocated<icrate::AppKit::NSWindow> = mtm.alloc();
         let wnd: objc2::rc::Id<icrate::AppKit::NSWindow> = unsafe {
@@ -172,6 +173,43 @@ impl AppDelegate {
             .instance_variable("var").unwrap();
         unsafe {
             (*var.load_ptr::<AppDelegateVar>(&self.base)).window = Some(wnd);
+        }
+
+        // Create the main menu with `Quit` item.
+        {
+            let menu_main = unsafe {
+                icrate::AppKit::NSMenu::initWithTitle(
+                    mtm.alloc(),
+                    icrate::Foundation::ns_string!("main"),
+                )
+            };
+            let menu_main_app = unsafe {
+                icrate::AppKit::NSMenu::initWithTitle(
+                    mtm.alloc(),
+                    icrate::Foundation::ns_string!("main.app"),
+                )
+            };
+            let item_main_app = unsafe {
+                icrate::AppKit::NSMenuItem::initWithTitle_action_keyEquivalent(
+                    mtm.alloc(),
+                    icrate::Foundation::ns_string!("main.app"),
+                    None,
+                    icrate::Foundation::ns_string!(""),
+                )
+            };
+            let item_main_app_quit = unsafe {
+                icrate::AppKit::NSMenuItem::initWithTitle_action_keyEquivalent(
+                    mtm.alloc(),
+                    icrate::Foundation::ns_string!("Quit"),
+                    Some(objc2::sel!(terminate:)),
+                    icrate::Foundation::ns_string!("q"),
+                )
+            };
+
+            item_main_app.setSubmenu(Some(&menu_main_app));
+            menu_main_app.addItem(&item_main_app_quit);
+            menu_main.addItem(&item_main_app);
+            app.setMainMenu(Some(&menu_main));
         }
 
         eprintln!("Launched");
