@@ -247,6 +247,8 @@ pub fn cargo_osiris() -> std::process::ExitCode {
         fn run(&self) -> Result<(), u8> {
             use crate::lib::args::{Flag, Value};
 
+            let cwd = std::env::current_dir().expect("Current working directory must be available");
+
             let args = std::env::args_os().skip(1).collect::<Vec<std::ffi::OsString>>();
 
             let v_help = lib::args::Help::new();
@@ -332,10 +334,12 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                         default_features: *v_default_features.borrow(),
                         features: v_features.borrow().iter().map(|v| (*v).into()).collect(),
                         frozen: *v_frozen.borrow(),
-                        manifest_path: v_manifest_path.borrow().as_ref().map(|v| v.into()),
+                        manifest_path: v_manifest_path.borrow().as_ref()
+                            .map(|v| cwd.join(v)),
                         package: v_package.borrow().clone(),
                         profile: v_profile.borrow().clone(),
-                        target_dir: v_target_dir.borrow().as_ref().map(|v| v.into()),
+                        target_dir: v_target_dir.borrow().as_ref()
+                            .map(|v| cwd.join(v)),
                     },
                 ),
             }
