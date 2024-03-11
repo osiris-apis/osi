@@ -43,6 +43,15 @@ pub struct ConfigPlatformAndroid {
 
 /// MacOS specific configuration for a platform integration.
 pub struct ConfigPlatformMacos {
+    pub bundle_id: String,
+    pub namespace: Option<String>,
+
+    pub abis: Vec<String>,
+
+    pub version_code: u32,
+    pub version_name: String,
+
+    pub category: String,
 }
 
 /// Union for platform specific configuration that is part of a platform
@@ -135,6 +144,16 @@ impl Config {
 
                 configuration: ConfigPlatformConfiguration::Macos(
                     ConfigPlatformMacos {
+                        bundle_id: "com.example.unknown".to_string(),
+                        namespace: Some("com.example".to_string()),
+
+                        abis: ["arm64", "x86_64"]
+                            .iter().map(|v| v.to_string()).collect(),
+
+                        version_code: 1,
+                        version_name: "1.0.0".to_string(),
+
+                        category: "public.app-category.utilities".to_string(),
                     },
                 ),
             },
@@ -265,10 +284,64 @@ impl Config {
                     )
                 )
             },
-            Some(cargo::MdOsiPlatformConfiguration::Macos(_data_macos)) => {
+            Some(cargo::MdOsiPlatformConfiguration::Macos(data_macos)) => {
+                // The namespace-value is not stored in a macOS bundle, yet we
+                // can use it as default for many other IDs. If not provided,
+                // we simply leave it unset.
+                let v_namespace = data_macos.namespace.clone();
+
+                // The Bundle-ID is used to uniquely identify bundles. It is
+                // also used to register applications on the apple servers and
+                // to create provisioning profiles. We must allow users to
+                // supply it verbatim. If they don't, we use a default based
+                // on the namespace or application-ID.
+                let v_bundle_id = data_macos.bundle_id.clone()
+                    .unwrap_or_else(|| {
+                        v_namespace.as_ref()
+                            .map(|v| format!("{}.{}", v, &self.id_symbol))
+                            .unwrap_or(self.id_symbol.clone())
+                    });
+
+                // Let the user select the macOS ABIs to build for. If it is
+                // not specified, we provide the default set with all ABIs.
+                let v_abis = if let Some(v) = data_macos.abis.as_ref() {
+                    v.clone()
+                } else {
+                    ["arm64", "x86_64"]
+                        .iter().map(|v| v.to_string()).collect()
+                };
+
+                // The version-code is a simple positive integer increased for
+                // every new build. It allows the app stores to identify the
+                // builds and decide which one is the most recent. The code has
+                // no other meaning. The version-name is used as user-visible
+                // version and purely meant as human-readable identification of
+                // the version.
+                // We can use `1` and `1.0.0` as safe default values, if not
+                // provided.
+                let v_version_code = data_macos.version_code.unwrap_or(1);
+                let v_version_name = data_macos.version_name.clone()
+                    .unwrap_or_else(|| format!("{}.0.0", v_version_code));
+
+                // The AppStore uses the category information to group apps
+                // according to their primary usage. We supply a default value
+                // if none was supplied.
+                let v_category = data_macos.category.as_deref()
+                    .unwrap_or("public.app-category.utilities")
+                    .to_string();
+
                 Ok(
                     ConfigPlatformConfiguration::Macos(
                         ConfigPlatformMacos {
+                            bundle_id: v_bundle_id,
+                            namespace: v_namespace,
+
+                            abis: v_abis,
+
+                            version_code: v_version_code,
+                            version_name: v_version_name,
+
+                            category: v_category,
                         }
                     )
                 )

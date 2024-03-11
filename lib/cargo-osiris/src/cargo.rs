@@ -92,6 +92,15 @@ pub struct MdOsiPlatformAndroid {
 /// Metadata about the application and framework for the macOS platform.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct MdOsiPlatformMacos {
+    pub bundle_id: Option<String>,
+    pub namespace: Option<String>,
+
+    pub abis: Option<Vec<String>>,
+
+    pub version_code: Option<u32>,
+    pub version_name: Option<String>,
+
+    pub category: Option<String>,
 }
 
 /// Metadata specific to a platform, indexed by the name of the platform.
@@ -536,9 +545,44 @@ impl MetadataBlob {
     // Helper for `parse_mdosi()` that extracts the macOS platform configuration.
     fn parse_mdosi_macos(
         &self,
-        _macos: &serde_json::value::Map<String, serde_json::Value>,
+        macos: &serde_json::value::Map<String, serde_json::Value>,
     ) -> Result<MdOsiPlatformMacos, Error> {
+        let v_bundle_id = Self::get_str(macos, "bundle-id", "platforms.[].macos.bundle-id")?;
+        let v_namespace = Self::get_str(macos, "namespace", "platforms.[].macos.namespace")?;
+        let v_version_code = Self::get_u32(macos, "version-code", "platforms.[].macos.version-code")?;
+        let v_version_name = Self::get_str(macos, "version-name", "platforms.[].macos.version-name")?;
+        let v_category = Self::get_str(macos, "category", "platforms.[].macos.category")?;
+
+        let v_abis = match macos.get("abis") {
+            None => None,
+            Some(serde_json::Value::Array(abis)) => {
+                let mut acc = Vec::new();
+                for abi in abis.iter() {
+                    match abi {
+                        serde_json::Value::String(v) => {
+                            acc.push(v.clone());
+                        },
+                        _ => {
+                            return Err(MdOsiError::TypeInvalid("platforms.[].macos.abis.[]", "string").into())
+                        }
+                    }
+                }
+                Some(acc)
+            },
+            Some(_) => {
+                return Err(MdOsiError::TypeInvalid("platforms.[].macos.abis", "array").into());
+            },
+        };
         Ok(MdOsiPlatformMacos {
+            bundle_id: v_bundle_id,
+            namespace: v_namespace,
+
+            abis: v_abis,
+
+            version_code: v_version_code,
+            version_name: v_version_name,
+
+            category: v_category,
         })
     }
 
