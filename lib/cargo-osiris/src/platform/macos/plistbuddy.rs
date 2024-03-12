@@ -3,9 +3,11 @@
 //! The `PlistBuddy` utility is a standard macOS helper to operate on plist
 //! files. This module provides structured access to its features.
 
-use crate::op;
+use crate::{misc, op};
 
 /// Combined arguments to a merge-query.
+///
+/// Conflicting entries will not be merged, but the original is retained.
 pub struct MergeQuery<'ctx> {
     /// Path to the input files to merge into the plist file
     pub input_file: &'ctx std::path::Path,
@@ -20,9 +22,11 @@ impl<'ctx> MergeQuery<'ctx> {
 
         // Assemble the merge query.
         //
-        // XXX: Escaping unclear.
-        let mut qr: std::ffi::OsString = "Merge ".into();
-        qr.push(self.input_file.as_os_str());
+        // The path can be escaped in single-quotes with backslashes as
+        // escape character.
+        let mut qr: std::ffi::OsString = "Merge '".into();
+        qr.push(misc::escape_single_quote(self.input_file.as_os_str()));
+        qr.push("'");
 
         // Run a merge query.
         cmd.arg("-x");

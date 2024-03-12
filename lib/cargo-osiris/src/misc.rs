@@ -30,6 +30,34 @@ pub fn absdir(path: &dyn AsRef<std::path::Path>) -> std::path::PathBuf {
     b
 }
 
+/// Escape suitably for single-quote usage. This will prefix any single quote
+/// or backslash ASCII character with a backslash.
+pub fn escape_single_quote(input: &std::ffi::OsStr) -> std::ffi::OsString {
+    // SAFETY: The encoded-bytes representation is self-synchronizing and a
+    //         superset of UTF-8 and thus ASCII. Hence, by just looking at the
+    //         ASCII characters, we can safely reassemble the stream.
+    let from = input.as_encoded_bytes();
+    let n_alloc = from.iter().fold(
+        0,
+        |acc, v| match v {
+            b'\'' | b'\\' => acc + 2,
+            _ => acc + 1,
+        },
+    );
+
+    let mut to = Vec::with_capacity(n_alloc);
+
+    for &c in from.iter() {
+        if c == b'\'' || c == b'\\' {
+            to.push(b'\\');
+        }
+        to.push(c);
+    }
+
+    // SAFETY: See above.
+    unsafe { std::ffi::OsString::from_encoded_bytes_unchecked(to) }
+}
+
 /// ## Escape XML PCDATA
 ///
 /// Create a new string that has the same content as the input but all special
@@ -100,6 +128,27 @@ mod tests {
             cwd.as_path(),
         );
         cwd.pop();
+    }
+
+    // Verify that the single-quote escapes are properly handled.
+    #[test]
+    fn test_single_quote() {
+        assert_eq!(
+            escape_single_quote(std::ffi::OsStr::new("")),
+            "",
+        );
+        assert_eq!(
+            escape_single_quote(std::ffi::OsStr::new("foobar")),
+            "foobar",
+        );
+        assert_eq!(
+            escape_single_quote(std::ffi::OsStr::new("foo'bar")),
+            "foo\\'bar",
+        );
+        assert_eq!(
+            escape_single_quote(std::ffi::OsStr::new("'foo\\'bar'")),
+            "\\'foo\\\\\\'bar\\'",
+        );
     }
 
     // Verify that the XML-PCDATA escapes are properly handled.
