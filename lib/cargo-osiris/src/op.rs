@@ -59,6 +59,7 @@ pub struct Build<'ctx> {
     pub cargo_metadata: &'ctx cargo::Metadata,
     pub config: &'ctx config::Config,
     pub platform: &'ctx config::ConfigPlatform,
+    pub verbose: bool,
 }
 
 impl From<lib::error::Uncaught> for BuildError {

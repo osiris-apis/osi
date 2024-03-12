@@ -92,6 +92,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
         fn op_build(
             &self,
             v_platform: &Option<String>,
+            verbose: bool,
             cargo_arguments: &cargo::Arguments,
         ) -> Result<(), u8> {
             let (metadata, config) = self.config(cargo_arguments)?;
@@ -101,6 +102,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                 cargo_metadata: &metadata,
                 config: &config,
                 platform: &platform,
+                verbose: verbose,
             };
 
             match build.build() {
@@ -253,6 +255,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
 
             let v_help = lib::args::Help::new();
             let v_platform: core::cell::RefCell<Option<String>> = Default::default();
+            let v_verbose: core::cell::RefCell<Option<bool>> = Default::default();
 
             let v_default_features: core::cell::RefCell<Option<bool>> = Default::default();
             let v_features: core::cell::RefCell<Vec<&str>> = Default::default();
@@ -265,6 +268,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
             let flags_build = lib::args::FlagList::with([
                 Flag::with_name("help", Value::Set(&v_help), Some("Show usage information")),
                 Flag::with_name("platform", Value::Parse(&v_platform), Some("ID of the target platform")),
+                Flag::with_name("verbose", Value::Parse(&v_verbose), Some("Be more verbose")),
 
                 Flag::with_name("default-features", Value::Toggle(&v_default_features), Some("Enable/Disable default package features")),
                 Flag::with_name("features", Value::Parse(&v_features), Some("Enable specified package features")),
@@ -330,6 +334,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                 },
                 Cmd::Build => self.op_build(
                     &*v_platform.borrow(),
+                    v_verbose.borrow().unwrap_or(false),
                     &cargo::Arguments {
                         default_features: *v_default_features.borrow(),
                         features: v_features.borrow().iter().map(|v| (*v).into()).collect(),

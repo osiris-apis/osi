@@ -471,6 +471,7 @@ impl<'ctx> Direct<'ctx> {
             min_os: Some(&self.build.macos.min_os),
             output_dir: res_dir,
             output_info_file: Some(&self.xcassets_plist_file),
+            verbose: self.build.op.verbose,
         }.run()?;
 
         plistbuddy::MergeQuery {

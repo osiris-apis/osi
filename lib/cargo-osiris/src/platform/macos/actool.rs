@@ -20,6 +20,8 @@ pub struct CompileQuery<'ctx, InputList> {
     pub output_dir: &'ctx std::path::Path,
     /// Path to the output info file
     pub output_info_file: Option<&'ctx std::path::Path>,
+    /// Whether to show verbose output
+    pub verbose: bool,
 }
 
 impl<'ctx, InputList> CompileQuery<'ctx, InputList>
@@ -89,7 +91,12 @@ where
 
         cmd.stderr(std::process::Stdio::inherit());
         cmd.stdin(std::process::Stdio::null());
-        cmd.stdout(std::process::Stdio::inherit());
+
+        if self.verbose {
+            cmd.stdout(std::process::Stdio::inherit());
+        } else {
+            cmd.stdout(std::process::Stdio::null());
+        }
 
         let status = cmd.status()
             .map_err(|io| op::ErrorProcess::Exec { name: "actool".into(), io })?;
