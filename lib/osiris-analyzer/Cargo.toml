@@ -76,3 +76,25 @@ features = [
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging",
 ]
+
+[[package.metadata.osiris.application.icons]]
+path = "res/icons/osiris-eye.16.png"
+size = 16
+[[package.metadata.osiris.application.icons]]
+path = "res/icons/osiris-eye.32.png"
+size = 32
+[[package.metadata.osiris.application.icons]]
+path = "res/icons/osiris-eye.64.png"
+size = 64
+[[package.metadata.osiris.application.icons]]
+path = "res/icons/osiris-eye.128.png"
+size = 128
+[[package.metadata.osiris.application.icons]]
+path = "res/icons/osiris-eye.256.png"
+size = 256
+[[package.metadata.osiris.application.icons]]
+path = "res/icons/osiris-eye.512.png"
+size = 512
+[[package.metadata.osiris.application.icons]]
+path = "res/icons/osiris-eye.1024.png"
+size = 1024
