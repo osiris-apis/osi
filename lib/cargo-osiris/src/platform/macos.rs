@@ -12,7 +12,13 @@ mod lipo;
 mod plistbuddy;
 
 pub enum ErrorBuild {
+    /// Unsupported target ABI for the macOS platform.
     UnsupportedAbi { abi: String },
+    /// Path contains characters that are not supported by the required tools.
+    /// This very likely means the path contains non-Unicode characters.
+    UnsupportedPath { path: std::path::PathBuf },
+    /// Cannot find any resource at the specified directory.
+    NoFile { path: std::path::PathBuf },
 }
 
 struct Build<'ctx> {
@@ -198,10 +204,10 @@ impl<'ctx> Direct<'ctx> {
         )
     }
 
-    fn prepare_xcassets_contents_appicon(&self) -> String {
+    fn prepare_xcassets_contents_appicon(&self) -> Result<String, op::BuildError> {
         let mut json = String::new();
         let mut first = true;
-        let mut keep = |path: &str, scale: u32, size: u32| {
+        let mut keep = |filename: &str, scale: u32, size: u32| {
             let leading = if first {
                 first = false;
                 "\n"
@@ -222,7 +228,7 @@ impl<'ctx> Direct<'ctx> {
                 // XXX: Properly escape the paths.
                 json,
                 leading,
-                path,
+                filename,
                 "mac",
                 scale,
                 size,
@@ -232,6 +238,10 @@ impl<'ctx> Direct<'ctx> {
 
         for (&(scale, size), paths) in &self.icons {
             let path = paths.first().expect("Application icons must have paths");
+            let filename = std::path::Path::new(path).file_name()
+                .ok_or_else(|| ErrorBuild::NoFile { path: path.into() })?
+                .to_str()
+                .ok_or_else(|| ErrorBuild::UnsupportedPath { path: path.into() })?;
 
             // If we are provided with a `1x`-scaled icon with an even
             // width, we can provide it as a half-width `2x`-scaled icon,
@@ -240,13 +250,13 @@ impl<'ctx> Direct<'ctx> {
                 && (size % 2) == 0
                 && !self.icons.contains_key(&(2, size / 2))
             {
-                keep(path, 2, size / 2);
+                keep(filename, 2, size / 2);
             }
 
-            keep(path, scale, size);
+            keep(filename, scale, size);
         }
 
-        format!(
+        Ok(format!(
             concat!(
                 r#"{{"#, "\n",
                 r#"  "images": [{}"#, "\n",
@@ -260,7 +270,7 @@ impl<'ctx> Direct<'ctx> {
             json,
             "xcode",
             1,
-        )
+        ))
     }
 
     fn prepare(&self) -> Result<(), op::BuildError> {
@@ -290,7 +300,7 @@ impl<'ctx> Direct<'ctx> {
         )?;
         op::update_file(
             self.xcassets_contents_appicon_file.as_path(),
-            self.prepare_xcassets_contents_appicon().as_bytes(),
+            self.prepare_xcassets_contents_appicon()?.as_bytes(),
         )?;
 
         Ok(())
@@ -444,6 +454,15 @@ impl<'ctx> Direct<'ctx> {
         &self,
         res_dir: &std::path::Path,
     ) -> Result<(), op::BuildError> {
+        // Copy the icons into the xcassets directory.
+        for (_, icons) in &self.icons {
+            let icon = icons.first().expect("Application icons must have paths");
+            let from = std::path::Path::new(icon);
+            let file_name = from.file_name().expect("Icon paths must have file-names");
+            let to = self.xcassets_appicon_dir.join(file_name);
+            op::copy_file(from, &to)?;
+        }
+
         actool::CompileQuery {
             accent_color: self.accent_color,
             app_icon: self.app_icon,
@@ -532,6 +551,8 @@ impl core::fmt::Display for ErrorBuild {
     fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
         match self {
             ErrorBuild::UnsupportedAbi { abi } => fmt.write_fmt(core::format_args!("Unsupported ABI: {}", abi)),
+            ErrorBuild::UnsupportedPath { path } => fmt.write_fmt(core::format_args!("Unsupported path: {}", path.to_string_lossy())),
+            ErrorBuild::NoFile { path } => fmt.write_fmt(core::format_args!("No file at the specified path: {}", path.to_string_lossy())),
         }
     }
 }
