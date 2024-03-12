@@ -107,7 +107,7 @@ impl core::fmt::Display for Error {
 
 impl Config {
     fn add_default_platforms(&mut self) {
-        self.platforms.insert(
+        self.platform_defaults.insert(
             "android".to_string(),
             ConfigPlatform {
                 path_platform: (&self.path_application).join("platform/android"),
@@ -134,7 +134,7 @@ impl Config {
             },
         );
 
-        self.platforms.insert(
+        self.platform_defaults.insert(
             "macos".to_string(),
             ConfigPlatform {
                 path_platform: (&self.path_application).join("platform/macos"),
