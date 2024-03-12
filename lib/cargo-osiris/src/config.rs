@@ -82,6 +82,8 @@ pub struct Config {
     pub path_application: std::path::PathBuf,
     /// Absolute path to the Cargo manifest.
     pub path_manifest: std::path::PathBuf,
+    /// Absolute path to the Cargo target directory.
+    pub path_target: std::path::PathBuf,
 
     /// Application ID
     pub id: String,
@@ -387,6 +389,10 @@ impl Config {
         // Other relative paths in the configuration are relative to it.
         let v_path_application = misc::absdir(path_manifest);
 
+        // Remember the absolute path to the Cargo target directory that will
+        // be used by this invocation.
+        let v_path_target = std::path::Path::new(&data.target_directory).to_path_buf();
+
         // Use the package-name as application name. Derive its ID from
         // it by masking unsupported characters.
         let mut v_name = data.package_name.clone();
@@ -400,6 +406,7 @@ impl Config {
                 Config {
                     path_application: v_path_application,
                     path_manifest: path_manifest.as_ref().into(),
+                    path_target: v_path_target,
 
                     id: v_id,
                     id_symbol: v_id_symbol,
@@ -429,6 +436,7 @@ impl Config {
                 let mut config = Config {
                     path_application: v_path_application,
                     path_manifest: path_manifest.as_ref().into(),
+                    path_target: v_path_target,
 
                     id: v_id,
                     id_symbol: v_id_symbol,
