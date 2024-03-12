@@ -30,6 +30,17 @@ android.kotlin.source-dirs = ["src/platform/android/java"]
 android.manifest-file = "src/platform/android/AndroidManifest.xml"
 android.resource-dirs = ["src/platform/android/res"]
 
+osiris.version = 1
+osiris.application.id = "OsirisAnalyzer"
+osiris.application.name = "Osiris Apis Analyzer"
+
+[[package.metadata.osiris.platforms]]
+id = "macos"
+macos.bundle-id = "foo.osiris.analyzer"
+macos.category = "public.app-category.developer-tools"
+macos.version-code = 1
+macos.version-name = "0.1.0"
+
 [target.'cfg(target_os = "linux")'.dependencies]
 adw = { features = ["v1_1"], workspace = true }
 gtk = { features = ["v4_6"], workspace = true }
