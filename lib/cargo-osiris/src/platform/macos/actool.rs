@@ -88,11 +88,13 @@ where
         }
 
         cmd.stderr(std::process::Stdio::inherit());
+        cmd.stdin(std::process::Stdio::null());
+        cmd.stdout(std::process::Stdio::inherit());
 
-        let output = cmd.output()
+        let status = cmd.status()
             .map_err(|io| op::ErrorProcess::Exec { name: "actool".into(), io })?;
-        if !output.status.success() {
-            return Err(op::ErrorProcess::Exit { name: "actool".into(), code: output.status });
+        if !status.success() {
+            return Err(op::ErrorProcess::Exit { name: "actool".into(), code: status });
         }
 
         Ok(())
