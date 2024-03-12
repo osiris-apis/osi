@@ -59,6 +59,17 @@ pub struct Arguments {
     pub target_dir: Option<std::path::PathBuf>,
 }
 
+/// Metadata about an application icon.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct MdOsiApplicationIcon {
+    /// Relative path to the icon file.
+    pub path: Option<String>,
+    /// Integer-scaling the icon applies to.
+    pub scale: Option<u32>,
+    /// Width of the square icon in pixels before scaling.
+    pub size: Option<u32>,
+}
+
 /// Metadata about the application independent of the target platform.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct MdOsiApplication {
@@ -69,6 +80,10 @@ pub struct MdOsiApplication {
     pub id: Option<String>,
     /// Human-readable name of the application.
     pub name: Option<String>,
+
+    /// Information on the application icon, allowing for multiple alternatives
+    /// that can each provide different attributes (e.g., dimensions).
+    pub icons: Vec<MdOsiApplicationIcon>,
 }
 
 /// Metadata about the application and library for the Android platform.
@@ -624,6 +639,8 @@ impl MetadataBlob {
                 let mut mdosi_app = MdOsiApplication {
                     id: None,
                     name: None,
+
+                    icons: Vec::new(),
                 };
 
                 match application.get("id") {
@@ -635,6 +652,7 @@ impl MetadataBlob {
                         return Err(MdOsiError::TypeInvalid("application.id", "string").into());
                     },
                 }
+
                 match application.get("name") {
                     None => {},
                     Some(serde_json::Value::String(name_str)) => {
@@ -642,6 +660,30 @@ impl MetadataBlob {
                     },
                     Some(_) => {
                         return Err(MdOsiError::TypeInvalid("application.name", "string").into());
+                    },
+                }
+
+                match application.get("icons") {
+                    None => {},
+                    Some(serde_json::Value::Array(icons)) => {
+                        for a_icon in icons.iter() {
+                            let serde_json::Value::Object(icon) = a_icon else {
+                                return Err(MdOsiError::TypeInvalid("application.icons.[]", "object").into());
+                            };
+
+                            let v_path = Self::get_str(icon, "path", "application.icons.[].path")?;
+                            let v_scale = Self::get_u32(icon, "scale", "application.icons.[].scale")?;
+                            let v_size = Self::get_u32(icon, "size", "application.icons.[].size")?;
+
+                            mdosi_app.icons.push(MdOsiApplicationIcon {
+                                path: v_path,
+                                scale: v_scale,
+                                size: v_size,
+                            });
+                        }
+                    },
+                    Some(_) => {
+                        return Err(MdOsiError::TypeInvalid("application.icons", "array").into());
                     },
                 }
 

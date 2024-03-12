@@ -26,6 +26,13 @@ pub enum Error {
     DuplicatePlatform(String),
 }
 
+/// Metadata on a particular icon instance.
+pub struct ConfigIcon {
+    pub path: String,
+    pub scale: u32,
+    pub size: u32,
+}
+
 /// Android specific configuration for a platform integration.
 pub struct ConfigPlatformAndroid {
     pub application_id: String,
@@ -92,6 +99,9 @@ pub struct Config {
     pub id_symbol: String,
     /// Application name
     pub name: String,
+
+    /// Icon information
+    pub icons: Vec<ConfigIcon>,
 
     /// Platform Configurations
     pub platforms: BTreeMap<String, ConfigPlatform>,
@@ -409,6 +419,9 @@ impl Config {
         let mut v_id = v_name.clone();
         let mut v_id_symbol = lib::str::symbolize(&v_id);
 
+        // Use empty icon-information as default.
+        let mut v_icons = Vec::new();
+
         let mut config = match data.osiris {
             None => {
                 // Create a default configuration from the information in the
@@ -421,6 +434,8 @@ impl Config {
                     id: v_id,
                     id_symbol: v_id_symbol,
                     name: v_name,
+
+                    icons: v_icons,
 
                     platforms: BTreeMap::new(),
                     platform_defaults: BTreeMap::new(),
@@ -439,6 +454,18 @@ impl Config {
                     if let Some(ref v) = mdosi_application.name {
                         v_name = v.into();
                     }
+
+                    for icon in &mdosi_application.icons {
+                        let Some(ref v_path) = icon.path else { continue };
+                        let v_scale = icon.scale.unwrap_or(1);
+                        let Some(v_size) = icon.size else { continue };
+
+                        v_icons.push(ConfigIcon {
+                            path: v_path.clone(),
+                            scale: v_scale,
+                            size: v_size,
+                        });
+                    }
                 }
 
                 // Create initial configuration with basic data. Further
@@ -451,6 +478,8 @@ impl Config {
                     id: v_id,
                     id_symbol: v_id_symbol,
                     name: v_name,
+
+                    icons: v_icons,
 
                     platforms: BTreeMap::new(),
                     platform_defaults: BTreeMap::new(),
@@ -514,6 +543,8 @@ mod tests {
                 application: Some(cargo::MdOsiApplication {
                     id: Some("ID".into()),
                     name: None,
+
+                    icons: Vec::new(),
                 }),
                 platforms: Vec::new(),
             })),
