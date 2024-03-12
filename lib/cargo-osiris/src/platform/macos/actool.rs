@@ -59,8 +59,11 @@ where
             cmd.arg(format!("{}", v));
         }
 
-        // Enable notices.
-        cmd.arg("--notices");
+        // Enable notices only in verbose mode, since they seem to got
+        // to stderr by default (which we do not want to suppress).
+        if self.verbose {
+            cmd.arg("--notices");
+        }
 
         // Request human-readable output.
         cmd.arg("--output-format");
@@ -92,6 +95,8 @@ where
         cmd.stderr(std::process::Stdio::inherit());
         cmd.stdin(std::process::Stdio::null());
 
+        // Command output is rather verbose, even on success, so suppress it
+        // unless requested by the caller.
         if self.verbose {
             cmd.stdout(std::process::Stdio::inherit());
         } else {
