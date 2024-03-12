@@ -7,6 +7,7 @@ use crate::{cargo, config, op};
 use std::collections::BTreeMap;
 
 mod codesign;
+mod lipo;
 
 pub enum ErrorBuild {
     UnsupportedAbi { abi: String },
@@ -123,8 +124,17 @@ impl<'ctx> Direct<'ctx> {
         Ok(())
     }
 
-    fn build_cargo(&self) -> Result<BTreeMap<std::path::PathBuf, cargo::BuildArtifact>, op::BuildError> {
-        let mut res = BTreeMap::new();
+    fn build_cargo(&self) -> Result<BTreeMap<std::path::PathBuf, Vec<std::path::PathBuf>>, op::BuildError> {
+        let mut res: BTreeMap<std::path::PathBuf, Vec<std::path::PathBuf>> = BTreeMap::new();
+
+        let mut keep = |singleton: bool, key: &std::path::Path, value: &cargo::BuildArtifact| {
+            let path = std::path::Path::new(&value.path).to_path_buf();
+            let entry = res.entry(key.into()).or_default();
+            if singleton {
+                entry.clear();
+            }
+            entry.push(path);
+        };
 
         // Supported ABI keys are documented in `arch(3)`.
         for abi in &self.build.macos.abis {
@@ -146,6 +156,7 @@ impl<'ctx> Direct<'ctx> {
             for artifact in build.artifacts {
                 let path = std::path::Path::new(&artifact.path);
                 let file_name = path.file_name().expect("Cargo artifacts must have file-names");
+                let file_path = std::path::Path::new(file_name);
                 let o_extension = path.extension();
 
                 // For each artifact, try to find its path relative to the
@@ -164,7 +175,7 @@ impl<'ctx> Direct<'ctx> {
                 let Ok(path) = path.strip_prefix(
                     self.build.op.config.path_target.as_path(),
                 ) else {
-                    res.insert(file_name.into(), artifact);
+                    keep(true, file_path, &artifact);
                     continue;
                 };
 
@@ -173,7 +184,7 @@ impl<'ctx> Direct<'ctx> {
                     None => path,
                     Some(v) => match path.strip_prefix(v) {
                         Err(_) => {
-                            res.insert(file_name.into(), artifact);
+                            keep(true, file_path, &artifact);
                             continue;
                         },
                         Ok(v) => v,
@@ -187,7 +198,7 @@ impl<'ctx> Direct<'ctx> {
                         Some(v) => v,
                     },
                 ) else {
-                    res.insert(file_name.into(), artifact);
+                    keep(true, file_path, &artifact);
                     continue;
                 };
 
@@ -218,33 +229,37 @@ impl<'ctx> Direct<'ctx> {
                 {
                     // Place the main executable in `Contents/MacOS` without
                     // any hierarchy. Use the same name as the bundle.
-                    res.insert(
-                        std::path::Path::new("Contents/MacOS")
-                            .join(&self.build.op.config.id_symbol).into(),
-                        artifact,
+                    keep(
+                        false,
+                        &std::path::Path::new("Contents/MacOS")
+                            .join(&self.build.op.config.id_symbol),
+                        &artifact,
                     );
                 } else if artifact.is_executable {
                     // Place helper executables in `Contents/Helpers` without
                     // any hierarchy. Retain the helper name.
-                    res.insert(
-                        std::path::Path::new("Contents/Helpers").join(file_name).into(),
-                        artifact,
+                    keep(
+                        false,
+                        &std::path::Path::new("Contents/Helpers").join(file_name),
+                        &artifact,
                     );
                 } else if o_extension.is_some_and(
                     |v| v == "bundle" || v == "dylib" || v == "so"
                 ) {
                     // Place linker artifacts into `Contents/Frameworks`
                     // without any hierarchy, but with their name retained.
-                    res.insert(
-                        std::path::Path::new("Contents/Frameworks").join(file_name).into(),
-                        artifact,
+                    keep(
+                        false,
+                        &std::path::Path::new("Contents/Frameworks").join(file_name),
+                        &artifact,
                     );
                 } else {
                     // Place everything else in `Contents/Resources` with the
                     // hierarchy retained.
-                    res.insert(
-                        std::path::Path::new("Contents/Resources").join(path).into(),
-                        artifact,
+                    keep(
+                        true,
+                        &std::path::Path::new("Contents/Resources").join(path),
+                        &artifact,
                     );
                 }
             }
@@ -255,7 +270,7 @@ impl<'ctx> Direct<'ctx> {
 
     fn build_bundle(
         &self,
-        cargo_builds: &BTreeMap<std::path::PathBuf, cargo::BuildArtifact>,
+        cargo_builds: &BTreeMap<std::path::PathBuf, Vec<std::path::PathBuf>>,
     ) -> Result<(), op::BuildError> {
         let mut path = self.bundle_dir.clone();
 
@@ -270,13 +285,22 @@ impl<'ctx> Direct<'ctx> {
             path.pop();
         }
 
-        for (dst, artifact) in cargo_builds {
-            let from = std::path::Path::new(&artifact.path);
+        for (dst, artifacts) in cargo_builds {
             let to = path.join(dst);
             if let Some(dir) = to.parent() {
                 op::mkdir(dir)?;
             }
-            op::copy_file(from, &to)?;
+
+            match artifacts.len() {
+                0 => {},
+                1 => op::copy_file(&artifacts[0], &to)?,
+                _ => {
+                    lipo::CreateQuery {
+                        input_files: artifacts.iter(),
+                        output_file: &to,
+                    }.run()?;
+                },
+            }
         }
 
         Ok(())
