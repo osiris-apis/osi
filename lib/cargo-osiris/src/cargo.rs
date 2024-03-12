@@ -96,6 +96,7 @@ pub struct MdOsiPlatformMacos {
     pub namespace: Option<String>,
 
     pub abis: Option<Vec<String>>,
+    pub min_os: Option<String>,
 
     pub version_code: Option<u32>,
     pub version_name: Option<String>,
@@ -549,6 +550,7 @@ impl MetadataBlob {
     ) -> Result<MdOsiPlatformMacos, Error> {
         let v_bundle_id = Self::get_str(macos, "bundle-id", "platforms.[].macos.bundle-id")?;
         let v_namespace = Self::get_str(macos, "namespace", "platforms.[].macos.namespace")?;
+        let v_min_os = Self::get_str(macos, "min-os", "platforms.[].macos.min-os")?;
         let v_version_code = Self::get_u32(macos, "version-code", "platforms.[].macos.version-code")?;
         let v_version_name = Self::get_str(macos, "version-name", "platforms.[].macos.version-name")?;
         let v_category = Self::get_str(macos, "category", "platforms.[].macos.category")?;
@@ -579,6 +581,7 @@ impl MetadataBlob {
             namespace: v_namespace,
 
             abis: v_abis,
+            min_os: v_min_os,
 
             version_code: v_version_code,
             version_name: v_version_name,

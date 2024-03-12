@@ -94,6 +94,8 @@ impl<'ctx> Direct<'ctx> {
                 "\n",
                 r#"    <key>LSApplicationCategoryType</key>"#, "\n",
                 r#"    <string>{}</string>"#, "\n",
+                r#"    <key>LSMinimumSystemVersion</key>"#, "\n",
+                r#"    <string>{}</string>"#, "\n",
                 r#"  </dict>"#, "\n",
                 r#"</plist>"#, "\n",
             ),
@@ -104,6 +106,7 @@ impl<'ctx> Direct<'ctx> {
             &self.build.macos.version_code,
             &self.build.op.config.id_symbol,
             &self.build.macos.category,
+            &self.build.macos.min_os,
         )
     }
 

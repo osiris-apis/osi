@@ -47,6 +47,7 @@ pub struct ConfigPlatformMacos {
     pub namespace: Option<String>,
 
     pub abis: Vec<String>,
+    pub min_os: String,
 
     pub version_code: u32,
     pub version_name: String,
@@ -151,6 +152,7 @@ impl Config {
 
                         abis: ["arm64", "x86_64"]
                             .iter().map(|v| v.to_string()).collect(),
+                        min_os: "10.13".to_string(),
 
                         version_code: 1,
                         version_name: "1.0.0".to_string(),
@@ -313,6 +315,13 @@ impl Config {
                         .iter().map(|v| v.to_string()).collect()
                 };
 
+                // Allow users to specify the minimum required OS version, but
+                // provide a suitable default. We use the oldest non-deprecated
+                // version as default. Apple documents this at:
+                //
+                //   https://developer.apple.com/documentation/packagedescription/supportedplatform/macosversion
+                let v_min_os = data_macos.min_os.clone().unwrap_or("10.13".to_string());
+
                 // The version-code is a simple positive integer increased for
                 // every new build. It allows the app stores to identify the
                 // builds and decide which one is the most recent. The code has
@@ -339,6 +348,7 @@ impl Config {
                             namespace: v_namespace,
 
                             abis: v_abis,
+                            min_os: v_min_os,
 
                             version_code: v_version_code,
                             version_name: v_version_name,
