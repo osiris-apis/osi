@@ -453,6 +453,7 @@ impl<'ctx> Direct<'ctx> {
     fn build_bundle_car(
         &self,
         res_dir: &std::path::Path,
+        info_plist: &std::path::Path,
     ) -> Result<(), op::BuildError> {
         // Copy the icons into the xcassets directory.
         for (_, icons) in &self.icons {
@@ -474,7 +475,7 @@ impl<'ctx> Direct<'ctx> {
 
         plistbuddy::MergeQuery {
             input_file: &self.xcassets_plist_file,
-            plist_file: &self.bundle_plist_file,
+            plist_file: info_plist,
         }.run()?;
 
         Ok(())
@@ -485,18 +486,20 @@ impl<'ctx> Direct<'ctx> {
         cargo_builds: &BTreeMap<std::path::PathBuf, Vec<std::path::PathBuf>>,
     ) -> Result<(), op::BuildError> {
         let mut path = self.bundle_dir.clone();
+        let info_plist;
 
         {
             path.push("Contents");
             op::mkdir(&path)?;
 
             path.push("Info.plist");
-            op::copy_file(&self.bundle_plist_file, &path)?;
+            info_plist = path.clone();
+            op::copy_file(&self.bundle_plist_file, &info_plist)?;
             path.pop();
 
             path.push("Resources");
             op::mkdir(&path)?;
-            self.build_bundle_car(&path)?;
+            self.build_bundle_car(&path, &info_plist)?;
             path.pop();
 
             path.pop();
