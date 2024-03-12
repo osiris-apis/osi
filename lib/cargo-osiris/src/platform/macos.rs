@@ -48,7 +48,7 @@ impl<'ctx> Build<'ctx> {
         &self,
     ) -> Direct {
         let v_artifact_dir = self.build_dir.join("artifacts");
-        let v_bundle_dir = self.build_dir.join("package.app");
+        let v_bundle_dir = self.build_dir.join(format!("{}.app", self.op.config.id_symbol));
 
         let v_bundle_plist_file = v_artifact_dir.join("package.plist");
 
@@ -72,30 +72,44 @@ impl<'ctx> Direct<'ctx> {
                 r#"<plist version="1.0">"#, "\n",
                 r#"  <dict>"#, "\n",
                 r#"    <key>CFBundleDisplayName</key>"#, "\n",
-                r#"    <string>{0}</string>"#, "\n",
-                r#"    <key>CFBundleExecutable</key>"#, "\n",
-                r#"    <string>{1}</string>"#, "\n",
+                r#"    <string>{}</string>"#, "\n",
                 r#"    <key>CFBundleIdentifier</key>"#, "\n",
-                r#"    <string>{2}</string>"#, "\n",
+                r#"    <string>{}</string>"#, "\n",
                 r#"    <key>CFBundleName</key>"#, "\n",
-                r#"    <string>{3}</string>"#, "\n",
+                r#"    <string>{}</string>"#, "\n",
+                r#"    <key>CFBundleShortVersionString</key>"#, "\n",
+                r#"    <string>{}</string>"#, "\n",
                 r#"    <key>CFBundleVersion</key>"#, "\n",
-                r#"    <string>{4}</string>"#, "\n",
+                r#"    <string>{}</string>"#, "\n",
+                "\n",
+                r#"    <key>CFBundleExecutable</key>"#, "\n",
+                r#"    <string>{}</string>"#, "\n",
+                r#"    <key>CFBundleSupportedPlatforms</key>"#, "\n",
+                r#"    <array>"#, "\n",
+                r#"      <string>MacOSX</string>"#, "\n",
+                r#"    </array>"#, "\n",
                 r#"    <key>CFBundlePackageType</key>"#, "\n",
-                r#"    <string>{5}</string>"#, "\n",
+                r#"    <string>APPL</string>"#, "\n",
+                "\n",
+                r#"    <key>LSApplicationCategoryType</key>"#, "\n",
+                r#"    <string>{}</string>"#, "\n",
                 r#"  </dict>"#, "\n",
                 r#"</plist>"#, "\n",
             ),
-            self.build.op.config.name,
-            "package.bin",
-            self.build.op.config.id,
-            self.build.op.config.name,
-            "0.1.0",
-            "APPL",
+            &self.build.op.config.name,
+            &self.build.macos.bundle_id,
+            &self.build.op.config.id_symbol,
+            &self.build.macos.version_name,
+            &self.build.macos.version_code,
+            &self.build.op.config.id_symbol,
+            &self.build.macos.category,
         )
     }
 
     fn prepare(&self) -> Result<(), op::BuildError> {
+        // Delete previous artifacts if re-use is not possible.
+        op::rmdir(&self.bundle_dir)?;
+
         // Create build directories
         op::mkdir(&self.artifact_dir)?;
         op::mkdir(&self.bundle_dir)?;
@@ -109,25 +123,131 @@ impl<'ctx> Direct<'ctx> {
         Ok(())
     }
 
-    fn build_cargo(&self) -> Result<BTreeMap<String, cargo::Build>, op::BuildError> {
+    fn build_cargo(&self) -> Result<BTreeMap<std::path::PathBuf, cargo::BuildArtifact>, op::BuildError> {
         let mut res = BTreeMap::new();
 
         // Supported ABI keys are documented in `arch(3)`.
-        for &abi in &["arm64"] {
-            let target = match abi {
-                "arm64" => Ok("aarch64-apple-darwin"),
-                "x86_64" => Ok("x86_64-apple-darwin"),
+        for abi in &self.build.macos.abis {
+            let o_target = match abi.as_str() {
+                "arm64" => Ok(Some("aarch64-apple-darwin")),
+                "native" => Ok(None),
+                "x86_64" => Ok(Some("x86_64-apple-darwin")),
                 v => Err(ErrorBuild::UnsupportedAbi { abi: v.into() }),
             }?;
 
             let query = cargo::BuildQuery {
                 cargo_arguments: self.build.op.cargo_arguments,
                 envs: Vec::new(),
-                target: Some(target.into()),
+                target: o_target.map(|v| v.into()),
             };
 
             let build = query.run()?;
-            res.insert(abi.into(), build);
+
+            for artifact in build.artifacts {
+                let path = std::path::Path::new(&artifact.path);
+                let file_name = path.file_name().expect("Cargo artifacts must have file-names");
+                let o_extension = path.extension();
+
+                // For each artifact, try to find its path relative to the
+                // main target directory. We have to retain the paths,
+                // otherwise they will likely not be placed correctly for the
+                // executable to find.
+                //
+                // If we cannot figure out the relative path (e.g., the
+                // artifact is placed outside the target directory), we copy
+                // the file without relative path.
+                // Similarly, since macOS bundles do not support nested
+                // non-bundle hierarchies for dylibs and executables, we copy
+                // those without relative path as well.
+
+                // Strip Cargo target directory, if possible.
+                let Ok(path) = path.strip_prefix(
+                    self.build.op.config.path_target.as_path(),
+                ) else {
+                    res.insert(file_name.into(), artifact);
+                    continue;
+                };
+
+                // Strip target-specific sub-directory, if possible.
+                let path = match o_target {
+                    None => path,
+                    Some(v) => match path.strip_prefix(v) {
+                        Err(_) => {
+                            res.insert(file_name.into(), artifact);
+                            continue;
+                        },
+                        Ok(v) => v,
+                    },
+                };
+
+                // Strip profile-specific sub-directory, if possible.
+                let Ok(path) = path.strip_prefix(
+                    match self.build.op.cargo_arguments.profile.as_deref() {
+                        None | Some("dev") => "debug",
+                        Some(v) => v,
+                    },
+                ) else {
+                    res.insert(file_name.into(), artifact);
+                    continue;
+                };
+
+                // Depending on the type of artifact, place it into the correct
+                // sub-directory of the bundle. Note that MacOS strongly
+                // discourages sub-directory hierarchies for executable code,
+                // but it is fine for assets. Hence, we strip hierarchy
+                // information for all executable code.
+                //
+                // XXX: Ideally, the caller would have more control over what
+                //      is placed where. Unfortunately, we have not found any
+                //      reasonable way to convey this metadata. For now, we
+                //      simply enforce the heuristic, but some solution for
+                //      the future is required.
+                //
+                // XXX: Optional components should be placed into
+                //      `Contents/PlugIns`. Not sure how to deduce that, yet.
+                //
+                // XXX: Alternative entry-points and root-level helpers should
+                //      go into `Contents/MacOS` instead of `Contents/Helpers`.
+                //      Again, unsure how to deduce that, yet.
+                //
+                // XXX: Lastly, lots of nieche use-cases require more elaborate
+                //      hierarchy control (e.g., `Contents/XPCServices`,
+                //      `Contents/Libraray/...`).
+                if artifact.is_executable
+                    && artifact.package_id == self.build.op.cargo_metadata.package_id
+                {
+                    // Place the main executable in `Contents/MacOS` without
+                    // any hierarchy. Use the same name as the bundle.
+                    res.insert(
+                        std::path::Path::new("Contents/MacOS")
+                            .join(&self.build.op.config.id_symbol).into(),
+                        artifact,
+                    );
+                } else if artifact.is_executable {
+                    // Place helper executables in `Contents/Helpers` without
+                    // any hierarchy. Retain the helper name.
+                    res.insert(
+                        std::path::Path::new("Contents/Helpers").join(file_name).into(),
+                        artifact,
+                    );
+                } else if o_extension.is_some_and(
+                    |v| v == "bundle" || v == "dylib" || v == "so"
+                ) {
+                    // Place linker artifacts into `Contents/Frameworks`
+                    // without any hierarchy, but with their name retained.
+                    res.insert(
+                        std::path::Path::new("Contents/Frameworks").join(file_name).into(),
+                        artifact,
+                    );
+                } else {
+                    // Place everything else in `Contents/Resources` with the
+                    // hierarchy retained.
+                    res.insert(
+                        std::path::Path::new("Contents/Resources").join(path).into(),
+                        artifact,
+                    );
+                }
+            }
         }
 
         Ok(res)
@@ -135,11 +255,9 @@ impl<'ctx> Direct<'ctx> {
 
     fn build_bundle(
         &self,
-        cargo_builds: &BTreeMap<String, cargo::Build>,
+        cargo_builds: &BTreeMap<std::path::PathBuf, cargo::BuildArtifact>,
     ) -> Result<(), op::BuildError> {
         let mut path = self.bundle_dir.clone();
-
-        op::rmdir(&path)?;
 
         {
             path.push("Contents");
@@ -149,63 +267,16 @@ impl<'ctx> Direct<'ctx> {
             op::copy_file(&self.bundle_plist_file, &path)?;
             path.pop();
 
-            {
-                path.push("Frameworks");
-                op::mkdir(&path)?;
-                path.pop();
-            }
-
-            {
-                path.push("MacOS");
-                op::mkdir(&path)?;
-                path.pop();
-            }
-
-            {
-                path.push("Resources");
-                op::mkdir(&path)?;
-                path.pop();
-            }
-
-            for (_abi, build) in cargo_builds {
-                for artifact in &build.artifacts {
-                    let from = std::path::Path::new(&artifact.path);
-                    let from_file_name = from.file_name().expect("Cargo artifacts must have file-names");
-
-                    // Copy the executable of the main package into `MacOS`
-                    // with the expected name. Copy everything else into the
-                    // `Frameworks` directory. We cannot use subdirectories,
-                    // since that is strongly discouraged by macOS.
-                    //
-                    // XXX: We should retain the hierarchy from the build,
-                    //      otherwise linking will likely fail. However, we
-                    //      should then warn if a non-flat hierarchy is used to
-                    //      comply with macOS standards.
-                    //
-                    // XXX: We should either pick a suitable default binary
-                    //      name, or just retain the name and set it
-                    //      accordingly in `Info.plist`.
-                    //
-                    // XXX: We should use `lipo` to merge multi-architecture
-                    //      artifacts into universal binaries.
-                    if artifact.is_executable
-                        && artifact.package_id == self.build.op.cargo_metadata.package_id
-                    {
-                        path.push("MacOS");
-                        path.push("package.bin");
-                    } else {
-                        path.push("Frameworks");
-                        path.push(from_file_name);
-                    }
-
-                    op::copy_file(from, &path)?;
-
-                    path.pop();
-                    path.pop();
-                }
-            }
-
             path.pop();
+        }
+
+        for (dst, artifact) in cargo_builds {
+            let from = std::path::Path::new(&artifact.path);
+            let to = path.join(dst);
+            if let Some(dir) = to.parent() {
+                op::mkdir(dir)?;
+            }
+            op::copy_file(from, &to)?;
         }
 
         Ok(())
