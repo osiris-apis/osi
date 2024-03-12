@@ -219,9 +219,9 @@ impl<'ctx> Direct<'ctx> {
                 concat!(
                     r#"{}{}"#,
                     r#"    {{"#, "\n",
-                    r#"      "filename": "{}""#, "\n",
-                    r#"      "idiom": "{}""#, "\n",
-                    r#"      "scale": "{}x""#, "\n",
+                    r#"      "filename": "{}","#, "\n",
+                    r#"      "idiom": "{}","#, "\n",
+                    r#"      "scale": "{}x","#, "\n",
                     r#"      "size": "{}x{}""#, "\n",
                     r#"    }}"#,
                 ),
