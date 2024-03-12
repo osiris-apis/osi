@@ -573,6 +573,7 @@ impl MetadataBlob {
                 return Err(MdOsiError::TypeInvalid("platforms.[].macos.abis", "array").into());
             },
         };
+
         Ok(MdOsiPlatformMacos {
             bundle_id: v_bundle_id,
             namespace: v_namespace,
