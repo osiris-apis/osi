@@ -107,8 +107,6 @@ pub struct ConfigPlatform {
 pub struct Config {
     /// Absolute path to the application root.
     pub path_application: std::path::PathBuf,
-    /// Absolute path to the Cargo manifest.
-    pub path_manifest: std::path::PathBuf,
     /// Absolute path to the Cargo target directory.
     pub path_target: std::path::PathBuf,
 
@@ -410,39 +408,38 @@ impl Config {
     /// Take the structured configuration from the Cargo manifest and verify
     /// all content. Parse everything into a secondary structure, which is much
     /// easier to deal with, and has defaults filled in.
-    ///
-    /// The path to the Cargo manifest file must be provided, to allow relative
-    /// paths in the configuration to be resolved. If this path is not
-    /// absolute, it is anchored in the current working directory at the time
-    /// of this function call.
     pub fn from_cargo(
-        data: &cargo::Metadata,
-        path_manifest: &dyn AsRef<std::path::Path>,
+        cargo_arguments: &cargo::Arguments,
+        cargo_metadata: &cargo::Metadata,
     ) -> Result<Self, Error> {
         // Remember the absolute path to the directory of the configuration.
         // Other relative paths in the configuration are relative to it.
-        let v_path_application = misc::absdir(path_manifest);
+        let v_path_application = misc::absdir(
+            &cargo_arguments.manifest_path.as_deref()
+                .unwrap_or(std::path::Path::new("./Cargo.toml")),
+        );
 
         // Remember the absolute path to the Cargo target directory that will
         // be used by this invocation.
-        let v_path_target = std::path::Path::new(&data.target_directory).to_path_buf();
+        let v_path_target = cargo_arguments.target_dir.as_deref()
+            .unwrap_or(std::path::Path::new(&cargo_metadata.target_directory))
+            .to_path_buf();
 
         // Use the package-name as application name. Derive its ID from
         // it by masking unsupported characters.
-        let mut v_name = data.package_name.clone();
+        let mut v_name = cargo_metadata.package_name.clone();
         let mut v_id = v_name.clone();
         let mut v_id_symbol = lib::str::symbolize(&v_id);
 
         // Use empty icon-information as default.
         let mut v_icons = Vec::new();
 
-        let mut config = match data.osiris {
+        let mut config = match cargo_metadata.osiris {
             None => {
                 // Create a default configuration from the information in the
                 // Cargo manifest.
                 Config {
                     path_application: v_path_application,
-                    path_manifest: path_manifest.as_ref().into(),
                     path_target: v_path_target,
 
                     id: v_id,
@@ -488,7 +485,6 @@ impl Config {
                 // information will be procedurally added to it.
                 let mut config = Config {
                     path_application: v_path_application,
-                    path_manifest: path_manifest.as_ref().into(),
                     path_target: v_path_target,
 
                     id: v_id,
@@ -585,7 +581,10 @@ mod tests {
             package_name: "foobar".into(),
             target_directory: "./target".into(),
         };
-        let config = Config::from_cargo(&data, &".").unwrap();
+        let config = Config::from_cargo(
+            &Default::default(),
+            &data,
+        ).unwrap();
 
         assert_eq!(config.id, "ID");
     }

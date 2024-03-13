@@ -36,8 +36,6 @@ pub fn cargo_osiris() -> std::process::ExitCode {
             &self,
             cargo_arguments: &cargo::Arguments,
         ) -> Result<(cargo::Metadata, config::Config), u8> {
-            let manifest_path = cargo_arguments.manifest_path();
-
             // Build query parameters.
             let query = cargo::MetadataQuery {
                 cargo_arguments: cargo_arguments,
@@ -56,7 +54,10 @@ pub fn cargo_osiris() -> std::process::ExitCode {
             }?;
 
             // Build internal configuration based on the metadata.
-            let config = match config::Config::from_cargo(&metadata, &manifest_path) {
+            let config = match config::Config::from_cargo(
+                cargo_arguments,
+                &metadata,
+            ) {
                 Ok(v) => Ok(v),
                 Err(e) => {
                     eprintln!("Cannot build configuration: {}", e);
