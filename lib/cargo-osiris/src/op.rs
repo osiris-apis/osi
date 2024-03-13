@@ -34,6 +34,8 @@ pub enum ErrorProcess {
 pub enum ArchiveError {
     /// Uncaught error propagation.
     Uncaught(lib::error::Uncaught),
+    /// File system errors
+    FileSystem(ErrorFileSystem),
 }
 
 /// ## Build Errors
@@ -83,7 +85,7 @@ pub struct Build<'ctx> {
 /// Recursively walk a directory and collect all entries, except for
 /// directories that are followed. This will follow symlinks and must thus be
 /// used carefully.
-pub fn lsrdir(path: &std::path::Path) -> Result<Vec<std::path::PathBuf>, BuildError> {
+pub fn lsrdir(path: &std::path::Path) -> Result<Vec<std::path::PathBuf>, ErrorFileSystem> {
     let mut past = std::collections::BTreeSet::new();
     let mut todo: Vec<std::path::PathBuf> = vec![path.into()];
     let mut res = Vec::new();
@@ -141,7 +143,7 @@ pub fn lsrdir(path: &std::path::Path) -> Result<Vec<std::path::PathBuf>, BuildEr
 ///
 /// This is a wrapper around `std::fs::create_dir_all()` that properly
 /// converts failures into the local error domain.
-pub fn mkdir(path: &std::path::Path) -> Result<(), BuildError> {
+pub fn mkdir(path: &std::path::Path) -> Result<(), ErrorFileSystem> {
     std::fs::create_dir_all(path).map_err(
         |io| ErrorFileSystem::DirectoryCreation { path: path.into(), io },
     )?;
@@ -157,7 +159,7 @@ pub fn mkdir(path: &std::path::Path) -> Result<(), BuildError> {
 /// This this a no-op if the target path does not exist in the file
 /// system. Note that this is only checked once, and thus may still fail
 /// when another removal runs in parallel.
-pub fn rmdir(path: &std::path::Path) -> Result<(), BuildError> {
+pub fn rmdir(path: &std::path::Path) -> Result<(), ErrorFileSystem> {
     if path.exists() {
         std::fs::remove_dir_all(path).map_err(
             |io| ErrorFileSystem::DirectoryRemoval { path: path.into(), io },
@@ -174,7 +176,7 @@ pub fn rmdir(path: &std::path::Path) -> Result<(), BuildError> {
 pub fn copy_file(
     src: &std::path::Path,
     dst: &std::path::Path,
-) -> Result<(), BuildError> {
+) -> Result<(), ErrorFileSystem> {
     std::fs::copy(src, dst).map_err(
         |io| ErrorFileSystem::FileCopy { from: src.into(), to: dst.into(), io },
     )?;
@@ -327,6 +329,18 @@ pub fn emerge(
     Ok(())
 }
 
+impl From<lib::error::Uncaught> for ArchiveError {
+    fn from(v: lib::error::Uncaught) -> Self {
+        Self::Uncaught(v)
+    }
+}
+
+impl From<ErrorFileSystem> for ArchiveError {
+    fn from(v: ErrorFileSystem) -> Self {
+        Self::FileSystem(v)
+    }
+}
+
 impl From<lib::error::Uncaught> for BuildError {
     fn from(v: lib::error::Uncaught) -> Self {
         Self::Uncaught(v)
@@ -403,6 +417,7 @@ impl core::fmt::Display for ArchiveError {
     fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
         match self {
             ArchiveError::Uncaught(e) => fmt.write_fmt(core::format_args!("Uncaught failure: {}", e)),
+            ArchiveError::FileSystem(e) => fmt.write_fmt(core::format_args!("File system failure: {}", e)),
         }
     }
 }
