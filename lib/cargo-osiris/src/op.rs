@@ -30,6 +30,12 @@ pub enum ErrorProcess {
     Exit { name: String, code: std::process::ExitStatus },
 }
 
+/// Enumeration of all possible errors of an archive operation
+pub enum ArchiveError {
+    /// Uncaught error propagation.
+    Uncaught(lib::error::Uncaught),
+}
+
 /// ## Build Errors
 ///
 /// This is the exhaustive list of possible errors raised by the build
@@ -53,7 +59,17 @@ pub enum BuildError {
     MacosPlatform(platform::macos::ErrorBuild),
 }
 
-/// Collection of parameters for a build operation.
+/// Collection of parameters for an archive operation
+pub struct Archive<'ctx> {
+    pub archive: &'ctx config::ConfigArchive,
+    pub cargo_arguments: &'ctx cargo::Arguments,
+    pub cargo_metadata: &'ctx cargo::Metadata,
+    pub config: &'ctx config::Config,
+    pub platform: &'ctx config::ConfigPlatform,
+    pub verbose: bool,
+}
+
+/// Collection of parameters for a build operation
 pub struct Build<'ctx> {
     pub cargo_arguments: &'ctx cargo::Arguments,
     pub cargo_metadata: &'ctx cargo::Metadata,
@@ -115,6 +131,14 @@ impl core::fmt::Display for ErrorProcess {
         match self {
             ErrorProcess::Exec { name, io } => fmt.write_fmt(core::format_args!("Execution of `{}` could not commence: {}", name, io)),
             ErrorProcess::Exit { name, code } => fmt.write_fmt(core::format_args!("Execution of `{}` ended with a failure: {}", name, code)),
+        }
+    }
+}
+
+impl core::fmt::Display for ArchiveError {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+        match self {
+            ArchiveError::Uncaught(e) => fmt.write_fmt(core::format_args!("Uncaught failure: {}", e)),
         }
     }
 }
@@ -290,6 +314,16 @@ pub fn update_file(
     };
 
     Ok(new)
+}
+
+impl<'ctx> Archive<'ctx> {
+    /// Package the build artifacts of a platform integration into an archive
+    /// suitable for distribution.
+    pub fn run(
+        &self,
+    ) -> Result<(), ArchiveError> {
+        Ok(())
+    }
 }
 
 impl<'ctx> Build<'ctx> {

@@ -33,6 +33,26 @@ pub struct ConfigIcon {
     pub size: u32,
 }
 
+/// Archive configuration for macOS pkgs
+pub struct ConfigArchiveMacosPkg {
+}
+
+/// Union for format-specific archive configuration
+pub enum ConfigArchiveConfiguration {
+    MacosPkg(ConfigArchiveMacosPkg),
+}
+
+/// Configuration for a specific archive format
+pub struct ConfigArchive {
+    /// Archive ID
+    pub id: String,
+    /// Symbolized archive ID
+    pub id_symbol: String,
+
+    /// Format-specific configuration
+    pub configuration: ConfigArchiveConfiguration,
+}
+
 /// Android specific configuration for a platform integration.
 pub struct ConfigPlatformAndroid {
     pub application_id: String,
@@ -102,7 +122,11 @@ pub struct Config {
     /// Icon information
     pub icons: Vec<ConfigIcon>,
 
-    /// Platform Configurations
+    /// Archive configurations
+    pub archives: BTreeMap<String, ConfigArchive>,
+    /// Default archive configurations
+    pub archive_defaults: BTreeMap<String, ConfigArchive>,
+    /// Platform configurations
     pub platforms: BTreeMap<String, ConfigPlatform>,
     /// Default platform configurations
     pub platform_defaults: BTreeMap<String, ConfigPlatform>,
@@ -427,6 +451,8 @@ impl Config {
 
                     icons: v_icons,
 
+                    archives: BTreeMap::new(),
+                    archive_defaults: BTreeMap::new(),
                     platforms: BTreeMap::new(),
                     platform_defaults: BTreeMap::new(),
                 }
@@ -471,6 +497,8 @@ impl Config {
 
                     icons: v_icons,
 
+                    archives: BTreeMap::new(),
+                    archive_defaults: BTreeMap::new(),
                     platforms: BTreeMap::new(),
                     platform_defaults: BTreeMap::new(),
                 };
@@ -488,6 +516,21 @@ impl Config {
         config.add_default_platforms();
 
         Ok(config)
+    }
+
+    /// Find an archive configuration with the given ID, using the archive
+    /// defaults as fallback if no explicit configuration is available.
+    pub fn archive(
+        &self,
+        id: &str,
+    ) -> Option<&ConfigArchive> {
+        if let Some(v) = self.archives.get(id) {
+            Some(v)
+        } else if let Some(v) = self.archive_defaults.get(id) {
+            Some(v)
+        } else {
+            None
+        }
     }
 
     /// Find a platform configuration with the given ID, using the platform

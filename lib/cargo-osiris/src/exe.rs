@@ -18,6 +18,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum Cmd {
         Root,
+        Archive,
         Build,
     }
 
@@ -66,6 +67,29 @@ pub fn cargo_osiris() -> std::process::ExitCode {
             Ok((metadata, config))
         }
 
+        // Handle the `--archive <...>` argument.
+        fn archive<'config>(
+            &self,
+            config: &'config config::Config,
+            v_archive: &Option<String>,
+        ) -> Result<&'config config::ConfigArchive, u8> {
+            let id = match v_archive {
+                None => {
+                    eprintln!("No archive configuration specified");
+                    Err(1)
+                },
+                Some(ref v) => Ok(v),
+            }?;
+
+            match config.archive(id) {
+                None => {
+                    eprintln!("No archive configuration with ID {}", id);
+                    Err(1)
+                },
+                Some(v) => Ok(v),
+            }
+        }
+
         // Handle the `--platform <...>` argument.
         fn platform<'config>(
             &self,
@@ -86,6 +110,36 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                     Err(1)
                 },
                 Some(v) => Ok(v),
+            }
+        }
+
+        fn op_archive(
+            &self,
+            v_archive: &Option<String>,
+            v_platform: &Option<String>,
+            verbose: bool,
+            cargo_arguments: &cargo::Arguments,
+        ) -> Result<(), u8> {
+            let (metadata, config) = self.config(cargo_arguments)?;
+            let archive = self.archive(&config, v_archive)?;
+            let platform = self.platform(&config, v_platform)?;
+            let op = op::Archive {
+                archive: &archive,
+                cargo_arguments: cargo_arguments,
+                cargo_metadata: &metadata,
+                config: &config,
+                platform: &platform,
+                verbose: verbose,
+            };
+
+            match op.run() {
+                Ok(()) => {
+                    Ok(())
+                },
+                Err(e) => {
+                    eprintln!("Cannot build archive: {}", e);
+                    Err(1)
+                },
             }
         }
 
@@ -253,6 +307,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
 
             let args = std::env::args_os().skip(1).collect::<Vec<std::ffi::OsString>>();
 
+            let v_archive: core::cell::RefCell<Option<String>> = Default::default();
             let v_help = lib::args::Help::new();
             let v_platform: core::cell::RefCell<Option<String>> = Default::default();
             let v_verbose: core::cell::RefCell<Option<bool>> = Default::default();
@@ -278,11 +333,29 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                 Flag::with_name("profile", Value::Parse(&v_profile), Some("Name of the build profile")),
                 Flag::with_name("target-dir", Value::Parse(&v_target_dir), Some("Path to the target directory")),
             ]);
+            let flags_archive = lib::args::FlagList::with([
+                Flag::with_name("archive", Value::Parse(&v_archive), Some("ID of the target archive")),
+                Flag::with_name("help", Value::Set(&v_help), Some("Show usage information")),
+                Flag::with_name("platform", Value::Parse(&v_platform), Some("ID of the target platform")),
+                Flag::with_name("verbose", Value::Parse(&v_verbose), Some("Be more verbose")),
+
+                Flag::with_name("default-features", Value::Toggle(&v_default_features), Some("Enable/Disable default package features")),
+                Flag::with_name("features", Value::Parse(&v_features), Some("Enable specified package features")),
+                Flag::with_name("frozen", Value::Parse(&v_frozen), Some("Use `Cargo.lock` without checking for updates")),
+                Flag::with_name("manifest-path", Value::Parse(&v_manifest_path), Some("Path to `Cargo.toml`")),
+                Flag::with_name("package", Value::Parse(&v_package), Some("Workspace package to build")),
+                Flag::with_name("profile", Value::Parse(&v_profile), Some("Name of the build profile")),
+                Flag::with_name("target-dir", Value::Parse(&v_target_dir), Some("Path to the target directory")),
+            ]);
             let flags_root = lib::args::FlagList::with([
                 Flag::with_name("help", Value::Set(&v_help), Some("Show usage information")),
             ]);
 
             let cmds_root = lib::args::CommandList::with([
+                lib::args::Command::with_name(
+                    Cmd::Archive, "archive", Default::default(), &flags_archive, None,
+                    Some("Build archives for the specified platform"),
+                ),
                 lib::args::Command::with_name(
                     Cmd::Build, "build", Default::default(), &flags_build, None,
                     Some("Build artifacts for the specified platform"),
@@ -332,6 +405,22 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                         .expect("STDERR must be writable");
                     Err(2)
                 },
+                Cmd::Archive => self.op_archive(
+                    &*v_archive.borrow(),
+                    &*v_platform.borrow(),
+                    v_verbose.borrow().unwrap_or(false),
+                    &cargo::Arguments {
+                        default_features: *v_default_features.borrow(),
+                        features: v_features.borrow().iter().map(|v| (*v).into()).collect(),
+                        frozen: *v_frozen.borrow(),
+                        manifest_path: v_manifest_path.borrow().as_ref()
+                            .map(|v| cwd.join(v)),
+                        package: v_package.borrow().clone(),
+                        profile: v_profile.borrow().clone(),
+                        target_dir: v_target_dir.borrow().as_ref()
+                            .map(|v| cwd.join(v)),
+                    },
+                ),
                 Cmd::Build => self.op_build(
                     &*v_platform.borrow(),
                     v_verbose.borrow().unwrap_or(false),
