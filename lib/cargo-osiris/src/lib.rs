@@ -20,6 +20,7 @@
 mod cargo;
 mod config;
 mod exe;
+mod md;
 mod misc;
 mod op;
 mod platform;

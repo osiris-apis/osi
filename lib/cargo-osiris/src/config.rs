@@ -13,7 +13,7 @@
 //! refuse validation if a mandatory key was missing. See the data parsers
 //! for documentation on most keys, and how they are to be interpreted.
 
-use crate::{cargo, lib, misc};
+use crate::{cargo, lib, md, misc};
 use std::collections::BTreeMap;
 
 /// Enumeration of all errors that can occur when assembling the configuration
@@ -51,7 +51,6 @@ pub struct ConfigPlatformAndroid {
 /// MacOS specific configuration for a platform integration.
 pub struct ConfigPlatformMacos {
     pub bundle_id: String,
-    pub namespace: Option<String>,
 
     pub abis: Vec<String>,
     pub min_os: String,
@@ -158,7 +157,6 @@ impl Config {
                 configuration: ConfigPlatformConfiguration::Macos(
                     ConfigPlatformMacos {
                         bundle_id: "com.example.unknown".to_string(),
-                        namespace: Some("com.example".to_string()),
 
                         abis: ["arm64", "x86_64"]
                             .iter().map(|v| v.to_string()).collect(),
@@ -177,7 +175,7 @@ impl Config {
     // Verify a platform configuration and add it to the set.
     fn add_platform_from_cargo(
         &mut self,
-        platform: &cargo::MdOsiPlatform,
+        platform: &md::OsirisPlatform,
     ) -> Result<(), Error> {
         // The ID is always present. Nothing to normalize here.
         let v_id = &platform.id;
@@ -197,7 +195,7 @@ impl Config {
             None => {
                 Err(Error::MissingKey(".platforms.[].<type>"))
             },
-            Some(cargo::MdOsiPlatformConfiguration::Android(data_android)) => {
+            Some(md::OsirisPlatformConfiguration::Android(data_android)) => {
                 // Java uses reverse-domain paths for all source files. We
                 // really need a namespace for the application. We could
                 // use `org.example` or `foo.osiris`, but those might show
@@ -298,12 +296,7 @@ impl Config {
                     )
                 )
             },
-            Some(cargo::MdOsiPlatformConfiguration::Macos(data_macos)) => {
-                // The namespace-value is not stored in a macOS bundle, yet we
-                // can use it as default for many other IDs. If not provided,
-                // we simply leave it unset.
-                let v_namespace = data_macos.namespace.clone();
-
+            Some(md::OsirisPlatformConfiguration::Macos(data_macos)) => {
                 // The Bundle-ID is used to uniquely identify bundles. It is
                 // also used to register applications on the apple servers and
                 // to create provisioning profiles. We must allow users to
@@ -311,9 +304,7 @@ impl Config {
                 // on the namespace or application-ID.
                 let v_bundle_id = data_macos.bundle_id.clone()
                     .unwrap_or_else(|| {
-                        v_namespace.as_ref()
-                            .map(|v| format!("{}.{}", v, &self.id_symbol))
-                            .unwrap_or(self.id_symbol.clone())
+                        self.id_symbol.clone()
                     });
 
                 // Let the user select the macOS ABIs to build for. If it is
@@ -355,7 +346,6 @@ impl Config {
                     ConfigPlatformConfiguration::Macos(
                         ConfigPlatformMacos {
                             bundle_id: v_bundle_id,
-                            namespace: v_namespace,
 
                             abis: v_abis,
                             min_os: v_min_os,
@@ -441,7 +431,7 @@ impl Config {
                     platform_defaults: BTreeMap::new(),
                 }
             },
-            Some(cargo::MdOsi::V1(ref mdosi)) => {
+            Some(md::Osiris::V1(ref mdosi)) => {
                 // Override the defaults with values from the application
                 // configuration, if any.
                 if let Some(ref mdosi_application) = mdosi.application {
@@ -539,8 +529,8 @@ mod tests {
     fn simple_config() {
         let data = cargo::Metadata {
             android_sets: Vec::new(),
-            osiris: Some(cargo::MdOsi::V1(cargo::MdOsiV1 {
-                application: Some(cargo::MdOsiApplication {
+            osiris: Some(md::Osiris::V1(md::OsirisV1 {
+                application: Some(md::OsirisApplication {
                     id: Some("ID".into()),
                     name: None,
 

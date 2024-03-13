@@ -4,23 +4,8 @@
 //! subcommands programmatically, parsing the output into machine-readable
 //! types.
 
-use crate::misc;
+use crate::{md, misc};
 use std::collections::{BTreeMap, BTreeSet};
-
-/// Error definitions for Osiris Metadata parsing.
-#[derive(Debug)]
-pub enum MdOsiError {
-    /// Invalid type for the specified field
-    TypeInvalid(&'static str, &'static str),
-    /// Supported range of the selected type was exceeded
-    TypeExceeded(&'static str),
-    /// Mandatory key is missing
-    KeyMissing(&'static str),
-    /// Key cannot be specified with conflicting alternatives
-    KeyExclusive(&'static str),
-    /// Specified version is higher/lower than supported by this implementation.
-    VersionUnsupported(u32),
-}
 
 /// Error definitions for all possible errors of the Cargo metadata extraction.
 #[derive(Debug)]
@@ -42,7 +27,7 @@ pub enum Error {
     /// Data decoding error
     Data,
     /// Osiris Metadata parsing errors
-    MdOsi(MdOsiError),
+    MdOsiris(md::OsirisError),
 }
 
 /// Cargo arguments shared across different Cargo sub-commands. They select
@@ -57,106 +42,6 @@ pub struct Arguments {
     pub package: Option<String>,
     pub profile: Option<String>,
     pub target_dir: Option<std::path::PathBuf>,
-}
-
-/// Metadata about an application icon.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct MdOsiApplicationIcon {
-    /// Relative path to the icon file.
-    pub path: Option<String>,
-    /// Integer-scaling the icon applies to.
-    pub scale: Option<u32>,
-    /// Width of the square icon in pixels before scaling.
-    pub size: Option<u32>,
-}
-
-/// Metadata about the application independent of the target platform.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct MdOsiApplication {
-    /// Identifier of the application. Used to register and identify the
-    /// application. Must not change over the life of the application. Only
-    /// alphanumeric and `-`, `_` allowed. Non-ASCII allowed but might break
-    /// external tools.
-    pub id: Option<String>,
-    /// Human-readable name of the application.
-    pub name: Option<String>,
-
-    /// Information on the application icon, allowing for multiple alternatives
-    /// that can each provide different attributes (e.g., dimensions).
-    pub icons: Vec<MdOsiApplicationIcon>,
-}
-
-/// Metadata about the application and library for the Android platform.
-/// These are one-to-one mappings of their respective counterparts in the
-/// Android SDK.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct MdOsiPlatformAndroid {
-    pub application_id: Option<String>,
-    pub namespace: Option<String>,
-
-    pub compile_sdk: Option<u32>,
-    pub min_sdk: Option<u32>,
-    pub target_sdk: Option<u32>,
-
-    pub abis: Option<Vec<String>>,
-
-    pub version_code: Option<u32>,
-    pub version_name: Option<String>,
-}
-
-/// Metadata about the application and framework for the macOS platform.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct MdOsiPlatformMacos {
-    pub bundle_id: Option<String>,
-    pub namespace: Option<String>,
-
-    pub abis: Option<Vec<String>>,
-    pub min_os: Option<String>,
-
-    pub version_code: Option<u32>,
-    pub version_name: Option<String>,
-
-    pub category: Option<String>,
-}
-
-/// Metadata specific to a platform, indexed by the name of the platform.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum MdOsiPlatformConfiguration {
-    /// Android platform table
-    Android(MdOsiPlatformAndroid),
-    /// Macos platform table
-    Macos(MdOsiPlatformMacos),
-}
-
-/// Metadata about a platform integration supported by the application.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct MdOsiPlatform {
-    /// Custom ID of the platform integration.
-    pub id: String,
-    /// Path to the platform integration root relative from the configuration.
-    pub path: Option<String>,
-
-    /// Platform specific configuration.
-    pub configuration: Option<MdOsiPlatformConfiguration>,
-}
-
-/// Version `1` of the Osiris metadata format.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct MdOsiV1 {
-    /// Application table specifying properties of the application
-    /// itself.
-    pub application: Option<MdOsiApplication>,
-    /// Platform table specifying all properties of the platform
-    /// integration for all supported platforms.
-    pub platforms: Vec<MdOsiPlatform>,
-}
-
-/// Osiris metadata that was embedded as `package.metadata.osiris` in a Cargo
-/// manifest.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum MdOsi {
-    /// Version `1` of the metadata format.
-    V1(MdOsiV1),
 }
 
 /// Metadata required to bundle an application of library for the Android
@@ -180,7 +65,7 @@ pub struct Metadata {
     /// Sets of Android-related build metadata
     pub android_sets: Vec<MetadataAndroid>,
     /// Osiris package metadata
-    pub osiris: Option<MdOsi>,
+    pub osiris: Option<md::Osiris>,
     /// Package ID of the target package
     pub package_id: String,
     /// Package name of the target package
@@ -258,18 +143,6 @@ fn cargo_command() -> std::ffi::OsString {
     std::env::var_os("CARGO").unwrap_or("cargo".into())
 }
 
-impl core::fmt::Display for MdOsiError {
-    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
-        match self {
-            MdOsiError::TypeInvalid(v, t) => fmt.write_fmt(core::format_args!("Specified entry requires a value of a different type: `{}` requires type `{}`", v, t)),
-            MdOsiError::TypeExceeded(v) => fmt.write_fmt(core::format_args!("Specified entry exceeded the maximum supported range for its type: {}", v)),
-            MdOsiError::KeyMissing(v) => fmt.write_fmt(core::format_args!("Required entry was not specified: {}", v)),
-            MdOsiError::KeyExclusive(v) => fmt.write_fmt(core::format_args!("Exclusive entry was specified with conflicts: {}", v)),
-            MdOsiError::VersionUnsupported(v) => fmt.write_fmt(core::format_args!("Specified version is not supported: {}", v)),
-        }
-    }
-}
-
 impl core::fmt::Display for Error {
     fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
         match self {
@@ -281,14 +154,14 @@ impl core::fmt::Display for Error {
             Error::UnknownPackage(v) => fmt.write_fmt(core::format_args!("Cannot resolve requested package name: {}", v)),
             Error::AmbiguousPackage(v) => fmt.write_fmt(core::format_args!("Ambiguous package name: {}", v)),
             Error::Data => fmt.write_fmt(core::format_args!("Cannot decode Cargo metadata")),
-            Error::MdOsi(e) => fmt.write_fmt(core::format_args!("Cannot parse Osiris metadata: {}", e)),
+            Error::MdOsiris(e) => fmt.write_fmt(core::format_args!("Cannot parse Osiris metadata: {}", e)),
         }
     }
 }
 
-impl core::convert::From<MdOsiError> for Error {
-    fn from(v: MdOsiError) -> Self {
-        Error::MdOsi(v)
+impl core::convert::From<md::OsirisError> for Error {
+    fn from(v: md::OsirisError) -> Self {
+        Error::MdOsiris(v)
     }
 }
 
@@ -472,298 +345,6 @@ impl MetadataBlob {
         ids
     }
 
-    fn get_str(
-        map: &serde_json::value::Map<String, serde_json::Value>,
-        key: &'static str,
-        path: &'static str,
-    ) -> Result<Option<String>, Error> {
-        match map.get(key) {
-            None => Ok(None),
-            Some(serde_json::Value::String(v)) => {
-                Ok(Some(v.clone()))
-            },
-            Some(_) => {
-                Err(MdOsiError::TypeInvalid(path, "string"))
-            },
-        }.map_err(|e| e.into())
-    }
-
-    fn get_u32(
-        map: &serde_json::value::Map<String, serde_json::Value>,
-        key: &'static str,
-        path: &'static str,
-    ) -> Result<Option<u32>, Error> {
-        match map.get(key) {
-            None => Ok(None),
-            Some(serde_json::Value::Number(v)) => {
-                if let Some(v) = v.as_u64() {
-                    if let Ok(v) = u32::try_from(v) {
-                        Ok(Some(v))
-                    } else {
-                        Err(MdOsiError::TypeExceeded(path))
-                    }
-                } else {
-                    Err(MdOsiError::TypeExceeded(path))
-                }
-            },
-            Some(_) => {
-                Err(MdOsiError::TypeInvalid(path, "number"))
-            },
-        }.map_err(|e| e.into())
-    }
-
-    // Helper for `parse_mdosi()` that extracts the Android platform configuration.
-    fn parse_mdosi_android(
-        &self,
-        android: &serde_json::value::Map<String, serde_json::Value>,
-    ) -> Result<MdOsiPlatformAndroid, Error> {
-        let v_application_id = Self::get_str(android, "application-id", "platforms.[].android.application-id")?;
-        let v_namespace = Self::get_str(android, "namespace", "platforms.[].android.namespace")?;
-        let v_compile_sdk = Self::get_u32(android, "compile-sdk", "platforms.[].android.compile-sdk")?;
-        let v_min_sdk = Self::get_u32(android, "min-sdk", "platforms.[].android.min-sdk")?;
-        let v_target_sdk = Self::get_u32(android, "target-sdk", "platforms.[].android.target-sdk")?;
-        let v_version_code = Self::get_u32(android, "version-code", "platforms.[].android.version-code")?;
-        let v_version_name = Self::get_str(android, "version-name", "platforms.[].android.version-name")?;
-
-        let v_abis = match android.get("abis") {
-            None => None,
-            Some(serde_json::Value::Array(abis)) => {
-                let mut acc = Vec::new();
-                for abi in abis.iter() {
-                    match abi {
-                        serde_json::Value::String(v) => {
-                            acc.push(v.clone());
-                        },
-                        _ => {
-                            return Err(MdOsiError::TypeInvalid("platforms.[].android.abis.[]", "string").into())
-                        }
-                    }
-                }
-                Some(acc)
-            },
-            Some(_) => {
-                return Err(MdOsiError::TypeInvalid("platforms.[].android.abis", "array").into());
-            },
-        };
-
-        Ok(MdOsiPlatformAndroid {
-            application_id: v_application_id,
-            namespace: v_namespace,
-
-            compile_sdk: v_compile_sdk,
-            min_sdk: v_min_sdk,
-            target_sdk: v_target_sdk,
-
-            abis: v_abis,
-
-            version_code: v_version_code,
-            version_name: v_version_name,
-        })
-
-    }
-
-    // Helper for `parse_mdosi()` that extracts the macOS platform configuration.
-    fn parse_mdosi_macos(
-        &self,
-        macos: &serde_json::value::Map<String, serde_json::Value>,
-    ) -> Result<MdOsiPlatformMacos, Error> {
-        let v_bundle_id = Self::get_str(macos, "bundle-id", "platforms.[].macos.bundle-id")?;
-        let v_namespace = Self::get_str(macos, "namespace", "platforms.[].macos.namespace")?;
-        let v_min_os = Self::get_str(macos, "min-os", "platforms.[].macos.min-os")?;
-        let v_version_code = Self::get_u32(macos, "version-code", "platforms.[].macos.version-code")?;
-        let v_version_name = Self::get_str(macos, "version-name", "platforms.[].macos.version-name")?;
-        let v_category = Self::get_str(macos, "category", "platforms.[].macos.category")?;
-
-        let v_abis = match macos.get("abis") {
-            None => None,
-            Some(serde_json::Value::Array(abis)) => {
-                let mut acc = Vec::new();
-                for abi in abis.iter() {
-                    match abi {
-                        serde_json::Value::String(v) => {
-                            acc.push(v.clone());
-                        },
-                        _ => {
-                            return Err(MdOsiError::TypeInvalid("platforms.[].macos.abis.[]", "string").into())
-                        }
-                    }
-                }
-                Some(acc)
-            },
-            Some(_) => {
-                return Err(MdOsiError::TypeInvalid("platforms.[].macos.abis", "array").into());
-            },
-        };
-
-        Ok(MdOsiPlatformMacos {
-            bundle_id: v_bundle_id,
-            namespace: v_namespace,
-
-            abis: v_abis,
-            min_os: v_min_os,
-
-            version_code: v_version_code,
-            version_name: v_version_name,
-
-            category: v_category,
-        })
-    }
-
-    // Helper for `parse()` that extracts the Osiris metadata from the package
-    // metadata.
-    fn parse_mdosi(
-        &self,
-        pkgmd: &serde_json::value::Map<String, serde_json::Value>,
-    ) -> Result<Option<MdOsi>, Error> {
-        // Get the top-level entry for Osiris metadata.
-        let json_osiris = match pkgmd.get("osiris") {
-            None => return Ok(None),
-            Some(serde_json::Value::Object(v)) => Ok(v),
-            Some(_) => Err(MdOsiError::TypeInvalid("osiris", "object")),
-        }?;
-
-        // Figure out the metadata version.
-        let _version = match Self::get_u32(json_osiris, "version", "version")? {
-            None => Err(MdOsiError::KeyMissing("version")),
-            Some(1) => Ok(1),
-            Some(v) => Err(MdOsiError::VersionUnsupported(v)),
-        }?;
-
-        // Create the top-level object and parse everything
-        // into it. Only version 1 is defined so far.
-        let mut mdosi = MdOsiV1 {
-            application: None,
-            platforms: Vec::new(),
-        };
-
-        // Extract the `application` data.
-        match json_osiris.get("application") {
-            None => {},
-            Some(serde_json::Value::Object(application)) => {
-                let mut mdosi_app = MdOsiApplication {
-                    id: None,
-                    name: None,
-
-                    icons: Vec::new(),
-                };
-
-                match application.get("id") {
-                    None => {},
-                    Some(serde_json::Value::String(id_str)) => {
-                        mdosi_app.id = Some(id_str.clone());
-                    },
-                    Some(_) => {
-                        return Err(MdOsiError::TypeInvalid("application.id", "string").into());
-                    },
-                }
-
-                match application.get("name") {
-                    None => {},
-                    Some(serde_json::Value::String(name_str)) => {
-                        mdosi_app.name = Some(name_str.clone());
-                    },
-                    Some(_) => {
-                        return Err(MdOsiError::TypeInvalid("application.name", "string").into());
-                    },
-                }
-
-                match application.get("icons") {
-                    None => {},
-                    Some(serde_json::Value::Array(icons)) => {
-                        for a_icon in icons.iter() {
-                            let serde_json::Value::Object(icon) = a_icon else {
-                                return Err(MdOsiError::TypeInvalid("application.icons.[]", "object").into());
-                            };
-
-                            let v_path = Self::get_str(icon, "path", "application.icons.[].path")?;
-                            let v_scale = Self::get_u32(icon, "scale", "application.icons.[].scale")?;
-                            let v_size = Self::get_u32(icon, "size", "application.icons.[].size")?;
-
-                            mdosi_app.icons.push(MdOsiApplicationIcon {
-                                path: v_path,
-                                scale: v_scale,
-                                size: v_size,
-                            });
-                        }
-                    },
-                    Some(_) => {
-                        return Err(MdOsiError::TypeInvalid("application.icons", "array").into());
-                    },
-                }
-
-                mdosi.application = Some(mdosi_app);
-            },
-            Some(_) => {
-                return Err(MdOsiError::TypeInvalid("application", "object").into());
-            }
-        }
-
-        // Extract the `platforms` data.
-        match json_osiris.get("platforms") {
-            None => {},
-            Some(serde_json::Value::Array(platforms)) => {
-                for platform in platforms.iter() {
-                    let id = match platform.get("id") {
-                        None => {
-                            return Err(MdOsiError::KeyMissing("platforms.[].id").into());
-                        },
-                        Some(serde_json::Value::String(id_str)) => {
-                            id_str.clone()
-                        },
-                        Some(_) => {
-                            return Err(MdOsiError::TypeInvalid("platforms.[].id", "string").into());
-                        },
-                    };
-
-                    let mut mdosi_pf = MdOsiPlatform {
-                        id: id,
-                        path: None,
-                        configuration: None,
-                    };
-
-                    match platform.get("path") {
-                        None => {},
-                        Some(serde_json::Value::String(path_str)) => {
-                            mdosi_pf.path = Some(path_str.clone());
-                        },
-                        Some(_) => {
-                            return Err(MdOsiError::TypeInvalid("platforms.[].path", "string").into());
-                        },
-                    }
-
-                    mdosi_pf.configuration = match (
-                        platform.get("android"),
-                        platform.get("macos"),
-                    ) {
-                        (None, None) => Ok(None),
-                        (Some(_), Some(_)) => {
-                            Err(MdOsiError::KeyExclusive("platforms.[].{android,macos}").into())
-                        },
-                        (Some(serde_json::Value::Object(android)), None) => {
-                            self.parse_mdosi_android(android).map(|v| Some(MdOsiPlatformConfiguration::Android(v)))
-                        },
-                        (Some(_), None) => {
-                            Err(MdOsiError::TypeInvalid("platforms.<platform>.android", "object").into())
-                        },
-                        (None, Some(serde_json::Value::Object(macos))) => {
-                            self.parse_mdosi_macos(macos).map(|v| Some(MdOsiPlatformConfiguration::Macos(v)))
-                        },
-                        (None, Some(_)) => {
-                            Err(MdOsiError::TypeInvalid("platforms.<platform>.macos", "object").into())
-                        },
-                    }?;
-
-                    mdosi.platforms.push(mdosi_pf);
-                }
-            },
-            Some(_) => {
-                return Err(MdOsiError::TypeInvalid("platforms", "array").into());
-            },
-        }
-
-        Ok(Some(MdOsi::V1(mdosi)))
-    }
-
     // Parse all desired fields in the manifest blob and expose them as a
     // new Metadata object.
     fn parse(&self, query: &MetadataQuery) -> Result<Metadata, Error> {
@@ -871,7 +452,9 @@ impl MetadataBlob {
                     }
 
                     if is_root {
-                        pkgmd_osi = self.parse_mdosi(metadata)?;
+                        if let Some(v) = metadata.get("osiris") {
+                            pkgmd_osi = Some(md::osiris_from_json(v)?);
+                        }
                     }
                 }
 
