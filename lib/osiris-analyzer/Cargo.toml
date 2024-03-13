@@ -21,9 +21,6 @@ readme.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[lib]
-crate-type = ["cdylib", "lib"]
-
 [package.metadata]
 android.java.source-dirs = ["src/platform/android/java"]
 android.kotlin.source-dirs = ["src/platform/android/java"]
