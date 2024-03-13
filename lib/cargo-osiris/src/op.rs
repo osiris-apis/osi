@@ -280,14 +280,13 @@ impl<'ctx> Build<'ctx> {
 
         // Create a build directory for all output artifacts of the build process.
         // Re-use the existing directory, if possible, to speed up builds. The
-        // directory is created at: `<target>/osi/<platform>`.
-        path_build.push(&self.cargo_metadata.target_directory);
-        path_build.push("osi");
+        // directory is created at: `<target>/osiris/platform/<platform>`.
+        path_build.push(&self.config.path_target);
+        path_build.push("osiris/platform");
         path_build.push(&self.platform.id_symbol);
         mkdir(path_build.as_path())?;
 
-        // Invoke the platform-dependent handler. Grant the path-buffers to it, so
-        // it can reuse it for further operations.
+        // Invoke the platform-dependent handler
         match self.platform.configuration {
             config::ConfigPlatformConfiguration::Android(ref v) => {
                 platform::android::build(
