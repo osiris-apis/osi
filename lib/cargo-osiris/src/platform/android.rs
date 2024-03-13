@@ -591,6 +591,8 @@ impl<'ctx> Direct<'ctx> {
 
             let query = cargo::BuildQuery {
                 cargo_arguments: self.build.op.cargo_arguments,
+                cfgs: Vec::new(),
+                crate_type: Some("cdylib".into()),
                 envs: vec![(linker_env.into(), linker_path.into())],
                 target: Some(target.into()),
             };

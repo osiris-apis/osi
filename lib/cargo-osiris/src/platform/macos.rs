@@ -329,6 +329,8 @@ impl<'ctx> Direct<'ctx> {
 
             let query = cargo::BuildQuery {
                 cargo_arguments: self.build.op.cargo_arguments,
+                cfgs: Vec::new(),
+                crate_type: Some("bin".into()),
                 envs: Vec::new(),
                 target: o_target.map(|v| v.into()),
             };

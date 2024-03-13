@@ -238,6 +238,10 @@ struct BuildBlob {
 pub struct BuildQuery<'ctx> {
     /// Package, workspace, and configuration arguments for Cargo.
     pub cargo_arguments: &'ctx Arguments,
+    /// Additional compilation environment variables to set
+    pub cfgs: Vec<(String, Option<String>)>,
+    /// Crate type to build
+    pub crate_type: Option<String>,
     /// Environment variables to set for the build.
     pub envs: Vec<(std::ffi::OsString, std::ffi::OsString)>,
     /// The target platform to compile for.
@@ -1111,12 +1115,19 @@ impl<'ctx> BuildQuery<'ctx> {
         let mut cmd = std::process::Command::new(cargo_command());
         cmd.args([
             "rustc",
+            "--lib",
             "--message-format=json-render-diagnostics",
         ]);
 
         // Append all desired environment variables.
         for (k, v) in &self.envs {
             cmd.env(k, v);
+        }
+
+        // Select the crate-type to build.
+        if let Some(ref v) = self.crate_type {
+            cmd.arg("--crate-type");
+            cmd.arg(v);
         }
 
         // Append the selected features.
@@ -1161,6 +1172,27 @@ impl<'ctx> BuildQuery<'ctx> {
         if let Some(ref target_dir) = self.cargo_arguments.target_dir {
             cmd.arg("--target-dir");
             cmd.arg(target_dir);
+        }
+
+        // Separate Cargo options from rustc options
+        cmd.arg("--");
+
+        // Append compilation environments. This must either be `--cfg KEY` or
+        // `--cfg KEY="VALUE"`. The key is limited to valid rust identifiers
+        // and the value must be a valid rust (raw) string literal. We do not
+        // verify this, and we leave it to the caller to decide how to provide
+        // the data.
+        //
+        // XXX: Ideally, we would verify the input enough to ensure it cannot
+        //      produce bogus unintended results. This is not critical, but
+        //      would certainly be nice.
+        for (key, o_value) in &self.cfgs {
+            cmd.arg("--cfg");
+            if let Some(value) = o_value {
+                cmd.arg(format!("{}={}", key, value));
+            } else {
+                cmd.arg(key);
+            }
         }
 
         // Always forward diagnostics to the parent error stream, so
