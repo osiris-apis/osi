@@ -78,71 +78,6 @@ pub struct Build<'ctx> {
     pub verbose: bool,
 }
 
-impl From<lib::error::Uncaught> for BuildError {
-    fn from(v: lib::error::Uncaught) -> Self {
-        Self::Uncaught(v)
-    }
-}
-
-impl From<ErrorFileSystem> for BuildError {
-    fn from(v: ErrorFileSystem) -> Self {
-        Self::FileSystem(v)
-    }
-}
-
-impl From<ErrorProcess> for BuildError {
-    fn from(v: ErrorProcess) -> Self {
-        Self::Process(v)
-    }
-}
-
-impl From<cargo::Error> for BuildError {
-    fn from(v: cargo::Error) -> Self {
-        Self::Cargo(v)
-    }
-}
-
-impl From<platform::android::BuildError> for BuildError {
-    fn from(v: platform::android::BuildError) -> Self {
-        Self::AndroidPlatform(v)
-    }
-}
-
-impl From<platform::macos::ErrorBuild> for BuildError {
-    fn from(v: platform::macos::ErrorBuild) -> Self {
-        Self::MacosPlatform(v)
-    }
-}
-
-impl core::fmt::Display for ErrorFileSystem {
-    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
-        match self {
-            ErrorFileSystem::DirectoryTraversal { path, io } => fmt.write_fmt(core::format_args!("Cannot traverse directory ({}): {}", path.to_string_lossy(), io)),
-            ErrorFileSystem::DirectoryCreation { path, io } => fmt.write_fmt(core::format_args!("Cannot create directory ({}): {}", path.to_string_lossy(), io)),
-            ErrorFileSystem::DirectoryRemoval { path, io } => fmt.write_fmt(core::format_args!("Cannot remove directory ({}): {}", path.to_string_lossy(), io)),
-            ErrorFileSystem::FileUpdate { path, io } => fmt.write_fmt(core::format_args!("Cannot update file ({}): {}", path.to_string_lossy(), io)),
-            ErrorFileSystem::FileCopy { from, to, io } => fmt.write_fmt(core::format_args!("Cannot copy file ({} -> {}): {}", from.to_string_lossy(), to.to_string_lossy(), io)),
-        }
-    }
-}
-
-impl core::fmt::Display for ErrorProcess {
-    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
-        match self {
-            ErrorProcess::Exec { name, io } => fmt.write_fmt(core::format_args!("Execution of `{}` could not commence: {}", name, io)),
-            ErrorProcess::Exit { name, code } => fmt.write_fmt(core::format_args!("Execution of `{}` ended with a failure: {}", name, code)),
-        }
-    }
-}
-
-impl core::fmt::Display for ArchiveError {
-    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
-        match self {
-            ArchiveError::Uncaught(e) => fmt.write_fmt(core::format_args!("Uncaught failure: {}", e)),
-        }
-    }
-}
-
 /// ## Enumerate Directory Recursively
 ///
 /// Recursively walk a directory and collect all entries, except for
@@ -390,4 +325,69 @@ pub fn emerge(
 ) -> Result<(), ()> {
     // XXX: To be implemented.
     Ok(())
+}
+
+impl From<lib::error::Uncaught> for BuildError {
+    fn from(v: lib::error::Uncaught) -> Self {
+        Self::Uncaught(v)
+    }
+}
+
+impl From<ErrorFileSystem> for BuildError {
+    fn from(v: ErrorFileSystem) -> Self {
+        Self::FileSystem(v)
+    }
+}
+
+impl From<ErrorProcess> for BuildError {
+    fn from(v: ErrorProcess) -> Self {
+        Self::Process(v)
+    }
+}
+
+impl From<cargo::Error> for BuildError {
+    fn from(v: cargo::Error) -> Self {
+        Self::Cargo(v)
+    }
+}
+
+impl From<platform::android::BuildError> for BuildError {
+    fn from(v: platform::android::BuildError) -> Self {
+        Self::AndroidPlatform(v)
+    }
+}
+
+impl From<platform::macos::ErrorBuild> for BuildError {
+    fn from(v: platform::macos::ErrorBuild) -> Self {
+        Self::MacosPlatform(v)
+    }
+}
+
+impl core::fmt::Display for ErrorFileSystem {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+        match self {
+            ErrorFileSystem::DirectoryTraversal { path, io } => fmt.write_fmt(core::format_args!("Cannot traverse directory ({}): {}", path.to_string_lossy(), io)),
+            ErrorFileSystem::DirectoryCreation { path, io } => fmt.write_fmt(core::format_args!("Cannot create directory ({}): {}", path.to_string_lossy(), io)),
+            ErrorFileSystem::DirectoryRemoval { path, io } => fmt.write_fmt(core::format_args!("Cannot remove directory ({}): {}", path.to_string_lossy(), io)),
+            ErrorFileSystem::FileUpdate { path, io } => fmt.write_fmt(core::format_args!("Cannot update file ({}): {}", path.to_string_lossy(), io)),
+            ErrorFileSystem::FileCopy { from, to, io } => fmt.write_fmt(core::format_args!("Cannot copy file ({} -> {}): {}", from.to_string_lossy(), to.to_string_lossy(), io)),
+        }
+    }
+}
+
+impl core::fmt::Display for ErrorProcess {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+        match self {
+            ErrorProcess::Exec { name, io } => fmt.write_fmt(core::format_args!("Execution of `{}` could not commence: {}", name, io)),
+            ErrorProcess::Exit { name, code } => fmt.write_fmt(core::format_args!("Execution of `{}` ended with a failure: {}", name, code)),
+        }
+    }
+}
+
+impl core::fmt::Display for ArchiveError {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+        match self {
+            ArchiveError::Uncaught(e) => fmt.write_fmt(core::format_args!("Uncaught failure: {}", e)),
+        }
+    }
 }
