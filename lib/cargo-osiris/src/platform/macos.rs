@@ -21,6 +21,13 @@ pub enum ErrorBuild {
     NoFile { path: std::path::PathBuf },
 }
 
+struct ArchivePkg<'ctx> {
+    // Configuration
+    pub build_dir: &'ctx std::path::Path,
+    pub macos_pkg: &'ctx config::ConfigArchiveMacosPkg,
+    pub op: &'ctx op::Archive<'ctx>,
+}
+
 struct Build<'ctx> {
     // Configuration
     pub build_dir: &'ctx std::path::Path,
@@ -50,6 +57,24 @@ struct Direct<'ctx> {
     pub accent_color: Option<&'ctx str>,
     pub app_icon: Option<&'ctx str>,
     pub icons: BTreeMap<(u32, u32), Vec<&'ctx str>>,
+}
+
+impl<'ctx> ArchivePkg<'ctx> {
+    pub fn new(
+        op: &'ctx op::Archive<'ctx>,
+        macos_pkg: &'ctx config::ConfigArchiveMacosPkg,
+        build_dir: &'ctx std::path::Path,
+    ) -> Self {
+        Self {
+            build_dir: build_dir,
+            macos_pkg: macos_pkg,
+            op: op,
+        }
+    }
+
+    pub fn run(&self) -> Result<(), op::ArchiveError> {
+        Ok(())
+    }
 }
 
 impl<'ctx> Build<'ctx> {
@@ -536,6 +561,20 @@ impl<'ctx> Direct<'ctx> {
 
         Ok(())
     }
+}
+
+pub fn archive_pkg(
+    op: &op::Archive,
+    macos_pkg: &config::ConfigArchiveMacosPkg,
+    build_dir: &std::path::Path,
+) -> Result<(), op::ArchiveError> {
+    let archive = ArchivePkg::new(
+        op,
+        macos_pkg,
+        build_dir,
+    );
+
+    archive.run()
 }
 
 pub fn build(

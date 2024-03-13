@@ -259,7 +259,29 @@ impl<'ctx> Archive<'ctx> {
     pub fn run(
         &self,
     ) -> Result<(), ArchiveError> {
-        Ok(())
+        let mut path_build = std::path::PathBuf::new();
+
+        // Create a build directory for all output artifacts of the archive
+        // operation. Re-use the existing directory, if possible, to speed up
+        // builds. The directory is created at:
+        //
+        //   `<target>/osiris/archive/<archive>`.
+        path_build.push(&self.config.path_target);
+        path_build.push("osiris/archive");
+        path_build.push(&self.archive.id_symbol);
+        mkdir(path_build.as_path())?;
+
+
+        // Invoke the platform-dependent handler
+        match self.archive.configuration {
+            config::ConfigArchiveConfiguration::MacosPkg(ref v) => {
+                platform::macos::archive_pkg(
+                    self,
+                    v,
+                    path_build.as_path(),
+                )
+            },
+        }
     }
 }
 
