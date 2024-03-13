@@ -764,3 +764,36 @@ pub fn build(
 
     Ok(())
 }
+
+impl core::fmt::Display for BuildError {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+        match self {
+            BuildError::UnsupportedPath(v) => fmt.write_fmt(core::format_args!("Path contains characters not supported by the Android SDK: {}", v.to_string_lossy())),
+            BuildError::UnsupportedHost => fmt.write_fmt(core::format_args!("Host platform not supported by the Android SDK")),
+            BuildError::UnsupportedAbi(v) => fmt.write_fmt(core::format_args!("ABI not supported by the Android SDK: {}", v)),
+            BuildError::NoAndroidHome => fmt.write_fmt(core::format_args!("No Android SDK available (`ANDROID_HOME` is not set)")),
+            BuildError::NoSdk(v) => fmt.write_fmt(core::format_args!("No Android SDK at: {}", v.to_string_lossy())),
+            BuildError::InvalidSdk(v) => fmt.write_fmt(core::format_args!("Invalid Android SDK at: {}", v.to_string_lossy())),
+            BuildError::NoJdk(v) => fmt.write_fmt(core::format_args!("No Java SDK at: {}", v.to_string_lossy())),
+            BuildError::InvalidJdk(v) => fmt.write_fmt(core::format_args!("Invalid Java SDK at: {}", v.to_string_lossy())),
+            BuildError::NoKdk(v) => fmt.write_fmt(core::format_args!("No Kotlin SDK at: {}", v.to_string_lossy())),
+            BuildError::InvalidKdk(v) => fmt.write_fmt(core::format_args!("Invalid Kotlin SDK at: {}", v.to_string_lossy())),
+            BuildError::NoNdk => fmt.write_fmt(core::format_args!("No NDK in the Android SDK")),
+            BuildError::InvalidNdk(v) => fmt.write_fmt(core::format_args!("Invalid Android NDK at: {}", v.to_string_lossy())),
+            BuildError::NoBuildTools => fmt.write_fmt(core::format_args!("No build-tools in the Android SDK")),
+            BuildError::InvalidBuildTools(v) => fmt.write_fmt(core::format_args!("Invalid Android build-tools at: {}", v.to_string_lossy())),
+            BuildError::NoPlatform(v) => fmt.write_fmt(core::format_args!("No platform in the Android SDK for API-level: {}", v)),
+            BuildError::InvalidPlatform(v) => fmt.write_fmt(core::format_args!("Invalid Android platform for API-level: {}", v)),
+            BuildError::FlatresExec(e) => fmt.write_fmt(core::format_args!("Flatres compiler could not commence: {}", e)),
+            BuildError::FlatresExit(e) => fmt.write_fmt(core::format_args!("Flatres compiler failed: {}", e)),
+            BuildError::JavacExec(e) => fmt.write_fmt(core::format_args!("Java compiler could not commence: {}", e)),
+            BuildError::JavacExit(e) => fmt.write_fmt(core::format_args!("Java compiler failed: {}", e)),
+            BuildError::KotlincExec(e) => fmt.write_fmt(core::format_args!("Kotlin compiler could not commence: {}", e)),
+            BuildError::KotlincExit(e) => fmt.write_fmt(core::format_args!("Kotlin compiler failed: {}", e)),
+            BuildError::DexExec(e) => fmt.write_fmt(core::format_args!("DEX compiler could not commence: {}", e)),
+            BuildError::DexExit(e) => fmt.write_fmt(core::format_args!("DEX compiler failed: {}", e)),
+            BuildError::AaptExec(e) => fmt.write_fmt(core::format_args!("APT linker could not commence: {}", e)),
+            BuildError::AaptExit(e) => fmt.write_fmt(core::format_args!("APT linker failed: {}", e)),
+        }
+    }
+}

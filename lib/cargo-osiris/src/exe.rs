@@ -7,7 +7,7 @@
 //! operations exposed by the library. This module does not implement any of
 //! the operations, but merely uses the APIs from the library.
 
-use crate::{cargo, config, lib, op, platform};
+use crate::{cargo, config, lib, op};
 
 /// Application entry-point of cargo-osiris.
 ///
@@ -160,142 +160,12 @@ pub fn cargo_osiris() -> std::process::ExitCode {
             };
 
             match build.build() {
-                Err(op::BuildError::Uncaught(v)) => {
-                    eprintln!("Cannot build platform integration: Uncaught failure: {}", v);
-                    Err(1)
-                },
-                Err(op::BuildError::FileSystem(v)) => {
-                    eprintln!("Cannot build platform integration: {}", v);
-                    Err(1)
-                },
-                Err(op::BuildError::Process(v)) => {
-                    eprintln!("Cannot build platform integration: {}", v);
-                    Err(1)
-                },
-                Err(op::BuildError::Exec(tool, v)) => {
-                    eprintln!("Cannot build platform integration: Execution of {} could not commence: {}", tool, v);
-                    Err(1)
-                },
-                Err(op::BuildError::Exit(tool, v)) => {
-                    eprintln!("Cannot build platform integration: {} failed executing: {}", tool, v);
-                    Err(1)
-                },
-                Err(op::BuildError::Cargo(e)) => {
-                    eprintln!("Cannot build Android platform integration: {}", e);
-                    Err(1)
-                },
-                Err(op::BuildError::AndroidPlatform(sub)) => match sub {
-                    platform::android::BuildError::UnsupportedPath(path) => {
-                        eprintln!("Cannot build Android platform integration: Path contains characters not supported by Android Builds (e.g., colons, semicolons): {}", path.display());
-                        Err(1)
-                    },
-                    platform::android::BuildError::UnsupportedHost => {
-                        eprintln!("Cannot build Android platform integration: Host platform not supported by the Android SDK");
-                        Err(1)
-                    },
-                    platform::android::BuildError::UnsupportedAbi(v) => {
-                        eprintln!("Cannot build Android platform integration: Selected target ABI is not supported: {}", v);
-                        Err(1)
-                    },
-                    platform::android::BuildError::NoAndroidHome => {
-                        eprintln!("Cannot build Android platform integration: No Android SDK available, `ANDROID_HOME` is not set");
-                        Err(1)
-                    },
-                    platform::android::BuildError::NoSdk(path) => {
-                        eprintln!("Cannot build Android platform integration: No Android SDK at {}", path.display());
-                        Err(1)
-                    },
-                    platform::android::BuildError::InvalidSdk(path) => {
-                        eprintln!("Cannot build Android platform integration: Invalid Android SDK at {}", path.display());
-                        Err(1)
-                    },
-                    platform::android::BuildError::NoJdk(path) => {
-                        eprintln!("Cannot build Android platform integration: No Android Java SDK at {}", path.display());
-                        Err(1)
-                    },
-                    platform::android::BuildError::InvalidJdk(path) => {
-                        eprintln!("Cannot build Android platform integration: Invalid Android Java SDK at {}", path.display());
-                        Err(1)
-                    },
-                    platform::android::BuildError::NoKdk(path) => {
-                        eprintln!("Cannot build Android platform integration: No Android Kotlin SDK at {}", path.display());
-                        Err(1)
-                    },
-                    platform::android::BuildError::InvalidKdk(path) => {
-                        eprintln!("Cannot build Android platform integration: Invalid Android Kotlin SDK at {}", path.display());
-                        Err(1)
-                    },
-                    platform::android::BuildError::NoNdk => {
-                        eprintln!("Cannot build Android platform integration: Android SDK lacks NDK component");
-                        Err(1)
-                    },
-                    platform::android::BuildError::InvalidNdk(v) => {
-                        eprintln!("Cannot build Android platform integration: No valid NDK of the selected version available in the Android SDK: {:?}", v);
-                        Err(1)
-                    },
-                    platform::android::BuildError::NoBuildTools => {
-                        eprintln!("Cannot build Android platform integration: Android SDK lacks Build Tools");
-                        Err(1)
-                    },
-                    platform::android::BuildError::InvalidBuildTools(v) => {
-                        eprintln!("Cannot build Android platform integration: No valid Build Tools of the selected version available in the Android SDK: {:?}", v);
-                        Err(1)
-                    },
-                    platform::android::BuildError::NoPlatform(v) => {
-                        eprintln!("Cannot build Android platform integration: Android SDK lacks Platform for API-level {}", v);
-                        Err(1)
-                    },
-                    platform::android::BuildError::InvalidPlatform(v) => {
-                        eprintln!("Cannot build Android platform integration: No valid Platform for API-level {} available in the Android SDK", v);
-                        Err(1)
-                    },
-                    platform::android::BuildError::FlatresExec(v) => {
-                        eprintln!("Cannot build Android platform integration: Execution of Android flatres compiler could not commence: {}", v);
-                        Err(1)
-                    },
-                    platform::android::BuildError::FlatresExit(v) => {
-                        eprintln!("Cannot build Android platform integration: Android flatres compiler failed executing: {}", v);
-                        Err(1)
-                    },
-                    platform::android::BuildError::JavacExec(v) => {
-                        eprintln!("Cannot build Android platform integration: Execution of Java compiler could not commence: {}", v);
-                        Err(1)
-                    },
-                    platform::android::BuildError::JavacExit(v) => {
-                        eprintln!("Cannot build Android platform integration: Java compiler failed executing: {}", v);
-                        Err(1)
-                    },
-                    platform::android::BuildError::KotlincExec(v) => {
-                        eprintln!("Cannot build Android platform integration: Execution of Kotlin compiler could not commence: {}", v);
-                        Err(1)
-                    },
-                    platform::android::BuildError::KotlincExit(v) => {
-                        eprintln!("Cannot build Android platform integration: Kotlin compiler failed executing: {}", v);
-                        Err(1)
-                    },
-                    platform::android::BuildError::DexExec(v) => {
-                        eprintln!("Cannot build Android platform integration: Execution of DEX compiler could not commence: {}", v);
-                        Err(1)
-                    },
-                    platform::android::BuildError::DexExit(v) => {
-                        eprintln!("Cannot build Android platform integration: DEX compiler failed executing: {}", v);
-                        Err(1)
-                    },
-                    platform::android::BuildError::AaptExec(v) => {
-                        eprintln!("Cannot build Android platform integration: Execution of Android APK linker could not commence: {}", v);
-                        Err(1)
-                    },
-                    platform::android::BuildError::AaptExit(v) => {
-                        eprintln!("Cannot build Android platform integration: Android APK linker failed executing: {}", v);
-                        Err(1)
-                    },
-                },
-                Err(op::BuildError::MacosPlatform(sub)) => {
-                    eprintln!("Cannot build macOS platform integration: {}", sub);
-                    Err(1)
-                },
-                Ok(_) => {
+                Ok(()) => {
                     Ok(())
+                },
+                Err(e) => {
+                    eprintln!("Cannot build platform integration: {}", e);
+                    Err(1)
                 },
             }
         }
