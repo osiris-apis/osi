@@ -54,6 +54,27 @@ pub struct OsirisApplication {
     pub icons: Vec<OsirisApplicationIcon>,
 }
 
+/// Archive configuration for macOS PKGs
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct OsirisArchiveMacosPkg {
+}
+
+/// Archive configuration specific to a platform
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum OsirisArchiveConfiguration {
+    MacosPkg(OsirisArchiveMacosPkg),
+}
+
+/// Archive configuration
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct OsirisArchive {
+    /// Custom ID of the archive configuration
+    pub id: String,
+
+    /// Platform specific configuration
+    pub configuration: Option<OsirisArchiveConfiguration>,
+}
+
 /// Metadata about the application and library for the Android platform.
 /// These are one-to-one mappings of their respective counterparts in the
 /// Android SDK.
@@ -113,6 +134,8 @@ pub struct OsirisV1 {
     /// Application table specifying properties of the application
     /// itself
     pub application: Option<OsirisApplication>,
+    /// Collection of all archive configurations for the application
+    pub archives: Vec<OsirisArchive>,
     /// Platform table specifying all properties of the platform
     /// integration for all supported platforms
     pub platforms: Vec<OsirisPlatform>,
@@ -243,6 +266,13 @@ pub fn u32_from_json<'json>(
     }).map(|v| Some(v))
 }
 
+fn osiris_archive_macos_pkg_from_json(
+    _json: &serde_json::Value,
+) -> Result<OsirisArchiveMacosPkg, OsirisError> {
+    Ok(OsirisArchiveMacosPkg {
+    })
+}
+
 fn osiris_android_from_json(
     json: &serde_json::Value,
 ) -> Result<OsirisPlatformAndroid, OsirisError> {
@@ -308,6 +338,7 @@ pub fn osiris_from_json(
     // version 1 is defined so far.
     let mut osi = OsirisV1 {
         application: None,
+        archives: Vec::new(),
         platforms: Vec::new(),
     };
 
@@ -338,6 +369,33 @@ pub fn osiris_from_json(
         }
 
         osi.application = Some(osi_application);
+    }
+
+    // Extract the archives data
+    if let Some(json_archives) = array_from_json(json, "archives", "osiris")? {
+        for json_archive in json_archives {
+            let v_id = str_from_json(json_archive, "id", "osiris.archives.[]")?
+                .ok_or_else(|| FormatError::KeyMissing { key: "osiris.archives.[].id".into() })?;
+
+            let v_macos_pkg = entry_from_json(json_archive, "macos-pkg", "osiris.archives.[]")?;
+            let v_configuration = match (v_macos_pkg, ) {
+                (None, ) => Ok(None),
+                (Some(v), ) => {
+                    osiris_archive_macos_pkg_from_json(v).map(
+                        |v| Some(OsirisArchiveConfiguration::MacosPkg(v)),
+                    )
+                },
+                #[allow(unreachable_patterns)]
+                _ => Err(FormatError::KeyExclusive { key: "osiris.archives.[].{macos-pkg}".into() }.into()),
+            }?;
+
+            let osi_archive = OsirisArchive {
+                id: v_id.into(),
+                configuration: v_configuration,
+            };
+
+            osi.archives.push(osi_archive);
+        }
     }
 
     // Extract the platforms data

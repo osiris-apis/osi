@@ -22,6 +22,8 @@ use std::collections::BTreeMap;
 pub enum Error {
     /// Specified key is required, but missing
     MissingKey(&'static str),
+    /// Duplicate archive IDs
+    DuplicateArchive(String),
     /// Duplicate platform IDs
     DuplicatePlatform(String),
 }
@@ -134,13 +136,27 @@ impl core::fmt::Display for Error {
     fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
         match self {
             Self::MissingKey(key) => fmt.write_fmt(core::format_args!("Missing mandatory configuration for: {}", key)),
+            Self::DuplicateArchive(id) => fmt.write_fmt(core::format_args!("Duplicate archive configuration for ID: {}", id)),
             Self::DuplicatePlatform(id) => fmt.write_fmt(core::format_args!("Duplicate platform configuration for ID: {}", id)),
         }
     }
 }
 
 impl Config {
-    fn add_default_platforms(&mut self) {
+    fn add_defaults(&mut self) {
+        self.archive_defaults.insert(
+            "macos-pkg".to_string(),
+            ConfigArchive {
+                id: "macos-pkg".to_string(),
+                id_symbol: "macos-pkg".to_string(),
+
+                configuration: ConfigArchiveConfiguration::MacosPkg(
+                    ConfigArchiveMacosPkg {
+                    },
+                ),
+            },
+        );
+
         self.platform_defaults.insert(
             "android".to_string(),
             ConfigPlatform {
@@ -192,6 +208,49 @@ impl Config {
                 ),
             },
         );
+    }
+
+    // Verify an archive configuration and add it to the set
+    fn add_archive_from_cargo(
+        &mut self,
+        archive: &md::OsirisArchive,
+    ) -> Result<(), Error> {
+        // The ID is always present. Nothing to normalize here.
+        let v_id = &archive.id;
+        let v_id_symbol = lib::str::symbolize(v_id);
+
+        // Collect the platform-specific configuration.
+        let v_configuration = match archive.configuration.as_ref() {
+            None => {
+                Err(Error::MissingKey(".archives.[].<type>"))
+            },
+            Some(md::OsirisArchiveConfiguration::MacosPkg(_data_macos)) => {
+                Ok(
+                    ConfigArchiveConfiguration::MacosPkg(
+                        ConfigArchiveMacosPkg {
+                        }
+                    )
+                )
+            },
+        }?;
+
+        // Create the archive entry
+        let archive = ConfigArchive {
+            id: v_id.clone(),
+            id_symbol: v_id_symbol,
+
+            configuration: v_configuration,
+        };
+
+        // Check for duplicates. We explicitly do this late for more
+        // diagnostics on the actual parameters of each entry.
+        match self.archives.contains_key(&archive.id) {
+            true => Err(Error::DuplicateArchive(archive.id)),
+            false => {
+                self.archives.insert(archive.id.clone(), archive);
+                Ok(())
+            }
+        }
     }
 
     // Verify a platform configuration and add it to the set.
@@ -499,7 +558,12 @@ impl Config {
                     platform_defaults: BTreeMap::new(),
                 };
 
-                // Collect all platform configuration.
+                // Collect all archive configuration
+                for archive in mdosi.archives.iter() {
+                    config.add_archive_from_cargo(archive)?;
+                }
+
+                // Collect all platform configuration
                 for platform in mdosi.platforms.iter() {
                     config.add_platform_from_cargo(platform)?;
                 }
@@ -509,7 +573,7 @@ impl Config {
         };
 
         // Create defaults for all platforms.
-        config.add_default_platforms();
+        config.add_defaults();
 
         Ok(config)
     }
@@ -575,6 +639,7 @@ mod tests {
 
                     icons: Vec::new(),
                 }),
+                archives: Vec::new(),
                 platforms: Vec::new(),
             })),
             package_id: "foobar (...)".into(),
