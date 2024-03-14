@@ -37,6 +37,9 @@ pub struct ConfigIcon {
 
 /// Archive configuration for macOS pkgs
 pub struct ConfigArchiveMacosPkg {
+    pub codesign_identity: Option<String>,
+    pub pkgsign_identity: Option<String>,
+    pub provision_file: Option<std::path::PathBuf>,
 }
 
 /// Union for format-specific archive configuration
@@ -152,6 +155,9 @@ impl Config {
 
                 configuration: ConfigArchiveConfiguration::MacosPkg(
                     ConfigArchiveMacosPkg {
+                        codesign_identity: None,
+                        pkgsign_identity: None,
+                        provision_file: None,
                     },
                 ),
             },
@@ -224,10 +230,19 @@ impl Config {
             None => {
                 Err(Error::MissingKey(".archives.[].<type>"))
             },
-            Some(md::OsirisArchiveConfiguration::MacosPkg(_data_macos)) => {
+            Some(md::OsirisArchiveConfiguration::MacosPkg(data_macos)) => {
+                let v_codesign_identity = data_macos.codesign_identity.clone();
+                let v_pkgsign_identity = data_macos.pkgsign_identity.clone();
+                let v_provision_file = data_macos.provision_file.as_ref().map(
+                    |v| self.path_application.join(v),
+                );
+
                 Ok(
                     ConfigArchiveConfiguration::MacosPkg(
                         ConfigArchiveMacosPkg {
+                            codesign_identity: v_codesign_identity,
+                            pkgsign_identity: v_pkgsign_identity,
+                            provision_file: v_provision_file,
                         }
                     )
                 )
