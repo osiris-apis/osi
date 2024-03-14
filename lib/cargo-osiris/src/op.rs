@@ -199,7 +199,7 @@ pub fn copy_file(
 pub fn update_file(
     path: &std::path::Path,
     content: &[u8],
-) -> Result<bool, BuildError> {
+) -> Result<bool, ErrorFileSystem> {
     // If the desired content is an empty file, we have to know whether the
     // file existed before we open it. Otherwise, we might create it when
     // opening it, and then cannot tell if we actually did.
