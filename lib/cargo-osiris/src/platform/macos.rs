@@ -140,11 +140,13 @@ impl<'ctx> ArchivePkg<'ctx> {
             .to_owned();
         from.push("/");
 
+        let mut to = self.bundle_dir.clone();
+
         cmd.arg("cp");
         cmd.arg("-r");
         cmd.arg("--");
         cmd.arg(&from);
-        cmd.arg(&self.bundle_dir);
+        cmd.arg(&to);
 
         cmd.stderr(std::process::Stdio::inherit());
         cmd.stdin(std::process::Stdio::null());
@@ -154,6 +156,17 @@ impl<'ctx> ArchivePkg<'ctx> {
             .map_err(|io| op::ErrorProcess::Exec { name: "cp".into(), io })?;
         if !status.success() {
             return Err(op::ErrorProcess::Exit { name: "cp".into(), code: status }.into());
+        }
+
+        if let Some(ref provfile) = self.macos_pkg.provision_file {
+            to.push("Contents");
+            op::mkdir(&to)?;
+
+            to.push("embedded.provisionprofile");
+            op::copy_file(provfile, &to)?;
+            to.pop();
+
+            to.pop();
         }
 
         Ok(())
