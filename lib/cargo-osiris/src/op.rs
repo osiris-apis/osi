@@ -433,6 +433,16 @@ impl core::fmt::Display for ErrorProcess {
     }
 }
 
+impl core::fmt::Display for ArchiveError {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+        match self {
+            ArchiveError::Uncaught(e) => fmt.write_fmt(core::format_args!("Uncaught failure: {}", e)),
+            ArchiveError::FileSystem(e) => fmt.write_fmt(core::format_args!("File system failure: {}", e)),
+            ArchiveError::Process(e) => fmt.write_fmt(core::format_args!("Process failure: {}", e)),
+        }
+    }
+}
+
 impl core::fmt::Display for BuildError {
     fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
         match self {
@@ -444,15 +454,6 @@ impl core::fmt::Display for BuildError {
             BuildError::Cargo(e) => fmt.write_fmt(core::format_args!("Cargo execution failed: {}", e)),
             BuildError::AndroidPlatform(e) => fmt.write_fmt(core::format_args!("Android build failed: {}", e)),
             BuildError::MacosPlatform(e) => fmt.write_fmt(core::format_args!("macOS build failed: {}", e)),
-        }
-    }
-}
-
-impl core::fmt::Display for ArchiveError {
-    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
-        match self {
-            ArchiveError::Uncaught(e) => fmt.write_fmt(core::format_args!("Uncaught failure: {}", e)),
-            ArchiveError::FileSystem(e) => fmt.write_fmt(core::format_args!("File system failure: {}", e)),
         }
     }
 }
