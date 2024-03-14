@@ -254,22 +254,27 @@ pub fn update_file(
 }
 
 impl<'ctx> Archive<'ctx> {
+    fn path_for(
+        config: &config::Config,
+        archive: &config::ConfigArchive,
+    ) -> std::path::PathBuf {
+        let mut path_build = std::path::PathBuf::new();
+
+        path_build.push(&config.path_target);
+        path_build.push("osiris/archive");
+        path_build.push(&archive.id_symbol);
+
+        path_build
+    }
+
     /// Package the build artifacts of a platform integration into an archive
     /// suitable for distribution.
     pub fn run(
         &self,
     ) -> Result<(), ArchiveError> {
-        let mut path_build = std::path::PathBuf::new();
-
-        // Create a build directory for all output artifacts of the archive
-        // operation. Re-use the existing directory, if possible, to speed up
-        // builds. The directory is created at:
-        //
-        //   `<target>/osiris/archive/<archive>`.
-        path_build.push(&self.config.path_target);
-        path_build.push("osiris/archive");
-        path_build.push(&self.archive.id_symbol);
-        mkdir(path_build.as_path())?;
+        // Create an artifact directory for the archive operation.
+        let path_archive = Self::path_for(self.config, self.archive);
+        mkdir(path_archive.as_path())?;
 
 
         // Invoke the platform-dependent handler
@@ -278,7 +283,7 @@ impl<'ctx> Archive<'ctx> {
                 platform::macos::archive_pkg(
                     self,
                     v,
-                    path_build.as_path(),
+                    &path_archive,
                 )
             },
         }
@@ -286,6 +291,19 @@ impl<'ctx> Archive<'ctx> {
 }
 
 impl<'ctx> Build<'ctx> {
+    fn path_for(
+        config: &config::Config,
+        platform: &config::ConfigPlatform,
+    ) -> std::path::PathBuf {
+        let mut path_build = std::path::PathBuf::new();
+
+        path_build.push(&config.path_target);
+        path_build.push("osiris/platform");
+        path_build.push(&platform.id_symbol);
+
+        path_build
+    }
+
     /// ## Build platform integration
     ///
     /// Perform a full build of the platform integration of the specified platform.
@@ -298,15 +316,11 @@ impl<'ctx> Build<'ctx> {
     pub fn build(
         &self,
     ) -> Result<(), BuildError> {
-        let mut path_build = std::path::PathBuf::new();
-
-        // Create a build directory for all output artifacts of the build process.
-        // Re-use the existing directory, if possible, to speed up builds. The
-        // directory is created at: `<target>/osiris/platform/<platform>`.
-        path_build.push(&self.config.path_target);
-        path_build.push("osiris/platform");
-        path_build.push(&self.platform.id_symbol);
-        mkdir(path_build.as_path())?;
+        // Create a build directory for all output artifacts of the build
+        // process. Re-use the existing directory, if possible, to speed up
+        // builds.
+        let path_build = Self::path_for(self.config, self.platform);
+        mkdir(&path_build)?;
 
         // Invoke the platform-dependent handler
         match self.platform.configuration {
@@ -314,14 +328,14 @@ impl<'ctx> Build<'ctx> {
                 platform::android::build(
                     self,
                     v,
-                    path_build.as_path(),
+                    &path_build,
                 )
             },
             config::ConfigPlatformConfiguration::Macos(ref v) => {
                 platform::macos::build(
                     self,
                     v,
-                    path_build.as_path(),
+                    &path_build,
                 )
             },
         }
