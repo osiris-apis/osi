@@ -82,7 +82,7 @@ impl<'ctx> ArchivePkg<'ctx> {
         let v_platform_bundle_dir = platform_dir.join(format!("{}.app", op.config.id_symbol));
 
         let v_bundle_entitlements_file = v_artifact_dir.join("bundle.entitlements.plist");
-        let v_pkg_file = platform_dir.join(format!("{}.pkg", op.config.id_symbol));
+        let v_pkg_file = archive_dir.join(format!("{}.pkg", op.config.id_symbol));
 
         Self {
             archive_dir: archive_dir,
