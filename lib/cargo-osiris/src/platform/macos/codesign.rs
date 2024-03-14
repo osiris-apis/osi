@@ -45,7 +45,7 @@ pub struct SignQuery<
     /// Internal requirements to embed
     pub requirements: Option<&'ctx str>,
     /// Whether to contact timestamp authority servers
-    pub timestamp: bool,
+    pub timestamp: Option<bool>,
 }
 
 impl SignOption {
@@ -153,8 +153,12 @@ where
         }
 
         // Request use of timestamp authority servers, if desired.
-        if self.timestamp {
-            cmd.arg("--timestamp");
+        if let Some(v) = self.timestamp {
+            if v {
+                cmd.arg("--timestamp");
+            } else {
+                cmd.arg("--timestamp=none");
+            }
         }
 
         // Finalize the flags and then append all paths verbatim.
