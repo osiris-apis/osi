@@ -132,10 +132,18 @@ impl<'ctx> ArchivePkg<'ctx> {
     fn import(&self) -> Result<(), op::ArchiveError> {
         let mut cmd = std::process::Command::new("xcrun");
 
+        // The source directory must end in a slash to ensure its contents
+        // are copied rather than the directory itself. `Path` cannot have
+        // trailing slashes, so we go the `OsString` route.
+        let mut from = self.platform_bundle_dir
+            .as_os_str()
+            .to_owned();
+        from.push("/");
+
         cmd.arg("cp");
         cmd.arg("-r");
         cmd.arg("--");
-        cmd.arg(&self.platform_bundle_dir);
+        cmd.arg(&from);
         cmd.arg(&self.bundle_dir);
 
         cmd.stderr(std::process::Stdio::inherit());
