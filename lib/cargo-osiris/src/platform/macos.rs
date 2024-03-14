@@ -444,6 +444,21 @@ impl<'ctx> Direct<'ctx> {
                             .join(&self.build.op.config.id_symbol),
                         &artifact,
                     );
+                } else if artifact.package_id == self.build.op.cargo_metadata.package_id {
+                    // XXX: We build with `--crate-type bin`, thus only a
+                    //      single binary artifact is produced for the main
+                    //      package. We can use this reliably as main
+                    //      executable.
+                    //
+                    //      Unfortunately, Cargo does not report executable
+                    //      paths for modified crate-types. Hopefully, this
+                    //      will be fixed in the future. PR filed.
+                    keep(
+                        false,
+                        &std::path::Path::new("Contents/MacOS")
+                            .join(&self.build.op.config.id_symbol),
+                        &artifact,
+                    );
                 } else if artifact.is_executable {
                     // Place helper executables in `Contents/Helpers` without
                     // any hierarchy. Retain the helper name.
