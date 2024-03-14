@@ -10,6 +10,7 @@ mod actool;
 mod codesign;
 mod lipo;
 mod plistbuddy;
+mod productbuild;
 
 pub enum ErrorBuild {
     /// Unsupported target ABI for the macOS platform.
