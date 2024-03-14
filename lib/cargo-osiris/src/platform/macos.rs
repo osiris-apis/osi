@@ -500,10 +500,10 @@ impl<'ctx> Direct<'ctx> {
         // Copy the icons into the xcassets directory.
         for (_, icons) in &self.icons {
             let icon = icons.first().expect("Application icons must have paths");
-            let from = std::path::Path::new(icon);
+            let from = self.build.op.config.path_application.join(icon);
             let file_name = from.file_name().expect("Icon paths must have file-names");
             let to = self.xcassets_appicon_dir.join(file_name);
-            op::copy_file(from, &to)?;
+            op::copy_file(&from, &to)?;
         }
 
         actool::CompileQuery {
