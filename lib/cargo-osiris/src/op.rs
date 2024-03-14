@@ -36,6 +36,8 @@ pub enum ArchiveError {
     Uncaught(lib::error::Uncaught),
     /// File system errors
     FileSystem(ErrorFileSystem),
+    /// Process execution errors
+    Process(ErrorProcess),
 }
 
 /// ## Build Errors
@@ -276,6 +278,8 @@ impl<'ctx> Archive<'ctx> {
         let path_archive = Self::path_for(self.config, self.archive);
         mkdir(path_archive.as_path())?;
 
+        // Provide the platform directory to the operation.
+        let path_platform = Build::path_for(self.config, self.platform);
 
         // Invoke the platform-dependent handler
         match self.archive.configuration {
@@ -284,6 +288,7 @@ impl<'ctx> Archive<'ctx> {
                     self,
                     v,
                     &path_archive,
+                    &path_platform,
                 )
             },
         }
@@ -373,6 +378,12 @@ impl From<lib::error::Uncaught> for ArchiveError {
 impl From<ErrorFileSystem> for ArchiveError {
     fn from(v: ErrorFileSystem) -> Self {
         Self::FileSystem(v)
+    }
+}
+
+impl From<ErrorProcess> for ArchiveError {
+    fn from(v: ErrorProcess) -> Self {
+        Self::Process(v)
     }
 }
 

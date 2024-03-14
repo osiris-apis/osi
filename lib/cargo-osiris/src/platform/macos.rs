@@ -24,9 +24,19 @@ pub enum ErrorBuild {
 
 struct ArchivePkg<'ctx> {
     // Configuration
-    pub build_dir: &'ctx std::path::Path,
+    pub archive_dir: &'ctx std::path::Path,
     pub macos_pkg: &'ctx config::ConfigArchiveMacosPkg,
     pub op: &'ctx op::Archive<'ctx>,
+    pub platform_dir: &'ctx std::path::Path,
+
+    // Build directories
+    pub artifact_dir: std::path::PathBuf,
+    pub bundle_dir: std::path::PathBuf,
+    pub platform_bundle_dir: std::path::PathBuf,
+
+    // Artifact files
+    pub bundle_entitlements_file: std::path::PathBuf,
+    pub pkg_file: std::path::PathBuf,
 }
 
 struct Build<'ctx> {
@@ -64,16 +74,123 @@ impl<'ctx> ArchivePkg<'ctx> {
     pub fn new(
         op: &'ctx op::Archive<'ctx>,
         macos_pkg: &'ctx config::ConfigArchiveMacosPkg,
-        build_dir: &'ctx std::path::Path,
+        archive_dir: &'ctx std::path::Path,
+        platform_dir: &'ctx std::path::Path,
     ) -> Self {
+        let v_artifact_dir = archive_dir.join("artifacts");
+        let v_bundle_dir = archive_dir.join(format!("{}.app", op.config.id_symbol));
+        let v_platform_bundle_dir = platform_dir.join(format!("{}.app", op.config.id_symbol));
+
+        let v_bundle_entitlements_file = v_artifact_dir.join("bundle.entitlements.plist");
+        let v_pkg_file = platform_dir.join(format!("{}.pkg", op.config.id_symbol));
+
         Self {
-            build_dir: build_dir,
+            archive_dir: archive_dir,
             macos_pkg: macos_pkg,
             op: op,
+            platform_dir: platform_dir,
+
+            artifact_dir: v_artifact_dir,
+            bundle_dir: v_bundle_dir,
+            platform_bundle_dir: v_platform_bundle_dir,
+
+            bundle_entitlements_file: v_bundle_entitlements_file,
+            pkg_file: v_pkg_file,
         }
     }
 
+    fn prepare_bundle_entitlements(&self) -> &str {
+        concat!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>"#, "\n",
+            r#"<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">"#, "\n",
+            r#"<plist version="1.0">"#, "\n",
+            r#"  <dict>"#, "\n",
+            r#"    <key>com.apple.security.app-sandbox</key>"#, "\n",
+            r#"    <true/>"#, "\n",
+            r#"  </dict>"#, "\n",
+            r#"</plist>"#, "\n",
+        )
+    }
+
+    fn prepare(&self) -> Result<(), op::ArchiveError> {
+        // Delete previous artifacts if re-use is not possible.
+        op::rmdir(&self.bundle_dir)?;
+
+        // Create build directories
+        op::mkdir(&self.artifact_dir)?;
+        op::mkdir(&self.bundle_dir)?;
+
+        // Emerge configuration files
+        op::update_file(
+            self.bundle_entitlements_file.as_path(),
+            self.prepare_bundle_entitlements().as_bytes(),
+        )?;
+
+        Ok(())
+    }
+
+    fn import(&self) -> Result<(), op::ArchiveError> {
+        let mut cmd = std::process::Command::new("xcrun");
+
+        cmd.arg("cp");
+        cmd.arg("-r");
+        cmd.arg("--");
+        cmd.arg(&self.platform_bundle_dir);
+        cmd.arg(&self.bundle_dir);
+
+        cmd.stderr(std::process::Stdio::inherit());
+        cmd.stdin(std::process::Stdio::null());
+        cmd.stdout(std::process::Stdio::inherit());
+
+        let status = cmd.status()
+            .map_err(|io| op::ErrorProcess::Exec { name: "cp".into(), io })?;
+        if !status.success() {
+            return Err(op::ErrorProcess::Exit { name: "cp".into(), code: status }.into());
+        }
+
+        Ok(())
+    }
+
+    fn codesign(&self) -> Result<(), op::ArchiveError> {
+        let Some(ref sign_identity) = self.macos_pkg.codesign_identity else {
+            return Ok(());
+        };
+
+        codesign::SignQuery {
+            entitlements: Some(&self.bundle_entitlements_file),
+            force: false,
+            identity: &sign_identity,
+            options: Some([
+                codesign::SignOption::Runtime,
+            ].iter().copied()),
+            paths: [
+                &self.bundle_dir
+            ].iter(),
+            requirements: None,
+            timestamp: Some(true),
+        }.run()?;
+
+        Ok(())
+    }
+
+    fn productbuild(&self) -> Result<(), op::ArchiveError> {
+        productbuild::BuildQuery {
+            components: [
+                (self.bundle_dir.as_path(), std::path::Path::new("/Applications")),
+            ].iter(),
+            identity: self.macos_pkg.pkgsign_identity.as_deref(),
+            output_file: &self.pkg_file,
+        }.run()?;
+
+        Ok(())
+    }
+
     pub fn run(&self) -> Result<(), op::ArchiveError> {
+        self.prepare()?;
+        self.import()?;
+        self.codesign()?;
+        self.productbuild()?;
+
         Ok(())
     }
 }
@@ -582,12 +699,14 @@ impl<'ctx> Direct<'ctx> {
 pub fn archive_pkg(
     op: &op::Archive,
     macos_pkg: &config::ConfigArchiveMacosPkg,
-    build_dir: &std::path::Path,
+    archive_dir: &std::path::Path,
+    platform_dir: &std::path::Path,
 ) -> Result<(), op::ArchiveError> {
     let archive = ArchivePkg::new(
         op,
         macos_pkg,
-        build_dir,
+        archive_dir,
+        platform_dir,
     );
 
     archive.run()
