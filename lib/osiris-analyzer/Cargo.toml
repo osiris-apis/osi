@@ -27,7 +27,6 @@ android.kotlin.source-dirs = ["src/platform/android/java"]
 android.manifest-file = "src/platform/android/AndroidManifest.xml"
 android.resource-dirs = ["src/platform/android/res"]
 
-osiris.version = 1
 osiris.application.id = "OsirisAnalyzer"
 osiris.application.name = "Osiris Apis Analyzer"
 
