@@ -174,12 +174,13 @@ pub fn cargo_osiris() -> std::process::ExitCode {
         fn run(&self) -> Result<(), u8> {
             use crate::lib::args::{Flag, Value};
 
-            let this = this::This::from_ambient();
+            let mut this = this::This::from_ambient();
 
             let args = std::env::args_os().skip(1).collect::<Vec<std::ffi::OsString>>();
 
             let v_archive: core::cell::RefCell<Option<String>> = Default::default();
             let v_help = lib::args::Help::new();
+            let v_display: core::cell::RefCell<Option<String>> = Default::default();
             let v_platform: core::cell::RefCell<Option<String>> = Default::default();
             let v_verbose: core::cell::RefCell<Option<bool>> = Default::default();
 
@@ -219,6 +220,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                 Flag::with_name("target-dir", Value::Parse(&v_target_dir), Some("Path to the target directory")),
             ]);
             let flags_root = lib::args::FlagList::with([
+                Flag::with_name("display", Value::Parse(&v_display), Some("Select display mode")),
                 Flag::with_name("help", Value::Set(&v_help), Some("Show usage information")),
             ]);
 
@@ -242,6 +244,17 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                 args.iter().map(|v| lib::compat::OsStr::from_osstr(v.as_os_str())),
                 &root,
             );
+
+            // Honor the selected display mode early, to apply it to error
+            // displays if possible.
+            let opt = v_display.borrow().as_ref().map(
+                |v| this::DisplayOption::from_string(&v)
+                    .ok_or_else(|| {
+                        this.display().error(&core::format_args!("invalid display mode `{}`", v));
+                        2
+                    }),
+            ).transpose()?;
+            this.set_display_option(opt);
 
             let mut fmt_stderr = lib::compat::Write(std::io::stderr().lock());
             let mut fmt_stdout = lib::compat::Write(std::io::stderr().lock());
