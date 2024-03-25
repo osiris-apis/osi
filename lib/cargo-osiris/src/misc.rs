@@ -85,6 +85,72 @@ pub fn escape_xml_pcdata(input: &str) -> String {
     v
 }
 
+/// Reduce a line of text to a fixed width, highlighting a selected range. Use
+/// it to reduce overlong lines when displaying on a limited device.
+///
+/// This will split the line into 2 sections, possibly stripping text before,
+/// between, and after the sections. The sections will be positioned to show
+/// the start and end of the highlighted region, plus leading and trailing
+/// context. If possible, the highlighted region is preserved in whole.
+pub fn ellipse(
+    line: &str,
+    mut range: core::ops::Range<usize>,
+    width: usize,
+) -> (core::ops::Range<usize>, core::ops::Range<usize>) {
+    let n_line = line.len();
+
+    // Normalize the range to avoid overflows in arithmetic.
+    if range.start > n_line {
+        range.start = n_line;
+    }
+    if range.end > n_line {
+        range.end = n_line;
+    }
+    if range.start > range.end {
+        range.start = range.end;
+    }
+    let n_range = range.end - range.start;
+
+    // Divide the window into zones, where the first and last quarters are
+    // reserved for leading and trailing context, and the center half is used
+    // for the highlighted region.
+    // The divide is arbitrary, but seems to work well. If needed, this can be
+    // turned into a function argument.
+    let zone = width / 4;
+
+    // Set zone-based borders left and right, which mark where leading and
+    // trailing context is capped.
+    let mut border_left = range.start.saturating_sub(zone);
+    let mut border_right = core::cmp::min(range.end.saturating_add(zone), n_line);
+
+    // Increase leading context if we have enough space.
+    let rem = width.saturating_sub(border_right.saturating_sub(border_left));
+    let n = core::cmp::min(border_left, rem);
+    border_left -= n;
+
+    // Increase trailing context if we still have enough space.
+    let rem = rem - n;
+    let n = core::cmp::min(n_line.saturating_sub(border_right), rem);
+    border_right += n;
+
+    // If we do not have enough space, create a cut in the center, using some
+    // approximation of a golden-ratio.
+    let n = border_right.saturating_sub(border_left).saturating_sub(width);
+    let cut_left = range.start + (n_range.saturating_mul(618) / 1000);
+    let cut_right = cut_left + n;
+
+    (
+        core::ops::Range {
+            start: border_left,
+            end: cut_left,
+        },
+        core::ops::Range {
+            start: cut_right,
+            end: border_right,
+        },
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
