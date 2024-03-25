@@ -25,7 +25,8 @@ osiris-windows = { path = "./lib/osiris-windows" }
 proc-macro2 = { version = "1.0" }
 quote = { version = "1.0" }
 syn = { version = "2.0" }
-windows = { version = "0.51" }
+windows = { version = "0.54" }
+windows-sys = { version = "0.52" }
 
 [workspace.package]
 categories = [
