@@ -26,3 +26,10 @@ rust-version.workspace = true
 [dependencies]
 osi-lib = { features = ["std"], workspace = true }
 serde_json = { version = "1.0.106", features = ["arbitrary_precision", "float_roundtrip"] }
+
+[target.'cfg(target_os = "windows")'.dependencies.windows-sys]
+workspace = true
+features = [
+        "Win32_Foundation",
+        "Win32_System_Console",
+]

@@ -18,6 +18,7 @@
 #![allow(dead_code)]
 
 mod cargo;
+mod con;
 mod config;
 mod exe;
 mod md;
