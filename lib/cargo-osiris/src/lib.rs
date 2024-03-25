@@ -24,6 +24,7 @@ mod md;
 mod misc;
 mod op;
 mod platform;
+mod this;
 
 use osi_lib as lib;
 

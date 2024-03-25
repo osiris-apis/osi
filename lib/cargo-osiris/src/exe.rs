@@ -7,7 +7,7 @@
 //! operations exposed by the library. This module does not implement any of
 //! the operations, but merely uses the APIs from the library.
 
-use crate::{cargo, config, lib, op};
+use crate::{cargo, config, lib, op, this};
 
 /// Application entry-point of cargo-osiris.
 ///
@@ -174,7 +174,7 @@ pub fn cargo_osiris() -> std::process::ExitCode {
         fn run(&self) -> Result<(), u8> {
             use crate::lib::args::{Flag, Value};
 
-            let cwd = std::env::current_dir().expect("Current working directory must be available");
+            let this = this::This::from_ambient();
 
             let args = std::env::args_os().skip(1).collect::<Vec<std::ffi::OsString>>();
 
@@ -285,11 +285,11 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                         features: v_features.borrow().iter().map(|v| (*v).into()).collect(),
                         frozen: *v_frozen.borrow(),
                         manifest_path: v_manifest_path.borrow().as_ref()
-                            .map(|v| cwd.join(v)),
+                            .map(|v| this.workdir().join(v)),
                         package: v_package.borrow().clone(),
                         profile: v_profile.borrow().clone(),
                         target_dir: v_target_dir.borrow().as_ref()
-                            .map(|v| cwd.join(v)),
+                            .map(|v| this.workdir().join(v)),
                     },
                 ),
                 Cmd::Build => self.op_build(
@@ -300,11 +300,11 @@ pub fn cargo_osiris() -> std::process::ExitCode {
                         features: v_features.borrow().iter().map(|v| (*v).into()).collect(),
                         frozen: *v_frozen.borrow(),
                         manifest_path: v_manifest_path.borrow().as_ref()
-                            .map(|v| cwd.join(v)),
+                            .map(|v| this.workdir().join(v)),
                         package: v_package.borrow().clone(),
                         profile: v_profile.borrow().clone(),
                         target_dir: v_target_dir.borrow().as_ref()
-                            .map(|v| cwd.join(v)),
+                            .map(|v| this.workdir().join(v)),
                     },
                 ),
             }
