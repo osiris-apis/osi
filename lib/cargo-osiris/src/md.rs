@@ -57,9 +57,11 @@ pub struct OsirisApplication {
 /// Archive configuration for macOS PKGs
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct OsirisArchiveMacosPkg {
+    pub app_id: Option<String>,
     pub codesign_identity: Option<String>,
     pub pkgsign_identity: Option<String>,
     pub provision_file: Option<String>,
+    pub team_id: Option<String>,
 }
 
 /// Archive configuration specific to a platform
@@ -272,14 +274,18 @@ pub fn u32_from_json<'json>(
 fn osiris_archive_macos_pkg_from_json(
     json: &serde_json::Value,
 ) -> Result<OsirisArchiveMacosPkg, OsirisError> {
+    let v_app_id = str_from_json(json, "app-id", "osiris.archives.[].macos-pkg")?;
     let v_codesign_identity = str_from_json(json, "codesign-identity", "osiris.archives.[].macos-pkg")?;
     let v_pkgsign_identity = str_from_json(json, "pkgsign-identity", "osiris.archives.[].macos-pkg")?;
     let v_provision_file = str_from_json(json, "provision-file", "osiris.archives.[].macos-pkg")?;
+    let v_team_id = str_from_json(json, "team-id", "osiris.archives.[].macos-pkg")?;
 
     Ok(OsirisArchiveMacosPkg {
+        app_id: v_app_id.map(|v| v.into()),
         codesign_identity: v_codesign_identity.map(|v| v.into()),
         pkgsign_identity: v_pkgsign_identity.map(|v| v.into()),
         provision_file: v_provision_file.map(|v| v.into()),
+        team_id: v_team_id.map(|v| v.into()),
     })
 }
 

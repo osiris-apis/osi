@@ -37,9 +37,11 @@ pub struct ConfigIcon {
 
 /// Archive configuration for macOS pkgs
 pub struct ConfigArchiveMacosPkg {
+    pub app_id: Option<String>,
     pub codesign_identity: Option<String>,
     pub pkgsign_identity: Option<String>,
     pub provision_file: Option<std::path::PathBuf>,
+    pub team_id: Option<String>,
 }
 
 /// Union for format-specific archive configuration
@@ -155,9 +157,11 @@ impl Config {
 
                 configuration: ConfigArchiveConfiguration::MacosPkg(
                     ConfigArchiveMacosPkg {
+                        app_id: None,
                         codesign_identity: None,
                         pkgsign_identity: None,
                         provision_file: None,
+                        team_id: None,
                     },
                 ),
             },
@@ -231,18 +235,22 @@ impl Config {
                 Err(Error::MissingKey(".archives.[].<type>"))
             },
             Some(md::OsirisArchiveConfiguration::MacosPkg(data_macos)) => {
+                let v_app_id = data_macos.app_id.clone();
                 let v_codesign_identity = data_macos.codesign_identity.clone();
                 let v_pkgsign_identity = data_macos.pkgsign_identity.clone();
                 let v_provision_file = data_macos.provision_file.as_ref().map(
                     |v| self.path_application.join(v),
                 );
+                let v_team_id = data_macos.team_id.clone();
 
                 Ok(
                     ConfigArchiveConfiguration::MacosPkg(
                         ConfigArchiveMacosPkg {
+                            app_id: v_app_id,
                             codesign_identity: v_codesign_identity,
                             pkgsign_identity: v_pkgsign_identity,
                             provision_file: v_provision_file,
+                            team_id: v_team_id,
                         }
                     )
                 )

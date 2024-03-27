@@ -3,7 +3,7 @@
 //! This module implements application bundles for the macOS platform. It
 //! supports direct builds via the XCode tools.
 
-use crate::{cargo, config, op};
+use crate::{cargo, config, misc, op};
 use std::collections::BTreeMap;
 
 mod actool;
@@ -100,17 +100,63 @@ impl<'ctx> ArchivePkg<'ctx> {
         }
     }
 
-    fn prepare_bundle_entitlements(&self) -> &str {
-        concat!(
-            r#"<?xml version="1.0" encoding="UTF-8"?>"#, "\n",
-            r#"<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">"#, "\n",
-            r#"<plist version="1.0">"#, "\n",
-            r#"  <dict>"#, "\n",
-            r#"    <key>com.apple.security.app-sandbox</key>"#, "\n",
-            r#"    <true/>"#, "\n",
-            r#"  </dict>"#, "\n",
-            r#"</plist>"#, "\n",
-        )
+    fn prepare_bundle_entitlements(&self) -> String {
+        let mut acc = String::new();
+
+        acc = format!(
+            concat!(
+                r#"{}"#,
+                r#"<?xml version="1.0" encoding="UTF-8"?>"#, "\n",
+                r#"<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">"#, "\n",
+                r#"<plist version="1.0">"#, "\n",
+                r#"  <dict>"#, "\n",
+            ),
+            acc,
+        );
+
+        acc = format!(
+            concat!(
+                r#"{}"#,
+                r#"    <key>com.apple.security.app-sandbox</key>"#, "\n",
+                r#"    <true/>"#, "\n",
+            ),
+            acc,
+        );
+
+        if let Some(ref v) = self.macos_pkg.app_id {
+            acc = format!(
+                concat!(
+                    r#"{}"#,
+                    r#"    <key>com.apple.application-identifier</key>"#, "\n",
+                    r#"    <string>{}</string>"#, "\n",
+                ),
+                acc,
+                misc::escape_xml_pcdata(v),
+            );
+        }
+
+        if let Some(ref v) = self.macos_pkg.team_id {
+            acc = format!(
+                concat!(
+                    r#"{}"#,
+                    r#"    <key>com.apple.developer.team-identifier</key>"#, "\n",
+                    r#"    <string>{}</string>"#, "\n",
+                ),
+                acc,
+                misc::escape_xml_pcdata(v),
+            );
+        }
+
+        acc = format!(
+            concat!(
+                r#"{}"#,
+                r#"  </dict>"#, "\n",
+                r#"</plist>"#, "\n",
+            ),
+            acc,
+        );
+
+        acc
     }
 
     fn prepare(&self) -> Result<(), op::ArchiveError> {
