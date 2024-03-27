@@ -151,12 +151,12 @@ impl Device {
                     &mut info,
                 ) == 0)
                     .then_some(())
-                    .expect("display console must be introspectable")
+                    .expect("display console must be introspectable");
             }
 
             Self::Wincon {
                 stream: stream,
-                width: 80,
+                width: info.srWindow.Right.saturated_sub(info.srWindow.Left),
                 attr_fg: (info.wAttributes & 0x0f),
                 attr_bg: (info.wAttributes & 0xf0),
             }
