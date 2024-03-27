@@ -59,6 +59,7 @@ struct Direct<'ctx> {
 
     // Artifact files
     pub bundle_plist_file: std::path::PathBuf,
+    pub bundle_pkginfo_file: std::path::PathBuf,
     pub xcassets_contents_file: std::path::PathBuf,
     pub xcassets_contents_accentcolor_file: std::path::PathBuf,
     pub xcassets_contents_appicon_file: std::path::PathBuf,
@@ -254,6 +255,7 @@ impl<'ctx> Build<'ctx> {
         let v_xcassets_appicon_dir = v_xcassets_dir.join("AppIcon.appiconset");
 
         let v_bundle_plist_file = v_artifact_dir.join("package.plist");
+        let v_bundle_pkginfo_file = v_artifact_dir.join("PkgInfo");
         let v_xcassets_contents_file = v_xcassets_dir.join("Contents.json");
         let v_xcassets_contents_accentcolor_file = v_xcassets_accentcolor_dir.join("Contents.json");
         let v_xcassets_contents_appicon_file = v_xcassets_appicon_dir.join("Contents.json");
@@ -273,6 +275,7 @@ impl<'ctx> Build<'ctx> {
             xcassets_appicon_dir: v_xcassets_appicon_dir,
 
             bundle_plist_file: v_bundle_plist_file,
+            bundle_pkginfo_file: v_bundle_pkginfo_file,
             xcassets_contents_file: v_xcassets_contents_file,
             xcassets_contents_accentcolor_file: v_xcassets_contents_accentcolor_file,
             xcassets_contents_appicon_file: v_xcassets_contents_appicon_file,
@@ -312,6 +315,8 @@ impl<'ctx> Direct<'ctx> {
                 r#"    </array>"#, "\n",
                 r#"    <key>CFBundlePackageType</key>"#, "\n",
                 r#"    <string>APPL</string>"#, "\n",
+                r#"    <key>CFBundleSignature</key>"#, "\n",
+                r#"    <string>????</string>"#, "\n",
                 "\n",
                 r#"    <key>LSApplicationCategoryType</key>"#, "\n",
                 r#"    <string>{}</string>"#, "\n",
@@ -330,6 +335,10 @@ impl<'ctx> Direct<'ctx> {
             &self.build.macos.category,
             &self.build.macos.min_os,
         )
+    }
+
+    fn prepare_bundle_pkginfo(&self) -> String {
+        "APPL????".into()
     }
 
     fn prepare_xcassets_contents(&self) -> String {
@@ -453,6 +462,10 @@ impl<'ctx> Direct<'ctx> {
         op::update_file(
             self.bundle_plist_file.as_path(),
             self.prepare_bundle_plist().as_bytes(),
+        )?;
+        op::update_file(
+            self.bundle_pkginfo_file.as_path(),
+            self.prepare_bundle_pkginfo().as_bytes(),
         )?;
         op::update_file(
             self.xcassets_contents_file.as_path(),
@@ -677,6 +690,10 @@ impl<'ctx> Direct<'ctx> {
             path.push("Info.plist");
             info_plist = path.clone();
             op::copy_file(&self.bundle_plist_file, &info_plist)?;
+            path.pop();
+
+            path.push("PkgInfo");
+            op::copy_file(&self.bundle_pkginfo_file, &path)?;
             path.pop();
 
             path.push("Resources");
