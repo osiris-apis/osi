@@ -62,7 +62,56 @@ impl Device {
     }
 
     fn new_ansi(stream: std::io::Stderr) -> Self {
-        Self::Ansi { stream: stream, width: 80 }
+        #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+        {
+            Self::Ansi {
+                stream: stream,
+                width: 80,
+            }
+        }
+
+        #[cfg(all(target_os = "linux", target_env = "gnu"))]
+        {
+            // Query the display console for window dimensions and remember the
+            // width. This is used to ellipse text and adapt to horizontal
+            // restrictions.
+            // Note that we do not listen for `SIGWINCH` but expect the
+            // dimensions to be static for the lifetime of this module.
+
+            const TIOCGWINSZ: usize = 0x5413;
+
+            #[repr(C)]
+            struct winsize {
+                pub ws_row: u16,
+                pub ws_col: u16,
+                pub ws_xpixel: u16,
+                pub ws_ypixel: u16,
+            }
+
+            extern "C" {
+                fn ioctl(fd: u32, io: usize, ...) -> u32;
+            }
+
+            let fd = std::os::fd::AsFd::as_fd(&stream);
+
+            let mut info = winsize {
+                ws_row: 0,
+                ws_col: 0,
+                ws_xpixel: 0,
+                ws_ypixel: 0,
+            };
+
+            unsafe {
+                (ioctl(core::mem::transmute(fd), TIOCGWINSZ, &mut info) == 0)
+                    .then_some(())
+                    .expect("display console must be introspectable");
+            }
+
+            Self::Ansi {
+                stream: stream,
+                width: info.ws_col as usize,
+            }
+        }
     }
 
     fn new_wincon(stream: std::io::Stderr) -> Self {
