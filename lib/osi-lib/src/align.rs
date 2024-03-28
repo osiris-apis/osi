@@ -34,8 +34,6 @@
 //! names of builtin primitive integer types, which use bits for historic
 //! reasons.
 
-use crate::dd;
-
 /// ## A 1-byte (8-bit) aligned ZST
 ///
 /// This type can be used to align structures to at least 1-byte by
@@ -147,8 +145,6 @@ pub unsafe trait Aligned {
 /// This type can be used to align structures to at least the alignment given
 /// as `BYTES` by embedding it in the structure. It works similar to other
 /// phantom-marker types.
-#[dd::derive(dd::Clone, dd::Copy, dd::Debug, dd::Default, dd::Hash)]
-#[dd::derive(dd::Eq, dd::Ord, dd::PartialEq, dd::PartialOrd)]
 #[repr(transparent)]
 pub struct AlignAs<const BYTES: usize>(
     <Self as Aligned>::Align,
@@ -159,8 +155,6 @@ pub struct AlignAs<const BYTES: usize>(
 /// This type can be used to align structures to at least the alignment of the
 /// type `Of` by embedding it in the structure. It works similar to other
 /// phantom-marker types.
-#[dd::derive(dd::Clone, dd::Copy, dd::Debug, dd::Default, dd::Hash)]
-#[dd::derive(dd::Eq, dd::Ord, dd::PartialEq, dd::PartialOrd)]
 #[repr(transparent)]
 pub struct AlignOf<Of>(
     Of::Align,
@@ -215,6 +209,184 @@ unsafe impl<T> Aligned for &T { type Align = AlignNative; }
 unsafe impl<T> Aligned for &mut T { type Align = AlignNative; }
 unsafe impl<T> Aligned for *const T { type Align = AlignNative; }
 unsafe impl<T> Aligned for *mut T { type Align = AlignNative; }
+
+impl<const BYTES: usize> core::clone::Clone for AlignAs<BYTES>
+where
+    Self: Aligned,
+    <Self as Aligned>::Align: core::clone::Clone,
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<const BYTES: usize> core::marker::Copy for AlignAs<BYTES>
+where
+    Self: Aligned,
+    <Self as Aligned>::Align: core::marker::Copy,
+{
+}
+
+impl<const BYTES: usize> core::fmt::Debug for AlignAs<BYTES>
+where
+    Self: Aligned,
+    <Self as Aligned>::Align: core::fmt::Debug,
+{
+    fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+        fmt.debug_tuple("AlignAs")
+            .field(&self.0)
+            .finish()
+    }
+}
+
+impl<const BYTES: usize> core::default::Default for AlignAs<BYTES>
+where
+    Self: Aligned,
+    <Self as Aligned>::Align: core::default::Default,
+{
+    fn default() -> Self {
+        Self(core::default::Default::default())
+    }
+}
+
+impl<const BYTES: usize> core::hash::Hash for AlignAs<BYTES>
+where
+    Self: Aligned,
+    <Self as Aligned>::Align: core::hash::Hash,
+{
+    fn hash<Op>(&self, state: &mut Op)
+    where
+        Op: core::hash::Hasher,
+    {
+        self.0.hash(state)
+    }
+}
+
+impl<const BYTES: usize> core::cmp::Eq for AlignAs<BYTES>
+where
+    Self: Aligned,
+    <Self as Aligned>::Align: core::cmp::Eq,
+{
+}
+
+impl<const BYTES: usize> core::cmp::Ord for AlignAs<BYTES>
+where
+    Self: Aligned,
+    <Self as Aligned>::Align: core::cmp::Ord,
+{
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        <_ as core::cmp::Ord>::cmp(&self.0, &other.0)
+    }
+}
+
+impl<const BYTES: usize> core::cmp::PartialEq for AlignAs<BYTES>
+where
+    Self: Aligned,
+    <Self as Aligned>::Align: core::cmp::PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        <_ as core::cmp::PartialEq>::eq(&self.0, &other.0)
+    }
+}
+
+impl<const BYTES: usize> core::cmp::PartialOrd for AlignAs<BYTES>
+where
+    Self: Aligned,
+    <Self as Aligned>::Align: core::cmp::PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        <_ as core::cmp::PartialOrd>::partial_cmp(&self.0, &other.0)
+    }
+}
+
+impl<Of> core::clone::Clone for AlignOf<Of>
+where
+    Of: Aligned + ?Sized,
+    Of::Align: core::clone::Clone,
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<Of> core::marker::Copy for AlignOf<Of>
+where
+    Of: Aligned + ?Sized,
+    Of::Align: core::marker::Copy,
+{
+}
+
+impl<Of> core::fmt::Debug for AlignOf<Of>
+where
+    Of: Aligned + ?Sized,
+    Of::Align: core::fmt::Debug,
+{
+    fn fmt(&self, fmt: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+        fmt.debug_tuple("AlignAs")
+            .field(&self.0)
+            .finish()
+    }
+}
+
+impl<Of> core::default::Default for AlignOf<Of>
+where
+    Of: Aligned + ?Sized,
+    Of::Align: core::default::Default,
+{
+    fn default() -> Self {
+        Self(core::default::Default::default())
+    }
+}
+
+impl<Of> core::hash::Hash for AlignOf<Of>
+where
+    Of: Aligned + ?Sized,
+    Of::Align: core::hash::Hash,
+{
+    fn hash<Op>(&self, state: &mut Op)
+    where
+        Op: core::hash::Hasher,
+    {
+        self.0.hash(state)
+    }
+}
+
+impl<Of> core::cmp::Eq for AlignOf<Of>
+where
+    Of: Aligned + ?Sized,
+    Of::Align: core::cmp::Eq,
+{
+}
+
+impl<Of> core::cmp::Ord for AlignOf<Of>
+where
+    Of: Aligned + ?Sized,
+    Of::Align: core::cmp::Ord,
+{
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        <_ as core::cmp::Ord>::cmp(&self.0, &other.0)
+    }
+}
+
+impl<Of> core::cmp::PartialEq for AlignOf<Of>
+where
+    Of: Aligned + ?Sized,
+    Of::Align: core::cmp::PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        <_ as core::cmp::PartialEq>::eq(&self.0, &other.0)
+    }
+}
+
+impl<Of> core::cmp::PartialOrd for AlignOf<Of>
+where
+    Of: Aligned + ?Sized,
+    Of::Align: core::cmp::PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        <_ as core::cmp::PartialOrd>::partial_cmp(&self.0, &other.0)
+    }
+}
 
 #[cfg(test)]
 mod tests {
