@@ -19,8 +19,5 @@ readme.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[dependencies]
-osi-derive = { workspace = true }
-
 [features]
 std = []
