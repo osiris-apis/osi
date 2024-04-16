@@ -15,7 +15,7 @@ operating system interfaces from the Rust Programming Language.
 
 The requirements for this project are:
 
- * `rustc >= 1.70`
+ * `rustc >= 1.77`
 
 ### Repository:
 

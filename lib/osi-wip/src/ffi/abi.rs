@@ -295,7 +295,7 @@ impl Abi for Sysv64be {
     type Align2 = align::Align2;
     type Align4 = align::Align4;
     type Align8 = align::Align8;
-    type Align16 = align::Align8;
+    type Align16 = align::Align16;
     type AlignNative = align::Align8;
 
     type Addr = ffi::util::Integer<ffi::util::BigEndian<core::num::NonZeroU64>, Self::AlignNative, core::num::NonZeroU64>;
@@ -337,7 +337,7 @@ impl Abi for Sysv64le {
     type Align2 = align::Align2;
     type Align4 = align::Align4;
     type Align8 = align::Align8;
-    type Align16 = align::Align8;
+    type Align16 = align::Align16;
     type AlignNative = align::Align8;
 
     type Addr = ffi::util::Integer<ffi::util::LittleEndian<core::num::NonZeroU64>, Self::AlignNative, core::num::NonZeroU64>;

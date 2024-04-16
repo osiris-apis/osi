@@ -30,12 +30,8 @@ pub struct AppDelegate {
     base: objc2::runtime::NSObject,
 }
 
-// XXX: Requires rustc-1.77
-#[cfg(any())]
 const _: () = assert!(core::mem::offset_of!(AppDelegate, base) == 0);
 
-// XXX: Requires rustc-1.77
-#[cfg(any())]
 const _: () = assert!(
     core::mem::align_of::<AppDelegateVar>()
     == core::mem::align_of::<u64>()
